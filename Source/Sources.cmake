@@ -27,6 +27,8 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/State/Presets/PluckPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/KeyboardPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/AtmospherePresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/ModernPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/ClassicPresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES

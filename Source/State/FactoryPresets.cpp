@@ -14,13 +14,24 @@ namespace nog::presets
     std::vector<Preset> sequencePresets();
     std::vector<Preset> y2kPresets();
     std::vector<Preset> effectPresets();
+    std::vector<Preset> futureBassPresets();
+    std::vector<Preset> trapPresets();
+    std::vector<Preset> drillPresets();
+    std::vector<Preset> chordPresets();
+    std::vector<Preset> arpPresets();
+    std::vector<Preset> synthwavePresets();
+    std::vector<Preset> orchestralPresets();
+    std::vector<Preset> ambientPresets();
+    std::vector<Preset> houseTechnoPresets();
 
     juce::StringArray categories()
     {
         // The order the browser presents them in: the things most reached for
         // first, then the more specialised ones.
-        return { "Bass", "Lead", "Pluck", "Keys", "Guitar",
-                 "Bell", "Pad", "Sequence", "Y2K", "FX" };
+        return { "Bass", "Lead", "Pluck", "Chords", "Keys", "Guitar",
+                 "Bell", "Pad", "Arp", "Sequence",
+                 "Future Bass", "Trap", "Drill", "House", "Y2K", "Synthwave",
+                 "Strings", "Brass", "Ambient", "FX" };
     }
 
     const std::vector<Preset>& all()
@@ -44,7 +55,16 @@ namespace nog::presets
             append (bellPresets());
             append (padPresets());
             append (sequencePresets());
+            append (chordPresets());
+            append (arpPresets());
+            append (futureBassPresets());
+            append (trapPresets());
+            append (drillPresets());
+            append (houseTechnoPresets());
             append (y2kPresets());
+            append (synthwavePresets());
+            append (orchestralPresets());
+            append (ambientPresets());
             append (effectPresets());
 
             return combined;
