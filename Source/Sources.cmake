@@ -36,6 +36,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/State/Presets/InstrumentPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/CharacterPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/RetroPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/AfroPresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES
