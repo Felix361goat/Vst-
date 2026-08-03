@@ -36,6 +36,9 @@ namespace nog
 
         int getActiveVoiceCount() const noexcept;
 
+        /** Latency the oversampling filters introduce, for the host. */
+        int getLatencySamples() noexcept;
+
         ModMatrix& getModMatrix() noexcept { return matrix; }
 
         /** The effects rack, so the editor can ask an effect what its three
@@ -47,6 +50,24 @@ namespace nog
 
         void handleMidiMessage (const juce::MidiMessage& message);
         void renderVoices (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, double bpm);
+
+        /** Renders every voice, oversampled if the parameter asks for it. */
+        void renderVoicesOversampled (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, double bpm);
+
+        /** Walks the MIDI buffer, rendering the audio between events so each
+            note starts on exactly the sample the host asked for. Event
+            positions are scaled by @p factor when rendering oversampled. */
+        void renderWithMidi (juce::AudioBuffer<float>& target, juce::MidiBuffer& midiMessages,
+                             double bpm, int factor, int hostNumSamples);
+
+        /** The oversampler for the current setting, or nullptr for 1x. */
+        juce::dsp::Oversampling<float>* getActiveOversampler() noexcept;
+
+        /** 1, 2 or 4. */
+        int getOversamplingFactor() noexcept;
+
+        /** Re-prepares the voices for the current oversampling rate. */
+        void prepareVoices();
 
         void startNote (int midiNote, float velocity, int channel);
         void stopNote (int midiNote, int channel);
@@ -64,7 +85,28 @@ namespace nog
 
         std::array<Voice, maxVoices> voices;
 
-        double sampleRate = 44100.0;
+        /** Renders the voices at 2x or 4x before downsampling.
+
+            The filter's drive stage and the distortion effect are both
+            nonlinear, and a nonlinearity generates harmonics above whatever
+            went into it. At the base rate those fold back down as aliasing,
+            which is the metallic edge that separates a cheap-sounding synth
+            from an expensive one. Running the voices faster gives those
+            harmonics somewhere to go before the downsampling filter removes
+            them.
+
+            Two factors are built up front so switching never allocates.
+        */
+        std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, 2> oversamplers;
+
+        /** Rebuilt when the oversampling parameter changes, so the tail of a
+            note is not cut off by the switch. */
+        int currentOversamplingChoice = 0;
+
+        double sampleRate   = 44100.0;
+        int    maxBlockSize = 512;
+        int    numChannels  = 2;
+
         juce::uint64 noteCounter = 0;
 
         // Notes held by the sustain pedal after their key was released.

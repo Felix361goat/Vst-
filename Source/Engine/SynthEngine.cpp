@@ -1,5 +1,7 @@
 #include "Engine/SynthEngine.h"
 
+#include "DSP/WavetableBank.h"
+
 namespace nog
 {
     SynthEngine::SynthEngine (ParameterStore& parametersToUse)
@@ -7,19 +9,80 @@ namespace nog
     {
         monoNoteStack.ensureStorageAllocated (128);
         monoVelocityStack.ensureStorageAllocated (128);
+
+        // Forces the factory wavetables to be synthesised here, on whatever
+        // thread constructs the plugin, rather than on the first audio callback.
+        dsp::WavetableBank::factory();
     }
 
-    void SynthEngine::prepare (double newSampleRate, int maximumBlockSize, int numChannels)
+    int SynthEngine::getOversamplingFactor() noexcept
     {
-        sampleRate = newSampleRate > 0.0 ? newSampleRate : 44100.0;
+        // Choice order: Off, 2x, 4x.
+        switch (parameters.oversampling->getIndex())
+        {
+            case 1:  return 2;
+            case 2:  return 4;
+            default: return 1;
+        }
+    }
+
+    juce::dsp::Oversampling<float>* SynthEngine::getActiveOversampler() noexcept
+    {
+        const auto choice = parameters.oversampling->getIndex();
+
+        if (choice <= 0 || choice > static_cast<int> (oversamplers.size()))
+            return nullptr;
+
+        return oversamplers[static_cast<size_t> (choice - 1)].get();
+    }
+
+    int SynthEngine::getLatencySamples() noexcept
+    {
+        if (auto* oversampler = getActiveOversampler())
+            return juce::roundToInt (oversampler->getLatencyInSamples());
+
+        return 0;
+    }
+
+    void SynthEngine::prepareVoices()
+    {
+        // Voices run at the oversampled rate, so everything inside them - the
+        // oscillators, the filter, the envelope timing - has to be told about it.
+        const auto voiceRate = sampleRate * static_cast<double> (getOversamplingFactor());
 
         for (auto& voice : voices)
-            voice.prepare (sampleRate);
+            voice.prepare (voiceRate);
+    }
 
+    void SynthEngine::prepare (double newSampleRate, int maximumBlockSize, int channels)
+    {
+        sampleRate   = newSampleRate > 0.0 ? newSampleRate : 44100.0;
+        maxBlockSize = juce::jmax (1, maximumBlockSize);
+        numChannels  = juce::jmax (1, channels);
+
+        // Both factors are built here so that changing the setting later never
+        // allocates on the audio thread.
+        for (size_t i = 0; i < oversamplers.size(); ++i)
+        {
+            oversamplers[i] = std::make_unique<juce::dsp::Oversampling<float>> (
+                static_cast<size_t> (numChannels),
+                i + 1,
+                juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
+                true,
+                true);
+
+            oversamplers[i]->initProcessing (static_cast<size_t> (maxBlockSize));
+        }
+
+        currentOversamplingChoice = parameters.oversampling->getIndex();
+        prepareVoices();
+
+        // The effects run at the base rate: the expensive ones gain little from
+        // oversampling, and a reverb at 4x would cost four times as much.
         juce::dsp::ProcessSpec spec;
         spec.sampleRate       = sampleRate;
-        spec.maximumBlockSize = static_cast<juce::uint32> (juce::jmax (1, maximumBlockSize));
-        spec.numChannels      = static_cast<juce::uint32> (juce::jmax (1, numChannels));
+        spec.maximumBlockSize = static_cast<juce::uint32> (maxBlockSize);
+        spec.numChannels      = static_cast<juce::uint32> (numChannels);
 
         effects.prepare (spec);
 
@@ -284,27 +347,88 @@ namespace nog
                 voice.renderNextBlock (buffer, startSample, numSamples, parameters, matrix, bpm);
     }
 
-    void SynthEngine::process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, double bpm)
+    void SynthEngine::renderWithMidi (juce::AudioBuffer<float>& target, juce::MidiBuffer& midiMessages,
+                                      double bpm, int factor, int hostNumSamples)
     {
-        matrix.refresh (parameters);
-
-        const auto numSamples = buffer.getNumSamples();
         auto position = 0;
 
-        // Walk the MIDI buffer, rendering the audio between events so that each
-        // note starts on exactly the sample the host specified.
         for (const auto metadata : midiMessages)
         {
-            const auto eventPosition = juce::jlimit (0, numSamples, metadata.samplePosition);
+            const auto eventPosition = juce::jlimit (0, hostNumSamples, metadata.samplePosition) * factor;
             const auto segment       = eventPosition - position;
 
-            renderVoices (buffer, position, segment, bpm);
+            renderVoices (target, position, segment, bpm);
             position += segment;
 
             handleMidiMessage (metadata.getMessage());
         }
 
-        renderVoices (buffer, position, numSamples - position, bpm);
+        renderVoices (target, position, target.getNumSamples() - position, bpm);
+    }
+
+    void SynthEngine::renderVoicesOversampled (juce::AudioBuffer<float>& buffer,
+                                               juce::MidiBuffer& midiMessages, double bpm)
+    {
+        const auto numSamples = buffer.getNumSamples();
+        auto* oversampler = getActiveOversampler();
+
+        if (oversampler == nullptr)
+        {
+            renderWithMidi (buffer, midiMessages, bpm, 1, numSamples);
+            return;
+        }
+
+        // The synth has no input, so upsampling a cleared buffer just gives a
+        // silent block at the higher rate for the voices to render into.
+        const juce::dsp::AudioBlock<const float> inputBlock (buffer);
+        auto upsampled = oversampler->processSamplesUp (inputBlock);
+
+        const auto channelsToUse = juce::jmin (static_cast<int> (upsampled.getNumChannels()),
+                                               static_cast<int> (buffer.getNumChannels()));
+
+        std::array<float*, 2> channelPointers {};
+
+        for (int channel = 0; channel < channelsToUse && channel < 2; ++channel)
+            channelPointers[static_cast<size_t> (channel)] =
+                upsampled.getChannelPointer (static_cast<size_t> (channel));
+
+        juce::AudioBuffer<float> upsampledBuffer (channelPointers.data(),
+                                                  juce::jmin (channelsToUse, 2),
+                                                  static_cast<int> (upsampled.getNumSamples()));
+
+        renderWithMidi (upsampledBuffer, midiMessages, bpm,
+                        static_cast<int> (oversampler->getOversamplingFactor()), numSamples);
+
+        juce::dsp::AudioBlock<float> outputBlock (buffer);
+        oversampler->processSamplesDown (outputBlock);
+    }
+
+    void SynthEngine::process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, double bpm)
+    {
+        matrix.refresh (parameters);
+
+        // Changing the oversampling factor changes the rate every voice runs
+        // at, so sounding notes are stopped rather than left running at the
+        // wrong speed. Switching this mid-performance is not a normal thing to
+        // do, and re-preparing a voice allocates nothing.
+        const auto choice = parameters.oversampling->getIndex();
+
+        if (choice != currentOversamplingChoice)
+        {
+            currentOversamplingChoice = choice;
+
+            for (auto& voice : voices)
+                voice.reset();
+
+            if (auto* oversampler = getActiveOversampler())
+                oversampler->reset();
+
+            prepareVoices();
+        }
+
+        const auto numSamples = buffer.getNumSamples();
+
+        renderVoicesOversampled (buffer, midiMessages, bpm);
 
         effects.process (buffer, parameters);
 

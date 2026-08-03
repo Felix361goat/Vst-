@@ -3,41 +3,35 @@
 #include <array>
 #include <juce_core/juce_core.h>
 
+#include "DSP/Wavetable.h"
+
 namespace nog::dsp
 {
     /**
-        A unison-capable oscillator with wave morphing and phase warping.
+        A unison wavetable oscillator.
 
-        This is the placeholder that stands in for real wavetable playback. It
-        keeps the full control surface a wavetable oscillator needs - morph
-        position, warp mode and amount, unison voices, detune, blend, stereo
-        width, phase and phase randomisation - but generates its waves
-        analytically from a small fixed bank instead of reading table frames.
+        Reads from a Wavetable owned elsewhere - the tables are immutable and
+        shared between every voice, so the oscillator only holds a pointer.
 
-        Swapping in real wavetables later means replacing sampleForWave() and
-        the meaning of the morph position. Everything around it, including the
-        modulation wiring and the entire parameter surface, stays as it is.
+        Each unison voice picks its own mip level from its own detuned
+        frequency, which is what keeps a wide detuned stack clean: the voices at
+        the top of the spread are band-limited harder than the ones at the
+        bottom, exactly as they should be.
 
-        Saw and pulse shapes are band-limited with PolyBLEP, and morphing
-        crossfades between already-band-limited outputs, so the placeholder is
-        clean enough to judge patches by.
+        Warp applies a distortion to the phase before the table is read, so
+        every mode works on every table.
     */
     class Oscillator
     {
     public:
-        // Order must match params::choices::waveforms().
-        enum class Wave { Sine = 0, Triangle, Saw, Square, Pulse, NoiseTable };
-
         // Order must match params::choices::warpModes().
         enum class Warp { Off = 0, Sync, BendPlus, BendMinus, Pwm, Mirror, Asymmetric, Quantize };
 
-        static constexpr int numWaves      = 6;
-        static constexpr int maxUnison     = 16;
+        static constexpr int maxUnison = 16;
 
         struct Settings
         {
-            int   wave         = 0;
-            float morph        = 0.0f;   // 0..1, position across the wave bank
+            float morph        = 0.0f;   // 0..1 across the table's frames
             int   warpMode     = 0;
             float warpAmount   = 0.0f;   // 0..1
             int   unisonVoices = 1;      // 1..maxUnison
@@ -58,7 +52,15 @@ namespace nog::dsp
         /** Seeds the unison phases for a new note. */
         void noteOn() noexcept;
 
-        void setSettings (const Settings& s) noexcept { settings = s; }
+        /** The table to read. Not owned; must outlive the oscillator. */
+        void setTable (const Wavetable* newTable) noexcept { table = newTable; }
+
+        void setSettings (const Settings& s) noexcept
+        {
+            settings = s;
+            layoutDirty = true;
+        }
+
         void setFrequency (float hz) noexcept { frequency = juce::jmax (0.0f, hz); }
 
         /** Adds this oscillator's output into @p left and @p right.
@@ -77,29 +79,27 @@ namespace nog::dsp
             float  gainRight   = 0.0f;
         };
 
-        /** Recomputes detune ratios and per-voice panning. Cheap enough to run
-            once per sample block, which is how the voice drives it. */
+        /** Recomputes detune ratios and per-voice panning. Only runs when the
+            settings have actually changed - it costs a handful of transcendental
+            calls per unison voice, which is far too much to pay per sample. */
         void updateUnisonLayout() noexcept;
 
-        /** One band-limited sample of a single wave from the bank. */
-        float sampleForWave (int waveIndex, double phase, double increment) const noexcept;
-
-        /** The morphed wave: a crossfade between two adjacent bank entries. */
-        float morphedSample (double phase, double increment) const noexcept;
-
-        /** Applies the selected warp and returns the resulting sample. */
+        /** Reads the table at @p phase, applying the selected warp. */
         float warpedSample (double phase, double increment) const noexcept;
 
-        static float polyBlep (double t, double dt) noexcept;
-        static float noiseTableSample (double phase) noexcept;
+        float readTable (double phase, double increment) const noexcept;
 
-        double      sampleRate = 44100.0;
-        float       frequency  = 440.0f;
-        Settings    settings;
+        const Wavetable* table = nullptr;
+
+        double   sampleRate = 44100.0;
+        float    frequency  = 440.0f;
+        Settings settings;
 
         std::array<UnisonVoice, maxUnison> unison {};
         int          activeUnisonVoices = 1;
         float        unisonNormalise    = 1.0f;
+        float        framePosition      = 0.0f;
+        bool         layoutDirty        = true;
         juce::Random random;
     };
 }

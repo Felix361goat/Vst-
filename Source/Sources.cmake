@@ -15,6 +15,8 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/Params/ParameterStore.cpp
     ${NOG_SOURCE_DIR}/Modulation/ModMatrix.cpp
     ${NOG_SOURCE_DIR}/DSP/Oscillator.cpp
+    ${NOG_SOURCE_DIR}/DSP/Wavetable.cpp
+    ${NOG_SOURCE_DIR}/DSP/WavetableBank.cpp
     ${NOG_SOURCE_DIR}/Engine/Voice.cpp
     ${NOG_SOURCE_DIR}/Engine/SynthEngine.cpp
     ${NOG_SOURCE_DIR}/FX/FXChain.cpp

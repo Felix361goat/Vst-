@@ -1,5 +1,6 @@
 #include "Params/ParameterLayout.h"
 
+#include "DSP/WavetableBank.h"
 #include "Modulation/ModDefs.h"
 #include "Params/ParameterIDs.h"
 
@@ -13,9 +14,8 @@ namespace nog::params
     {
         juce::StringArray waveforms()
         {
-            // Placeholder bank. Once real wavetable loading lands these become
-            // the names of the loaded tables rather than fixed shapes.
-            return { "Sine", "Triangle", "Saw", "Square", "Pulse", "Noise Table" };
+            // The factory wavetables. Reading the names does not build them.
+            return dsp::WavetableBank::getTableNames();
         }
 
         juce::StringArray subWaveforms()   { return { "Sine", "Triangle", "Saw", "Square" }; }
@@ -192,9 +192,11 @@ namespace nog::params
                          floatParam (ids::osc (index, ids::oscPan), "Osc " + number + " Pan",
                                      linear (-1.0f, 1.0f), 0.0f, fmtPan),
                          choiceParam (ids::osc (index, ids::oscWave), "Osc " + number + " Wave",
-                                      choices::waveforms(), index == 0 ? 2 : 0),
+                                      choices::waveforms(), 0),
+                         // Halfway through Basic Shapes is a saw, which is the
+                         // most useful thing to hear on an init patch.
                          floatParam (ids::osc (index, ids::oscWtPos), "Osc " + number + " WT Pos",
-                                     linear (0.0f, 1.0f), 0.0f, fmtPercent),
+                                     linear (0.0f, 1.0f), 0.5f, fmtPercent),
                          choiceParam (ids::osc (index, ids::oscWarpMode), "Osc " + number + " Warp Mode",
                                       choices::warpModes(), 0),
                          floatParam (ids::osc (index, ids::oscWarpAmount), "Osc " + number + " Warp",

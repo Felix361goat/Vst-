@@ -51,6 +51,10 @@ namespace nog
     void NogSuiteProcessor::prepareToPlay (double sampleRate, int maximumExpectedSamplesPerBlock)
     {
         engine.prepare (sampleRate, maximumExpectedSamplesPerBlock, getTotalNumOutputChannels());
+
+        // Oversampling filters delay the signal; the host has to know so it can
+        // line the plugin's output up with everything else.
+        setLatencySamples (engine.getLatencySamples());
     }
 
     void NogSuiteProcessor::releaseResources()
@@ -84,6 +88,11 @@ namespace nog
                     bpm = *hostBpm;
 
         engine.process (buffer, midiMessages, bpm);
+
+        // The oversampling setting can change between blocks, and with it the
+        // reported latency.
+        if (const auto latency = engine.getLatencySamples(); latency != getLatencySamples())
+            setLatencySamples (latency);
 
         // The synth generates no MIDI; leaving incoming events in the buffer
         // would make some hosts echo them back out.

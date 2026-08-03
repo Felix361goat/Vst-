@@ -1,5 +1,6 @@
 #include "Engine/Voice.h"
 
+#include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 
 namespace nog
@@ -227,6 +228,10 @@ namespace nog
 
     void Voice::applyParameters (const ParameterStore& parameters)
     {
+        // Already built: SynthEngine forces the bank during construction, so
+        // this is a cheap guarded read rather than a first-use synthesis.
+        const auto& bank = dsp::WavetableBank::factory();
+
         for (int i = 0; i < ids::numOscillators; ++i)
         {
             const auto index = static_cast<size_t> (i);
@@ -241,8 +246,9 @@ namespace nog
             const auto phaseDest  = i == 0 ? mod::Dest::Osc1Phase  : mod::Dest::Osc2Phase;
             const auto pitchDest  = i == 0 ? mod::Dest::Osc1Pitch  : mod::Dest::Osc2Pitch;
 
+            oscillator.setTable (&bank.getTable (p.wave->getIndex()));
+
             dsp::Oscillator::Settings settings;
-            settings.wave         = p.wave->getIndex();
             settings.warpMode     = p.warpMode->getIndex();
             settings.unisonVoices = p.unison->get();
             settings.blend        = p.blend->get();
@@ -274,10 +280,17 @@ namespace nog
 
         // -- sub ------------------------------------------------------------
         {
+            subOscillator.setTable (&bank.getSubTable());
+
             dsp::Oscillator::Settings settings;
-            settings.wave         = parameters.sub.wave->getIndex();
             settings.unisonVoices = 1;
             settings.phaseRandom  = 0.0f;
+
+            // The sub table holds four exact shapes, one per frame, so the
+            // waveform choice addresses a frame directly instead of morphing.
+            const auto subFrames = juce::jmax (1, bank.getSubTable().getNumFrames() - 1);
+            settings.morph = static_cast<float> (parameters.sub.wave->getIndex())
+                           / static_cast<float> (subFrames);
             settings.level = parameters.sub.enable->get()
                            ? parameters.modulated (mod::Dest::SubLevel, frame.getOffset (mod::Dest::SubLevel))
                            : 0.0f;

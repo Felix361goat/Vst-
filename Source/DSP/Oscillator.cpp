@@ -6,31 +6,8 @@ namespace nog::dsp
 {
     namespace
     {
-        constexpr int   noiseTableSize    = 2048;
         constexpr float maxDetuneCents    = 100.0f;   // per side, at detune = 1
         constexpr float centsToRatioScale = 1.0f / 1200.0f;
-
-        /** A fixed pseudo-random table, built once and shared.
-
-            Seeded deterministically so that the "noise table" wave is identical
-            in every instance and on every run - a patch has to sound the same
-            when the project is reopened.
-        */
-        const std::array<float, noiseTableSize>& noiseTable()
-        {
-            static const auto table = []
-            {
-                std::array<float, noiseTableSize> t {};
-                juce::Random seeded (0x9E3779B9);
-
-                for (auto& sample : t)
-                    sample = seeded.nextFloat() * 2.0f - 1.0f;
-
-                return t;
-            }();
-
-            return table;
-        }
     }
 
     void Oscillator::prepare (double newSampleRate) noexcept
@@ -44,6 +21,7 @@ namespace nog::dsp
         for (auto& voice : unison)
             voice.phase = 0.0;
 
+        layoutDirty = true;
         updateUnisonLayout();
     }
 
@@ -61,12 +39,22 @@ namespace nog::dsp
 
     void Oscillator::updateUnisonLayout() noexcept
     {
+        if (! layoutDirty)
+            return;
+
+        layoutDirty = false;
+
         activeUnisonVoices = juce::jlimit (1, maxUnison, settings.unisonVoices);
 
         const auto count      = activeUnisonVoices;
         const auto centreOnly = count == 1;
         const auto width      = juce::jlimit (0.0f, 1.0f, settings.width);
         const auto blend      = juce::jlimit (0.0f, 1.0f, settings.blend);
+
+        // Frame index the morph control lands on, resolved once per update.
+        const auto frameCount = table != nullptr ? table->getNumFrames() : 1;
+        framePosition = juce::jlimit (0.0f, 1.0f, settings.morph)
+                      * static_cast<float> (juce::jmax (0, frameCount - 1));
 
         auto gainSum = 0.0f;
 
@@ -104,98 +92,14 @@ namespace nog::dsp
         unisonNormalise = gainSum > 0.0f ? 1.0f / std::sqrt (gainSum) : 1.0f;
     }
 
-    float Oscillator::polyBlep (double t, double dt) noexcept
+    float Oscillator::readTable (double phase, double increment) const noexcept
     {
-        // Smooths the one-sample neighbourhood of a waveform discontinuity,
-        // which removes most of the aliasing a naive saw or square produces.
-        if (dt <= 0.0)
+        if (table == nullptr || table->isEmpty())
             return 0.0f;
 
-        if (t < dt)
-        {
-            const auto x = t / dt;
-            return static_cast<float> (x + x - x * x - 1.0);
-        }
+        const auto mip = Wavetable::mipForIncrement (increment);
 
-        if (t > 1.0 - dt)
-        {
-            const auto x = (t - 1.0) / dt;
-            return static_cast<float> (x * x + x + x + 1.0);
-        }
-
-        return 0.0f;
-    }
-
-    float Oscillator::noiseTableSample (double phase) noexcept
-    {
-        const auto& table    = noiseTable();
-        const auto  position = phase * noiseTableSize;
-        const auto  index    = static_cast<int> (position) % noiseTableSize;
-        const auto  next     = (index + 1) % noiseTableSize;
-        const auto  fraction = static_cast<float> (position - std::floor (position));
-
-        return table[static_cast<size_t> (index)]
-             + (table[static_cast<size_t> (next)] - table[static_cast<size_t> (index)]) * fraction;
-    }
-
-    float Oscillator::sampleForWave (int waveIndex, double phase, double increment) const noexcept
-    {
-        switch (static_cast<Wave> (waveIndex))
-        {
-            case Wave::Sine:
-                return std::sin (static_cast<float> (phase) * juce::MathConstants<float>::twoPi);
-
-            case Wave::Triangle:
-                // Harmonics fall off as 1/n^2, so naive generation is clean
-                // enough here without a band-limiting correction.
-                return 4.0f * std::abs (static_cast<float> (phase) - 0.5f) - 1.0f;
-
-            case Wave::Saw:
-                return static_cast<float> (2.0 * phase - 1.0) - polyBlep (phase, increment);
-
-            case Wave::Square:
-            {
-                const auto naive = phase < 0.5 ? 1.0f : -1.0f;
-                return naive - polyBlep (phase, increment)
-                             + polyBlep (std::fmod (phase + 0.5, 1.0), increment);
-            }
-
-            case Wave::Pulse:
-            {
-                constexpr double dutyCycle = 0.25;
-                const auto naive = phase < dutyCycle ? 1.0f : -1.0f;
-                return naive - polyBlep (phase, increment)
-                             + polyBlep (std::fmod (phase + (1.0 - dutyCycle), 1.0), increment);
-            }
-
-            case Wave::NoiseTable:
-                return noiseTableSample (phase);
-        }
-
-        return 0.0f;
-    }
-
-    float Oscillator::morphedSample (double phase, double increment) const noexcept
-    {
-        // The wave selector picks the starting point and morph travels forwards
-        // through the bank from there, wrapping at the end. With real
-        // wavetables this becomes a frame index into the loaded table.
-        const auto position = static_cast<float> (settings.wave)
-                            + juce::jlimit (0.0f, 1.0f, settings.morph) * static_cast<float> (numWaves - 1);
-
-        const auto lower    = static_cast<int> (std::floor (position));
-        const auto fraction = position - static_cast<float> (lower);
-
-        const auto lowerIndex = ((lower % numWaves) + numWaves) % numWaves;
-        const auto upperIndex = (lowerIndex + 1) % numWaves;
-
-        if (fraction < 1.0e-4f)
-            return sampleForWave (lowerIndex, phase, increment);
-
-        const auto a = sampleForWave (lowerIndex, phase, increment);
-        const auto b = sampleForWave (upperIndex, phase, increment);
-
-        return a + (b - a) * fraction;
+        return table->getSample (framePosition, mip, phase - std::floor (phase));
     }
 
     float Oscillator::warpedSample (double phase, double increment) const noexcept
@@ -203,32 +107,32 @@ namespace nog::dsp
         const auto amount = juce::jlimit (0.0f, 1.0f, settings.warpAmount);
 
         if (amount <= 0.0f)
-            return morphedSample (phase, increment);
+            return readTable (phase, increment);
 
         switch (static_cast<Warp> (settings.warpMode))
         {
             case Warp::Off:
-                return morphedSample (phase, increment);
+                return readTable (phase, increment);
 
             case Warp::Sync:
             {
                 // Runs the wave faster and restarts it at the base period,
-                // producing the hard-sync formant sweep.
-                const auto ratio   = 1.0 + static_cast<double> (amount) * 3.0;
-                const auto synced  = std::fmod (phase * ratio, 1.0);
-                return morphedSample (synced, increment * ratio);
+                // producing the hard-sync formant sweep. The increment is
+                // scaled too, so the mip level follows the real bandwidth.
+                const auto ratio = 1.0 + static_cast<double> (amount) * 3.0;
+                return readTable (std::fmod (phase * ratio, 1.0), increment * ratio);
             }
 
             case Warp::BendPlus:
             {
                 const auto exponent = 1.0 + static_cast<double> (amount) * 3.0;
-                return morphedSample (std::pow (phase, exponent), increment);
+                return readTable (std::pow (phase, exponent), increment * exponent);
             }
 
             case Warp::BendMinus:
             {
                 const auto exponent = 1.0 / (1.0 + static_cast<double> (amount) * 3.0);
-                return morphedSample (std::pow (phase, exponent), increment);
+                return readTable (std::pow (phase, exponent), increment / exponent);
             }
 
             case Warp::Pwm:
@@ -236,43 +140,43 @@ namespace nog::dsp
                 // Subtracting a phase-shifted copy turns any wave into a
                 // pulse-width-modulated version of itself.
                 const auto offset = 0.5 - static_cast<double> (amount) * 0.49;
-                return 0.5f * (morphedSample (phase, increment)
-                             - morphedSample (std::fmod (phase + offset, 1.0), increment));
+                return 0.5f * (readTable (phase, increment)
+                             - readTable (std::fmod (phase + offset, 1.0), increment));
             }
 
             case Warp::Mirror:
             {
                 const auto folded = phase < 0.5 ? phase * 2.0 : (1.0 - phase) * 2.0;
                 const auto mixed  = phase + (folded - phase) * static_cast<double> (amount);
-                return morphedSample (mixed, increment);
+                return readTable (mixed, increment * 2.0);
             }
 
             case Warp::Asymmetric:
             {
                 // Squeezes the first half of the cycle and stretches the second.
-                const auto pivot = 0.5 - static_cast<double> (amount) * 0.45;
+                const auto pivot  = 0.5 - static_cast<double> (amount) * 0.45;
                 const auto mapped = phase < pivot ? (phase / pivot) * 0.5
                                                   : 0.5 + ((phase - pivot) / (1.0 - pivot)) * 0.5;
-                return morphedSample (mapped, increment);
+                return readTable (mapped, increment / juce::jmax (0.05, pivot * 2.0));
             }
 
             case Warp::Quantize:
             {
-                const auto steps = juce::jmax (2.0, std::round (64.0 * (1.0 - static_cast<double> (amount)) + 2.0));
+                const auto steps   = juce::jmax (2.0, std::round (64.0 * (1.0 - static_cast<double> (amount)) + 2.0));
                 const auto stepped = std::floor (phase * steps) / steps;
-                return morphedSample (stepped, increment);
+                return readTable (stepped, increment);
             }
         }
 
-        return morphedSample (phase, increment);
+        return readTable (phase, increment);
     }
 
     void Oscillator::addNextSample (float& left, float& right) noexcept
     {
-        if (settings.level <= 0.0f || frequency <= 0.0f)
-            return;
-
         updateUnisonLayout();
+
+        if (settings.level <= 0.0f || frequency <= 0.0f || table == nullptr)
+            return;
 
         // Equal-power pan for the oscillator as a whole, applied on top of the
         // per-unison-voice placement.

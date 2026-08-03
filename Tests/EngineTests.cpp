@@ -10,10 +10,13 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include "Engine/SynthEngine.h"
 #include "DSP/Envelope.h"
 #include "DSP/Oscillator.h"
+#include "DSP/Wavetable.h"
+#include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 #include "Params/ParameterStore.h"
 
@@ -374,6 +377,137 @@ namespace
     };
 
     // -----------------------------------------------------------------------
+    class WavetableTests final : public juce::UnitTest
+    {
+    public:
+        WavetableTests() : UnitTest ("Wavetables", "nog") {}
+
+        void runTest() override
+        {
+            beginTest ("every frame of every mip is normalised to a consistent level");
+            {
+                // Mip levels are synthesised by separate inverse transforms, and
+                // an inverse transform scales by its own length. If that is not
+                // compensated, the level jumps every time a note crosses a mip
+                // boundary - which is silent in a spectrum plot and glaring in a
+                // patch.
+                const auto& bank = nog::dsp::WavetableBank::factory();
+
+                for (int index = 0; index < nog::dsp::WavetableBank::getNumTables(); ++index)
+                {
+                    const auto& table = bank.getTable (index);
+
+                    expect (! table.isEmpty(), table.getName() + " is empty");
+
+                    for (int frame = 0; frame < table.getNumFrames(); ++frame)
+                    {
+                        for (int mip = 0; mip < nog::dsp::Wavetable::numMipLevels; ++mip)
+                        {
+                            auto peak = 0.0f;
+
+                            for (int i = 0; i < 1024; ++i)
+                                peak = juce::jmax (peak, std::abs (table.getSample (static_cast<float> (frame),
+                                                                                    mip, i / 1024.0)));
+
+                            const auto where = table.getName() + " frame " + juce::String (frame)
+                                             + " mip " + juce::String (mip);
+
+                            // Only the full-bandwidth mip has to carry signal.
+                            // A high mip legitimately goes quiet when a frame's
+                            // energy lives entirely in harmonics it has dropped
+                            // - an FM frame whose fundamental sits in a Bessel
+                            // null, for instance.
+                            if (mip == 0)
+                                expect (peak > 0.1f, where + " is silent (peak " + juce::String (peak) + ")");
+
+                            expect (peak < 2.0f, where + " is too loud (peak " + juce::String (peak) + ")");
+                        }
+                    }
+                }
+            }
+
+            beginTest ("high notes stay free of aliasing");
+            {
+                // The whole point of the mip pyramid. A naive table read folds
+                // every harmonic above Nyquist back into the audible band,
+                // landing on frequencies that are not multiples of the note
+                // being played - which is what is measured here.
+                //
+                // The test frequency is an exact multiple of the analysis bin
+                // width, so every harmonic lands dead on a bin and no window is
+                // needed. That matters: a window's own leakage skirt measures
+                // around -47 dB and would swamp the thing being looked for.
+                const auto& bank = nog::dsp::WavetableBank::factory();
+
+                constexpr int    fftOrder   = 14;
+                constexpr int    fftSize    = 1 << fftOrder;
+                constexpr double sampleRate = 48000.0;
+
+                // 797 is prime, which keeps aliases from folding onto harmonics.
+                constexpr int    binsPerCycle = 797;
+                constexpr float  frequency    = static_cast<float> (binsPerCycle * sampleRate / fftSize);
+
+                juce::dsp::FFT fft (fftOrder);
+
+                for (int index = 0; index < nog::dsp::WavetableBank::getNumTables(); ++index)
+                {
+                    nog::dsp::Oscillator oscillator;
+                    oscillator.prepare (sampleRate);
+                    oscillator.setTable (&bank.getTable (index));
+
+                    nog::dsp::Oscillator::Settings settings;
+                    settings.level        = 1.0f;
+                    settings.morph        = 0.5f;
+                    settings.unisonVoices = 1;
+                    settings.phaseRandom  = 0.0f;
+                    oscillator.setSettings (settings);
+                    oscillator.setFrequency (frequency);
+                    oscillator.noteOn();
+
+                    std::vector<float> samples (static_cast<size_t> (fftSize) * 2, 0.0f);
+
+                    for (int i = 0; i < fftSize; ++i)
+                    {
+                        auto left = 0.0f, right = 0.0f;
+                        oscillator.addNextSample (left, right);
+                        samples[static_cast<size_t> (i)] = left;
+                    }
+
+                    fft.performFrequencyOnlyForwardTransform (samples.data());
+
+                    auto harmonicEnergy = 0.0, otherEnergy = 0.0;
+
+                    for (int bin = 1; bin < fftSize / 2; ++bin)
+                    {
+                        const auto magnitude = static_cast<double> (samples[static_cast<size_t> (bin)]);
+                        const auto energy    = magnitude * magnitude;
+
+                        // Exact multiples of the fundamental's bin, allowing one
+                        // bin either side for floating point drift.
+                        const auto remainder = bin % binsPerCycle;
+                        const auto onHarmonic = remainder <= 1 || remainder >= binsPerCycle - 1;
+
+                        if (onHarmonic)
+                            harmonicEnergy += energy;
+                        else
+                            otherEnergy += energy;
+                    }
+
+                    const auto decibels = 10.0 * std::log10 ((otherEnergy + 1.0e-30)
+                                                             / (harmonicEnergy + 1.0e-30));
+
+                    logMessage (bank.getTable (index).getName()
+                                + ": non-harmonic energy " + juce::String (decibels, 1) + " dB");
+
+                    expect (decibels < -70.0,
+                            bank.getTable (index).getName() + " aliases: "
+                                + juce::String (decibels, 1) + " dB of non-harmonic energy");
+                }
+            }
+        }
+    };
+
+    // -----------------------------------------------------------------------
     class OscillatorTests final : public juce::UnitTest
     {
     public:
@@ -381,17 +515,20 @@ namespace
 
         void runTest() override
         {
-            beginTest ("output stays finite across every wave, warp and unison count");
+            beginTest ("output stays finite across every table, warp and unison count");
             {
+                const auto& bank = nog::dsp::WavetableBank::factory();
+
                 nog::dsp::Oscillator oscillator;
                 oscillator.prepare (testSampleRate);
 
-                for (int wave = 0; wave < nog::dsp::Oscillator::numWaves; ++wave)
+                for (int table = 0; table < nog::dsp::WavetableBank::getNumTables(); ++table)
                 {
+                    oscillator.setTable (&bank.getTable (table));
+
                     for (int warp = 0; warp < 8; ++warp)
                     {
                         nog::dsp::Oscillator::Settings settings;
-                        settings.wave         = wave;
                         settings.warpMode     = warp;
                         settings.warpAmount   = 0.75f;
                         settings.morph        = 0.4f;
@@ -409,9 +546,9 @@ namespace
                             oscillator.addNextSample (left, right);
 
                             expect (std::isfinite (left) && std::isfinite (right),
-                                    "wave " + juce::String (wave) + " warp " + juce::String (warp));
+                                    "table " + juce::String (table) + " warp " + juce::String (warp));
                             expect (std::abs (left) < 8.0f && std::abs (right) < 8.0f,
-                                    "runaway level on wave " + juce::String (wave));
+                                    "runaway level on table " + juce::String (table));
                         }
                     }
                 }
@@ -419,11 +556,13 @@ namespace
 
             beginTest ("frequencies at or above Nyquist are dropped rather than aliased");
             {
+                const auto& bank = nog::dsp::WavetableBank::factory();
+
                 nog::dsp::Oscillator oscillator;
                 oscillator.prepare (testSampleRate);
+                oscillator.setTable (&bank.getTable (0));
 
                 nog::dsp::Oscillator::Settings settings;
-                settings.wave  = 2;
                 settings.level = 1.0f;
                 oscillator.setSettings (settings);
 
@@ -598,6 +737,7 @@ namespace
     };
 
     ParameterTests  parameterTests;
+    WavetableTests  wavetableTests;
     ModMatrixTests  modMatrixTests;
     EnvelopeTests   envelopeTests;
     OscillatorTests oscillatorTests;
