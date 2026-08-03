@@ -57,7 +57,7 @@ namespace nog::presets
             .master (-7.0f)
             .done());
 
-        list.push_back (Build ("Electric Piano", "Keys")
+        list.push_back (Build ("Synth E-Piano", "Keys")
             .voices (16)
             .osc (0, wt::FmBell, 0.30f, 0.7f)
             .osc (1, wt::BasicShapes, wt::sine, 0.35f)
@@ -322,7 +322,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("Kalimba", "Bell")
+        list.push_back (Build ("Synth Kalimba", "Bell")
             .voices (12)
             .osc (0, wt::BasicShapes, 0.22f, 0.8f)
             .osc (1, wt::FmBell, 0.3f, 0.25f)

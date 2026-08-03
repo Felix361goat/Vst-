@@ -266,6 +266,266 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
+
+        // -- more of the sparkle family --------------------------------------
+        //
+        // These are all built the same way, because that shape is what makes
+        // the sound: a wide detuned saw for body, a quiet high partial an
+        // octave or a fifth above for the glint, heavy keytracking so the
+        // filter opens as the line climbs, and a long delay and reverb behind
+        // it. What varies is the second oscillator and how far the filter
+        // tracks - which is what makes one usable as a top line and the next
+        // usable as a chord.
+
+        // Softer attack and a lower master than the original, because six of
+        // these at once is a chord and six of the original is a wall.
+        list.push_back (Build ("Sparkle Chords", "Chords")
+            .voices (12)
+            .osc (0, wt::BasicShapes, wt::saw, 0.50f)
+            .osc (1, wt::HarmonicSweep, 0.78f, 0.26f)
+            .tune (1, 1, 0, 5.0f)
+            .unison (0, 7, 0.14f, 0.55f, 0.9f)
+            .unison (1, 3, 0.09f, 0.5f, 0.7f)
+            .filter (flt::LP24, 2400.0f, 0.10f, 0.08f, 1.0f, 0.7f)
+            .env (0, 14.0f, 1400.0f, 0.70f, 620.0f)
+            .env (1, 4.0f, 340.0f, 0.25f, 380.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.24f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.68f, 0.55f)
+            .fx (FX::Delay, 0.20f, 0.32f, 0.32f, 0.75f)
+            .fx (FX::Reverb, 0.36f, 0.78f, 0.26f, 1.0f)
+            .master (-12.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Chords Soft", "Chords")
+            .voices (12)
+            .osc (0, wt::BasicShapes, 0.38f, 0.52f)
+            .osc (1, wt::FmBell, 0.30f, 0.20f)
+            .tune (1, 1)
+            .unison (0, 5, 0.11f, 0.55f, 0.85f)
+            .filter (flt::LP24, 1900.0f, 0.08f, 0.0f, 1.0f, 0.62f)
+            .env (0, 22.0f, 1600.0f, 0.68f, 800.0f)
+            .env (1, 6.0f, 420.0f, 0.20f, 420.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.20f)
+            .fx (FX::Chorus, 0.24f, 0.10f, 0.34f, 0.28f)
+            .fx (FX::Delay, 0.18f, 0.34f, 0.28f, 0.7f)
+            .fx (FX::Reverb, 0.42f, 0.84f, 0.24f, 1.0f)
+            .master (-12.0f)
+            .done());
+
+        // The high end climbs with the note rather than staying put, which is
+        // what makes a line sound like it is lifting as it goes up.
+        list.push_back (Build ("Sparkle Rise Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.58f)
+            .osc (1, wt::OddEven, 0.62f, 0.30f)
+            .tune (1, 1, 7)
+            .unison (0, 7, 0.17f, 0.55f, 0.88f)
+            .unison (1, 2, 0.07f, 0.5f, 0.6f)
+            .filter (flt::LP24, 2200.0f, 0.14f, 0.10f, 1.0f, 1.0f)
+            .env (0, 4.0f, 950.0f, 0.72f, 400.0f)
+            .env (1, 2.0f, 300.0f, 0.30f, 320.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.28f)
+            .route (Src::Velocity, Dst::FilterCutoff, 0.18f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.72f, 0.6f)
+            .fx (FX::Delay, 0.24f, 0.30f, 0.36f, 0.85f)
+            .fx (FX::Reverb, 0.34f, 0.76f, 0.26f, 1.0f)
+            .master (-9.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Glass Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.50f)
+            .osc (1, wt::Digital, 0.22f, 0.26f)
+            .tune (1, 2)
+            .unison (0, 7, 0.15f, 0.55f, 0.9f)
+            .filter (flt::LP24, 3400.0f, 0.10f, 0.05f, 1.0f, 0.85f)
+            .env (0, 3.0f, 1000.0f, 0.70f, 420.0f)
+            .env (1, 1.0f, 180.0f, 0.10f, 240.0f)
+            .route (Src::Env2, Dst::Osc2Level, 0.30f)
+            .fx (FX::Eq, 1.0f, 0.44f, 0.76f, 0.6f)
+            .fx (FX::Delay, 0.26f, 0.28f, 0.38f, 0.9f)
+            .fx (FX::Reverb, 0.36f, 0.80f, 0.24f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Air Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, 0.42f, 0.55f)
+            .osc (1, wt::Formant, 0.30f, 0.22f)
+            .tune (1, 1)
+            .unison (0, 5, 0.12f, 0.55f, 0.85f)
+            .noise (1, 0.05f)
+            .filter (flt::LP24, 3000.0f, 0.08f, 0.0f, 1.0f, 0.78f)
+            .env (0, 8.0f, 1100.0f, 0.74f, 520.0f)
+            .lfoFree (0, 0, 4.2f)
+            .lfoShape (0, 800.0f, 0.15f)
+            .route (Src::Lfo1, Dst::Osc1Pitch, 0.005f, true)
+            .fx (FX::Eq, 1.0f, 0.42f, 0.78f, 0.6f)
+            .fx (FX::Delay, 0.24f, 0.32f, 0.34f, 0.85f)
+            .fx (FX::Reverb, 0.40f, 0.82f, 0.24f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        // A fifth above rather than an octave: the interval is what gives it
+        // the shimmer, and it stays in key on almost anything.
+        list.push_back (Build ("Sparkle Fifth Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.56f)
+            .osc (1, wt::BasicShapes, wt::triangle, 0.24f)
+            .tune (1, 1, 7)
+            .unison (0, 7, 0.16f, 0.55f, 0.88f)
+            .unison (1, 3, 0.08f, 0.5f, 0.7f)
+            .filter (flt::LP24, 2800.0f, 0.12f, 0.08f, 1.0f, 0.8f)
+            .env (0, 4.0f, 950.0f, 0.74f, 400.0f)
+            .env (1, 2.0f, 280.0f, 0.28f, 300.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.28f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.70f, 0.55f)
+            .fx (FX::Delay, 0.22f, 0.30f, 0.34f, 0.8f)
+            .fx (FX::Reverb, 0.32f, 0.74f, 0.26f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Pluck Chords", "Chords")
+            .voices (12)
+            .osc (0, wt::BasicShapes, wt::saw, 0.55f)
+            .osc (1, wt::FmBell, 0.34f, 0.26f)
+            .tune (1, 1)
+            .unison (0, 5, 0.12f, 0.55f, 0.85f)
+            .filter (flt::LP24, 1500.0f, 0.16f, 0.06f, 1.0f, 0.72f)
+            .env (0, 1.0f, 800.0f, 0.10f, 420.0f)
+            .env (1, 0.5f, 240.0f, 0.0f, 200.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.42f)
+            .route (Src::Velocity, Dst::FilterCutoff, 0.16f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.68f, 0.5f)
+            .fx (FX::Delay, 0.22f, 0.30f, 0.34f, 0.85f)
+            .fx (FX::Reverb, 0.36f, 0.78f, 0.26f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Saw Stack", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.50f)
+            .osc (1, wt::BasicShapes, wt::saw, 0.34f)
+            .tune (1, 1, 0, -8.0f)
+            .unison (0, 9, 0.20f, 0.60f, 1.0f)
+            .unison (1, 5, 0.14f, 0.55f, 0.9f)
+            .filter (flt::LP24, 3000.0f, 0.10f, 0.10f, 1.0f, 0.82f)
+            .env (0, 6.0f, 1200.0f, 0.76f, 480.0f)
+            .env (1, 2.0f, 260.0f, 0.25f, 300.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.26f)
+            .fx (FX::Eq, 1.0f, 0.44f, 0.72f, 0.6f)
+            .fx (FX::Delay, 0.26f, 0.28f, 0.36f, 0.9f)
+            .fx (FX::Reverb, 0.34f, 0.78f, 0.24f, 1.0f)
+            .master (-11.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Trance Lead", "Trance")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.60f)
+            .osc (1, wt::HarmonicSweep, 0.70f, 0.28f)
+            .tune (1, 1)
+            .unison (0, 7, 0.18f, 0.58f, 0.95f)
+            .filter (flt::LP24, 2200.0f, 0.22f, 0.14f, 1.0f, 0.75f)
+            .env (0, 3.0f, 800.0f, 0.72f, 340.0f)
+            .env (1, 1.0f, 220.0f, 0.20f, 260.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.34f)
+            .lfoSynced (0, 0, 5)
+            .route (Src::Lfo1, Dst::FilterCutoff, 0.10f, true)
+            .fx (FX::Eq, 1.0f, 0.44f, 0.70f, 0.58f)
+            .fx (FX::Delay, 0.28f, 0.26f, 0.38f, 0.95f)
+            .fx (FX::Reverb, 0.32f, 0.74f, 0.26f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        // Mono and portamento: the same tone as a line rather than a chord,
+        // for the hook that slides between notes.
+        list.push_back (Build ("Sparkle Slide Lead", "Lead")
+            .voices (1, 1)
+            .glide (60.0f, 2)
+            .osc (0, wt::BasicShapes, wt::saw, 0.60f)
+            .osc (1, wt::HarmonicSweep, 0.76f, 0.30f)
+            .tune (1, 1, 0, 6.0f)
+            .unison (0, 5, 0.14f, 0.55f, 0.85f)
+            .filter (flt::LP24, 2600.0f, 0.14f, 0.10f, 1.0f, 0.78f)
+            .env (0, 4.0f, 900.0f, 0.78f, 380.0f)
+            .env (1, 2.0f, 240.0f, 0.30f, 280.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.28f)
+            .route (Src::ModWheel, Dst::FilterCutoff, 0.25f)
+            .lfoFree (0, 0, 5.4f)
+            .route (Src::Lfo1, Dst::Osc1Pitch, 0.010f, true)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.70f, 0.55f)
+            .fx (FX::Delay, 0.24f, 0.28f, 0.34f, 0.85f)
+            .fx (FX::Reverb, 0.30f, 0.72f, 0.26f, 1.0f)
+            .master (-9.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Bell Chords", "Chords")
+            .voices (12)
+            .osc (0, wt::FmBell, 0.38f, 0.45f)
+            .osc (1, wt::BasicShapes, wt::triangle, 0.32f)
+            .tune (1, 0)
+            .unison (0, 3, 0.08f, 0.5f, 0.7f)
+            .filter (flt::LP24, 4000.0f, 0.06f, 0.0f, 1.0f, 0.8f)
+            .env (0, 3.0f, 1800.0f, 0.40f, 900.0f)
+            .env (1, 1.0f, 400.0f, 0.0f, 380.0f)
+            .route (Src::Env2, Dst::Osc1WtPos, 0.20f)
+            .fx (FX::Eq, 1.0f, 0.42f, 0.74f, 0.6f)
+            .fx (FX::Delay, 0.24f, 0.32f, 0.32f, 0.85f)
+            .fx (FX::Reverb, 0.44f, 0.86f, 0.24f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Wide Octaves", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.52f)
+            .osc (1, wt::BasicShapes, wt::saw, 0.30f)
+            .tune (1, 2, 0, 9.0f)
+            .unison (0, 7, 0.16f, 0.55f, 0.9f)
+            .unison (1, 5, 0.22f, 0.6f, 1.0f)
+            .pan (1, 0.15f)
+            .filter (flt::LP24, 3600.0f, 0.09f, 0.06f, 1.0f, 0.9f)
+            .env (0, 5.0f, 1100.0f, 0.74f, 500.0f)
+            .env (1, 2.0f, 220.0f, 0.20f, 280.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.24f)
+            .fx (FX::Eq, 1.0f, 0.42f, 0.76f, 0.62f)
+            .fx (FX::Delay, 0.28f, 0.26f, 0.40f, 0.95f)
+            .fx (FX::Reverb, 0.38f, 0.82f, 0.22f, 1.0f)
+            .master (-11.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Afro Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, 0.46f, 0.58f)
+            .osc (1, wt::FmBell, 0.32f, 0.24f)
+            .tune (1, 1)
+            .unison (0, 3, 0.09f, 0.5f, 0.7f)
+            .filter (flt::LP24, 2600.0f, 0.10f, 0.05f, 1.0f, 0.7f)
+            // Short and bright rather than sustained: this sits on top of a
+            // busy afrobeats arrangement instead of filling it.
+            .env (0, 1.0f, 620.0f, 0.20f, 300.0f)
+            .env (1, 0.5f, 180.0f, 0.0f, 200.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.38f)
+            .fx (FX::Delay, 0.24f, 0.24f, 0.32f, 0.8f)
+            .fx (FX::Reverb, 0.30f, 0.70f, 0.28f, 1.0f)
+            .master (-8.0f)
+            .done());
+
+        list.push_back (Build ("Sparkle Dream Lead", "Lead")
+            .voices (8)
+            .osc (0, wt::HarmonicSweep, 0.55f, 0.52f)
+            .osc (1, wt::BasicShapes, wt::sine, 0.30f)
+            .tune (1, 1)
+            .unison (0, 5, 0.13f, 0.55f, 0.88f)
+            .filter (flt::LP24, 3200.0f, 0.08f, 0.0f, 1.0f, 0.85f)
+            .env (0, 20.0f, 1400.0f, 0.72f, 900.0f)
+            .lfoFree (0, 0, 0.22f)
+            .route (Src::Lfo1, Dst::Osc1WtPos, 0.18f, true)
+            .fx (FX::Chorus, 0.28f, 0.10f, 0.36f, 0.3f)
+            .fx (FX::Delay, 0.26f, 0.34f, 0.34f, 0.9f)
+            .fx (FX::Reverb, 0.46f, 0.88f, 0.22f, 1.0f)
+            .master (-11.0f)
+            .done());
+
         return list;
     }
 }

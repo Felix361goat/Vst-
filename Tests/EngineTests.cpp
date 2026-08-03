@@ -843,6 +843,30 @@ namespace
                 }
             }
 
+            beginTest ("instrument presets actually play their sample");
+            {
+                // An oscillator in sample mode with an empty slot falls back to
+                // its wavetable, which sounds plausible and is completely wrong.
+                // The only way to catch that is to check the patch sounds
+                // different with its sample than without it.
+                for (const auto& preset : presets)
+                {
+                    const auto wantsSample = std::any_of (preset.builtInSamples.begin(),
+                                                          preset.builtInSamples.end(),
+                                                          [] (int index) { return index >= 0; });
+
+                    if (! wantsSample)
+                        continue;
+
+                    const auto withSample    = renderFingerprint (preset, true);
+                    const auto withoutSample = renderFingerprint (preset, false);
+
+                    expect (std::abs (withSample - withoutSample) > 1.0e-4,
+                            preset.name + " sounds the same with and without its sample, "
+                                          "so it is falling back to a wavetable");
+                }
+            }
+
             beginTest ("every preset releases to silence");
             {
                 for (const auto& preset : presets)
@@ -875,13 +899,51 @@ namespace
         }
 
     private:
-        static void apply (TestProcessor& processor, const nog::presets::Preset& preset)
+        /** Sum of absolute output over a short note, as a cheap stand-in for
+            "what this patch sounds like". Two renders that agree to five
+            decimal places came from the same signal path. */
+        static double renderFingerprint (const nog::presets::Preset& preset, bool loadSamples)
+        {
+            TestProcessor processor;
+            apply (processor, preset, loadSamples);
+            processor.prepareToPlay (testSampleRate, testBlockSize);
+
+            juce::AudioBuffer<float> buffer (2, testBlockSize);
+            juce::MidiBuffer midi;
+            midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.9f), 0);
+
+            auto total = 0.0;
+
+            for (int block = 0; block < 40; ++block)
+            {
+                processor.processBlock (buffer, midi);
+                midi.clear();
+
+                for (int i = 0; i < testBlockSize; ++i)
+                    total += std::abs (static_cast<double> (buffer.getSample (0, i)));
+            }
+
+            return total;
+        }
+
+        static void apply (TestProcessor& processor, const nog::presets::Preset& preset,
+                           bool loadSamples = true)
         {
             for (const auto& [id, value] : preset.values)
                 if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (
                         processor.apvts.getParameter (id)))
                     parameter->setValueNotifyingHost (
                         juce::jlimit (0.0f, 1.0f, parameter->convertTo0to1 (value)));
+
+            // Samples are not parameters, so setting the values alone leaves a
+            // sample patch pointing at an empty slot. Without this the tests
+            // below would pass on silence for every instrument preset.
+            if (! loadSamples)
+                return;
+
+            for (int i = 0; i < static_cast<int> (preset.builtInSamples.size()); ++i)
+                if (const auto builtIn = preset.builtInSamples[static_cast<size_t> (i)]; builtIn >= 0)
+                    processor.engine.getSampleLibrary().loadBuiltIn (i, builtIn);
         }
     };
 

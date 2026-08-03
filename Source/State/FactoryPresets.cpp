@@ -23,6 +23,7 @@ namespace nog::presets
     std::vector<Preset> orchestralPresets();
     std::vector<Preset> ambientPresets();
     std::vector<Preset> houseTechnoPresets();
+    std::vector<Preset> instrumentPresets();
 
     juce::StringArray categories()
     {
@@ -47,6 +48,7 @@ namespace nog::presets
                                  std::make_move_iterator (category.end()));
             };
 
+            append (instrumentPresets());
             append (bassPresets());
             append (leadPresets());
             append (pluckPresets());
