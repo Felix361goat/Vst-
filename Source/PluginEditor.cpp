@@ -1,5 +1,7 @@
 #include "PluginEditor.h"
 
+#include <BinaryData.h>
+
 #include "PluginProcessor.h"
 
 namespace nog
@@ -9,9 +11,9 @@ namespace nog
         // These add up to the editor's minimum height, so every panel's controls
         // fit without clipping even when the window is at its smallest.
         constexpr int topBarHeight      = 56;
-        constexpr int bottomBarHeight   = 244;
+        constexpr int bottomBarHeight   = 268;
         constexpr int macroSectionWidth = 300;
-        constexpr int oscRowHeight      = 252;
+        constexpr int oscRowHeight      = 292;
 
         using namespace nog::ui;
 
@@ -100,6 +102,34 @@ namespace nog
         };
     }
 
+    NogSuiteEditor::Content::Content()
+    {
+        background = juce::ImageCache::getFromMemory (BinaryData::background_jpg,
+                                                      BinaryData::background_jpgSize);
+
+        // Children paint themselves; this only draws behind them.
+        setInterceptsMouseClicks (false, true);
+    }
+
+    void NogSuiteEditor::Content::paint (juce::Graphics& g)
+    {
+        g.fillAll (ui::colours::background);
+
+        if (background.isValid())
+        {
+            // Fills the window, cropping rather than squashing, so the artwork
+            // keeps its proportions at any window shape.
+            g.drawImage (background, getLocalBounds().toFloat(),
+                         juce::RectanglePlacement::fillDestination);
+
+            // Knocked back just enough that white text on the translucent
+            // panels stays readable wherever the artwork is brightest.
+            g.setColour (ui::colours::background.withAlpha (0.42f));
+            g.fillRect (getLocalBounds());
+        }
+    }
+
+    // -----------------------------------------------------------------------
     NogSuiteEditor::NogSuiteEditor (NogSuiteProcessor& processorToUse)
         : AudioProcessorEditor (&processorToUse),
           processor (processorToUse),
@@ -111,33 +141,49 @@ namespace nog
     {
         setLookAndFeel (&lookAndFeel);
 
+        addAndMakeVisible (content);
+
         synthPage = std::make_unique<SynthPage> (processor.getValueTreeState(),
                                                  processor.getEngine().getModMatrix());
         globalPage = std::make_unique<GlobalPage> (processor.getValueTreeState());
 
         mainTabs.setTabBarDepth (28);
         mainTabs.setOutline (0);
-        mainTabs.addTab ("OSC",    ui::colours::background, synthPage.get(),  false);
-        mainTabs.addTab ("FX",     ui::colours::background, &fxPanel,         false);
-        mainTabs.addTab ("MATRIX", ui::colours::background, &matrixPanel,     false);
-        mainTabs.addTab ("GLOBAL", ui::colours::background, globalPage.get(), false);
+        // Transparent, or the tab's own background would paint over the
+        // artwork and undo the whole point of the translucent panels.
+        mainTabs.addTab ("OSC",    juce::Colours::transparentBlack, synthPage.get(),  false);
+        mainTabs.addTab ("FX",     juce::Colours::transparentBlack, &fxPanel,         false);
+        mainTabs.addTab ("MATRIX", juce::Colours::transparentBlack, &matrixPanel,     false);
+        mainTabs.addTab ("GLOBAL", juce::Colours::transparentBlack, globalPage.get(), false);
 
-        addAndMakeVisible (topBar);
-        addAndMakeVisible (mainTabs);
-        addAndMakeVisible (modulators);
+        // Everything goes inside the content component, which is what gets
+        // scaled; adding to the editor directly would leave a control at a
+        // fixed size while the rest of the interface grew.
+        content.addAndMakeVisible (topBar);
+        content.addAndMakeVisible (mainTabs);
+        content.addAndMakeVisible (modulators);
 
         macroSection.setContent (macros);
-        addAndMakeVisible (macroSection);
+        content.addAndMakeVisible (macroSection);
 
         setResizable (true, true);
-        setResizeLimits (minimumWidth, minimumHeight, 2400, 1600);
+
+        // Locking the aspect ratio is what makes the corner drag scale the
+        // interface rather than reshape it.
+        sizeConstrainer.setFixedAspectRatio (static_cast<double> (logicalWidth)
+                                             / static_cast<double> (logicalHeight));
+        sizeConstrainer.setSizeLimits (juce::roundToInt (logicalWidth * minimumScale),
+                                       juce::roundToInt (logicalHeight * minimumScale),
+                                       juce::roundToInt (logicalWidth * maximumScale),
+                                       juce::roundToInt (logicalHeight * maximumScale));
+        setConstrainer (&sizeConstrainer);
 
         // Reopen at whatever size the user last left the window.
         const auto saved = processor.getSavedEditorSize();
-        const auto width  = saved.x >= minimumWidth  ? saved.x : defaultWidth;
-        const auto height = saved.y >= minimumHeight ? saved.y : defaultHeight;
+        const auto smallest = juce::roundToInt (logicalWidth * minimumScale);
 
-        setSize (width, height);
+        setSize (saved.x >= smallest ? saved.x : logicalWidth,
+                 saved.y >= juce::roundToInt (logicalHeight * minimumScale) ? saved.y : logicalHeight);
     }
 
     NogSuiteEditor::~NogSuiteEditor()
@@ -148,6 +194,7 @@ namespace nog
 
     void NogSuiteEditor::paint (juce::Graphics& g)
     {
+        // Only ever visible in the sliver the aspect ratio cannot fill exactly.
         g.fillAll (ui::colours::background);
     }
 
@@ -155,7 +202,15 @@ namespace nog
     {
         processor.setSavedEditorSize ({ getWidth(), getHeight() });
 
-        auto bounds = getLocalBounds();
+        // The interface is always laid out at its design size; the transform
+        // does the resizing. Scaling by width alone is safe because the
+        // constrainer holds the aspect ratio.
+        const auto scale = static_cast<float> (getWidth()) / static_cast<float> (logicalWidth);
+
+        content.setTransform (juce::AffineTransform::scale (scale));
+        content.setBounds (0, 0, logicalWidth, logicalHeight);
+
+        auto bounds = content.getLocalBounds();
 
         topBar.setBounds (bounds.removeFromTop (topBarHeight));
 

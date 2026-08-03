@@ -7,7 +7,7 @@ namespace nog::ui
     namespace
     {
         constexpr int controlRowHeight = 30;
-        constexpr int knobRowHeight    = 62;
+        constexpr int knobRowHeight    = 76;
     }
 
     void layoutRow (juce::Rectangle<int> area, const std::vector<juce::Component*>& components, int gap)
@@ -62,6 +62,15 @@ namespace nog::ui
         const auto detuneDest = index == 0 ? mod::Dest::Osc1Detune : mod::Dest::Osc2Detune;
         const auto phaseDest  = index == 0 ? mod::Dest::Osc1Phase  : mod::Dest::Osc2Phase;
 
+        // Osc 1 and Osc 2 get their own colours so a glance tells you which
+        // half of the page you are working on.
+        const auto capColour = index == 0 ? colours::candyRed : colours::candyBlue;
+
+        for (auto* knob : { &level, &pan, &wtPos, &warp, &detune,
+                            &unison, &blend, &width, &phase, &phaseRandom,
+                            &octave, &semi, &fine })
+            knob->setAccentColour (capColour);
+
         level.showModulationFor (matrix, levelDest);
         pan.showModulationFor (matrix, panDest);
         wtPos.showModulationFor (matrix, wtDest);
@@ -95,6 +104,9 @@ namespace nog::ui
     {
         addAllChildren (*this, { &enable, &toFilter, &wave, &level, &pan, &octave });
 
+        for (auto* knob : { &level, &pan, &octave })
+            knob->setAccentColour (colours::candyPurple);
+
         level.showModulationFor (matrix, mod::Dest::SubLevel);
         pan.showModulationFor (matrix, mod::Dest::SubPan);
     }
@@ -120,6 +132,9 @@ namespace nog::ui
           pan      (state, ids::noisePan, "Pan")
     {
         addAllChildren (*this, { &enable, &toFilter, &colour, &level, &pan });
+
+        for (auto* knob : { &level, &pan })
+            knob->setAccentColour (colours::candyOrange);
 
         level.showModulationFor (matrix, mod::Dest::NoiseLevel);
         pan.showModulationFor (matrix, mod::Dest::NoisePan);
@@ -148,6 +163,9 @@ namespace nog::ui
           keytrack  (state, ids::filterKeytrack, "Key Trk")
     {
         addAllChildren (*this, { &enable, &type, &cutoff, &resonance, &drive, &mix, &keytrack });
+
+        for (auto* knob : { &cutoff, &resonance, &drive, &mix, &keytrack })
+            knob->setAccentColour (colours::candyGreen);
 
         cutoff.showModulationFor (matrix, mod::Dest::FilterCutoff);
         resonance.showModulationFor (matrix, mod::Dest::FilterReso);
@@ -179,7 +197,12 @@ namespace nog::ui
         addAllChildren (*this, { &voiceMode, &glideMode, &oversampling,
                                  &polyphony, &glideTime, &bendRange, &velocitySens });
 
-        help.setText ("Oversampling is reserved for the DSP work still to come and currently has no effect.",
+        for (auto* knob : { &polyphony, &glideTime, &bendRange, &velocitySens })
+            knob->setAccentColour (colours::candyGreen);
+
+        help.setText ("Oversampling runs the voices at a higher rate before downsampling, "
+                      "which removes the aliasing the filter drive would otherwise produce. "
+                      "It costs CPU in proportion.",
                       juce::dontSendNotification);
         help.setFont (juce::Font (juce::FontOptions (11.0f)));
         help.setColour (juce::Label::textColourId, colours::dimText);

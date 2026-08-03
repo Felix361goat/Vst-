@@ -32,10 +32,12 @@ namespace nog::ui
     public:
         EnvelopePanel (juce::AudioProcessorValueTreeState& state, int index);
 
+        void paint (juce::Graphics& g) override;
         void resized() override;
 
     private:
         EnvelopeDisplay display;
+        ModSourceChip   dragHandle;
         Knob attack, hold, decay, sustain, release;
         Knob attackCurve, decayCurve, releaseCurve;
     };
@@ -63,10 +65,12 @@ namespace nog::ui
     public:
         LfoPanel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix, int index);
 
+        void paint (juce::Graphics& g) override;
         void resized() override;
 
     private:
-        LfoDisplay display;
+        LfoDisplay    display;
+        ModSourceChip dragHandle;
         ChoiceBox shape, syncMode, division, trigger;
         ToggleBox bipolar;
         Knob rate, phase, rise, smooth;
@@ -82,6 +86,22 @@ namespace nog::ui
 
     private:
         std::array<std::unique_ptr<Knob>, ids::numMacros> macros;
+        std::array<std::unique_ptr<ModSourceChip>, ids::numMacros> handles;
+    };
+
+    /** Drag handles for the sources that are not modules of their own -
+        velocity, the keyboard, and the MIDI controllers. */
+    class MidiSourcesPanel final : public juce::Component
+    {
+    public:
+        MidiSourcesPanel();
+
+        void paint (juce::Graphics& g) override;
+        void resized() override;
+
+    private:
+        std::vector<std::unique_ptr<ModSourceChip>> chips;
+        juce::Label help;
     };
 
     /** Tabbed container holding every envelope and LFO. */
@@ -97,5 +117,6 @@ namespace nog::ui
 
         std::array<std::unique_ptr<EnvelopePanel>, ids::numEnvelopes> envelopes;
         std::array<std::unique_ptr<LfoPanel>,      ids::numLfos>      lfos;
+        MidiSourcesPanel midiSources;
     };
 }

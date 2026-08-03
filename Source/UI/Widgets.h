@@ -16,14 +16,50 @@ namespace nog::ui
     */
     void addAllChildren (juce::Component& parent, std::initializer_list<juce::Component*> children);
 
+    /** Drag-and-drop payload identifying a modulation source. */
+    juce::String makeModSourceDragDescription (mod::Source source);
+
+    /** The source a drag description names, or Source::None if it is not one
+        of ours. */
+    mod::Source modSourceFromDragDescription (const juce::var& description);
+
+    /**
+        A draggable handle representing a modulation source.
+
+        Dragging one onto any modulatable knob creates a matrix routing. This is
+        the fast path for programming a patch - the matrix table is still there
+        for editing what the drags produced.
+    */
+    class ModSourceChip final : public juce::Component,
+                                public juce::SettableTooltipClient
+    {
+    public:
+        ModSourceChip (mod::Source sourceToRepresent, juce::String labelText);
+
+        void paint (juce::Graphics& g) override;
+        void mouseDrag (const juce::MouseEvent& event) override;
+        void mouseEnter (const juce::MouseEvent& event) override;
+        void mouseExit (const juce::MouseEvent& event) override;
+
+    private:
+        mod::Source  source;
+        juce::String text;
+        bool         highlighted = false;
+    };
+
     /**
         A labelled rotary control bound to a parameter.
 
-        Optionally shows how far the modulation matrix can push the parameter, by
-        polling the matrix on a timer and handing the depth to the look and feel
-        through a slider property.
+        Shows how far the modulation matrix can push the parameter, by polling
+        the matrix on a timer and handing the depth to the look and feel through
+        a slider property.
+
+        A knob with a modulation destination is also a drop target: dragging a
+        source chip onto it creates a routing, and right-clicking lists what is
+        already modulating it.
     */
     class Knob final : public juce::Component,
+                       public juce::DragAndDropTarget,
                        private juce::Timer
     {
     public:
@@ -38,19 +74,38 @@ namespace nog::ui
             depends on the effect type selected in its slot. */
         void setLabelText (const juce::String& newText);
 
+        /** The colour of this control's cap. Set per module. */
+        void setAccentColour (juce::Colour newColour);
+
         void resized() override;
+        void paintOverChildren (juce::Graphics& g) override;
+
+        /** Right-click opens the modulation menu. The knob listens to its own
+            slider, because the slider covers the area the user clicks on. */
+        void mouseDown (const juce::MouseEvent& event) override;
+
+        // -- DragAndDropTarget ----------------------------------------------
+        bool isInterestedInDragSource (const SourceDetails& details) override;
+        void itemDragEnter (const SourceDetails& details) override;
+        void itemDragExit (const SourceDetails& details) override;
+        void itemDropped (const SourceDetails& details) override;
 
         juce::Slider slider;
 
     private:
         void timerCallback() override;
 
+        /** Right-click menu listing what modulates this control. */
+        void showModulationMenu();
+
+        juce::AudioProcessorValueTreeState& state;
         juce::Label nameLabel;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 
         const ModMatrix* matrix = nullptr;
         mod::Dest        dest   = mod::Dest::None;
         float            lastDepth = 0.0f;
+        bool             dragOver  = false;
     };
 
     /** A labelled combo box bound to a choice parameter. */

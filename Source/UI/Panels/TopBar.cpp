@@ -59,6 +59,7 @@ namespace nog::ui
         addAndMakeVisible (voiceCount);
 
         addAndMakeVisible (meter);
+        masterGain.setAccentColour (colours::candyYellow);
         addAndMakeVisible (masterGain);
         masterGain.showModulationFor (processor.getEngine().getModMatrix(), mod::Dest::MasterGain);
 
@@ -129,10 +130,9 @@ namespace nog::ui
 
     void TopBar::paint (juce::Graphics& g)
     {
-        g.setColour (colours::panel);
-        g.fillRect (getLocalBounds());
+        paintGlassPanel (g, getLocalBounds().toFloat().withTrimmedBottom (1.0f), 0.0f, true);
 
-        g.setColour (colours::border);
+        g.setColour (juce::Colours::white.withAlpha (0.18f));
         g.drawHorizontalLine (getHeight() - 1, 0.0f, static_cast<float> (getWidth()));
     }
 

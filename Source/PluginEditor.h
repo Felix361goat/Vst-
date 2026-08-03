@@ -21,16 +21,24 @@ namespace nog
         level, a tabbed working area, and a modulator strip along the bottom
         that stays visible whichever tab is open - envelopes and LFOs are needed
         while editing every other page.
+
+        The whole interface is built once at a fixed logical size and then
+        scaled by a transform to fill whatever size the window is dragged to.
+        That is how the resize behaves the way a plugin is expected to: every
+        control grows and shrinks together instead of the panels reflowing.
     */
-    class NogSuiteEditor final : public juce::AudioProcessorEditor
+    class NogSuiteEditor final : public juce::AudioProcessorEditor,
+                                 public juce::DragAndDropContainer
     {
     public:
-        // The minimum is the size at which every panel still fits its controls;
-        // the constrainer stops the window going below it.
-        static constexpr int defaultWidth  = 1180;
-        static constexpr int defaultHeight = 860;
-        static constexpr int minimumWidth  = 960;
-        static constexpr int minimumHeight = 760;
+        /** The size the interface is designed at. Everything inside is laid out
+            in these coordinates whatever the window is actually set to. */
+        static constexpr int logicalWidth  = 1180;
+        static constexpr int logicalHeight = 860;
+
+        /** How far the window may be scaled from the design size. */
+        static constexpr float minimumScale = 0.7f;
+        static constexpr float maximumScale = 2.0f;
 
         explicit NogSuiteEditor (NogSuiteProcessor& processorToUse);
         ~NogSuiteEditor() override;
@@ -39,10 +47,24 @@ namespace nog
         void resized() override;
 
     private:
+        /** Everything visible lives inside this, so a single transform on it
+            scales the entire interface. */
+        class Content final : public juce::Component
+        {
+        public:
+            Content();
+            void paint (juce::Graphics& g) override;
+
+        private:
+            juce::Image background;
+        };
+
         NogSuiteProcessor& processor;
 
         // Declared first so it outlives every component that uses it.
         ui::NogLookAndFeel lookAndFeel;
+
+        Content content;
 
         ui::TopBar topBar;
 
@@ -59,6 +81,12 @@ namespace nog
         ui::ModulatorsPanel modulators;
         ui::SectionPanel    macroSection { "Macros" };
         ui::MacroStrip      macros;
+
+        // Shows the "drag onto a knob" hint on the modulation source handles.
+        juce::TooltipWindow tooltips { this, 600 };
+
+        // Keeps the window proportional while it is dragged.
+        juce::ComponentBoundsConstrainer sizeConstrainer;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NogSuiteEditor)
     };

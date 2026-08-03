@@ -4,8 +4,13 @@ namespace nog::ui
 {
     namespace
     {
-        constexpr float knobThickness = 3.5f;
-        constexpr float modRingInset  = 4.0f;
+        constexpr float knobThickness = 3.0f;
+        constexpr float modRingInset  = 3.0f;
+
+        /** Gap between the value arc and the edge of the cap. Kept small so the
+            cap is as large as it can be - the moulded shading needs the room to
+            be legible at the size these knobs are drawn. */
+        constexpr float capGap = 2.0f;
 
         /** Knobs advertise their modulation depth through a slider property, so
             the look and feel stays decoupled from the modulation system. */
@@ -18,11 +23,47 @@ namespace nog::ui
         }
     }
 
+    void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
+                          float cornerSize, bool highlightTop)
+    {
+        // The tint is graded rather than flat: heavier at the top where text
+        // sits, lighter towards the bottom so more of the artwork comes through.
+        juce::ColourGradient tint (colours::panel.withAlpha (0.90f),
+                                   bounds.getCentreX(), bounds.getY(),
+                                   colours::panel.withAlpha (0.72f),
+                                   bounds.getCentreX(), bounds.getBottom(), false);
+
+        g.setGradientFill (tint);
+        g.fillRoundedRectangle (bounds, cornerSize);
+
+        // A lit top edge is most of what makes a surface read as glass.
+        if (highlightTop && bounds.getHeight() > 4.0f)
+        {
+            juce::Graphics::ScopedSaveState saved (g);
+
+            juce::Path clip;
+            clip.addRoundedRectangle (bounds, cornerSize);
+            g.reduceClipRegion (clip);
+
+            juce::ColourGradient sheen (juce::Colours::white.withAlpha (0.16f),
+                                        bounds.getCentreX(), bounds.getY(),
+                                        juce::Colours::white.withAlpha (0.0f),
+                                        bounds.getCentreX(), bounds.getY() + bounds.getHeight() * 0.35f,
+                                        false);
+
+            g.setGradientFill (sheen);
+            g.fillRect (bounds.withHeight (bounds.getHeight() * 0.35f));
+        }
+
+        g.setColour (juce::Colours::white.withAlpha (0.14f));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), cornerSize, 1.0f);
+    }
+
     NogLookAndFeel::NogLookAndFeel()
     {
         setColour (juce::ResizableWindow::backgroundColourId, colours::background);
         setColour (juce::Label::textColourId,                 colours::text);
-        setColour (juce::Slider::textBoxTextColourId,         colours::text);
+        setColour (juce::Slider::textBoxTextColourId,         juce::Colours::white);
         setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::transparentBlack);
         setColour (juce::Slider::textBoxBackgroundColourId,   juce::Colours::transparentBlack);
         setColour (juce::ComboBox::backgroundColourId,        colours::panelHeader);
@@ -65,7 +106,20 @@ namespace nog::ui
 
         const auto arcRadius = radius - knobThickness;
 
-        // -- track ----------------------------------------------------------
+        // The cap colour comes from the knob itself; anything that has not set
+        // one falls back to the interface accent.
+        const auto capColour = [&slider]
+        {
+            const auto stored = slider.getProperties().getWithDefault (knobColourProperty, 0);
+            const auto argb   = static_cast<juce::uint32> (static_cast<juce::int64> (stored));
+
+            return argb != 0 ? juce::Colour (argb) : colours::accent;
+        }();
+
+        const auto enabled = slider.isEnabled();
+        const auto cap     = enabled ? capColour : capColour.withSaturation (0.15f).withBrightness (0.35f);
+
+        // -- value track and arc --------------------------------------------
         juce::Path track;
         track.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                              rotaryStartAngle, rotaryEndAngle, true);
@@ -74,7 +128,6 @@ namespace nog::ui
         g.strokePath (track, juce::PathStrokeType (knobThickness, juce::PathStrokeType::curved,
                                                    juce::PathStrokeType::rounded));
 
-        // -- value ----------------------------------------------------------
         // Bipolar controls fill outwards from the centre, so a pan or a detune
         // reads as an offset rather than an amount.
         const auto isBipolar = slider.getMinimum() < 0.0 && slider.getMaximum() > 0.0;
@@ -89,7 +142,7 @@ namespace nog::ui
             value.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                                  juce::jmin (originAngle, angle), juce::jmax (originAngle, angle), true);
 
-            g.setColour (slider.isEnabled() ? colours::accent : colours::dimText);
+            g.setColour (cap.brighter (0.35f));
             g.strokePath (value, juce::PathStrokeType (knobThickness, juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
         }
@@ -107,26 +160,86 @@ namespace nog::ui
             modulation.addCentredArc (centre.x, centre.y, arcRadius + knobThickness, arcRadius + knobThickness,
                                       0.0f, juce::jmin (modStart, modEnd), juce::jmax (modStart, modEnd), true);
 
-            g.setColour (colours::modulation.withAlpha (0.85f));
+            g.setColour (colours::modulation.withAlpha (0.9f));
             g.strokePath (modulation, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
                                                             juce::PathStrokeType::rounded));
         }
 
-        // -- body and pointer ------------------------------------------------
-        const auto bodyRadius = arcRadius - knobThickness * 1.4f;
+        // -- the cap ----------------------------------------------------------
+        // Built up in layers the way a moulded plastic button reads: a lit top,
+        // a dark rim where it curves away, a hard specular highlight, and a
+        // softer bounce light near the bottom edge.
+        const auto capRadius = arcRadius - knobThickness * 0.5f - capGap;
 
-        g.setColour (colours::panelHeader);
-        g.fillEllipse (juce::Rectangle<float> (bodyRadius * 2.0f, bodyRadius * 2.0f).withCentre (centre));
+        if (capRadius <= 1.0f)
+            return;
 
-        g.setColour (colours::border);
-        g.drawEllipse (juce::Rectangle<float> (bodyRadius * 2.0f, bodyRadius * 2.0f).withCentre (centre), 1.0f);
+        const auto capBounds = juce::Rectangle<float> (capRadius * 2.0f, capRadius * 2.0f).withCentre (centre);
 
+        {
+            juce::ColourGradient body (cap.brighter (0.55f), capBounds.getCentreX(), capBounds.getY(),
+                                       cap.darker (0.55f),   capBounds.getCentreX(), capBounds.getBottom(),
+                                       false);
+            body.addColour (0.55, cap);
+
+            g.setGradientFill (body);
+            g.fillEllipse (capBounds);
+        }
+
+        // Darkening around the rim is what turns a flat disc into a dome.
+        {
+            juce::ColourGradient rim (juce::Colours::transparentBlack, centre.x, centre.y,
+                                      juce::Colours::black.withAlpha (0.45f),
+                                      centre.x, capBounds.getBottom(), true);
+            rim.addColour (0.72, juce::Colours::transparentBlack);
+
+            g.setGradientFill (rim);
+            g.fillEllipse (capBounds);
+        }
+
+        g.setColour (juce::Colours::black.withAlpha (0.85f));
+        g.drawEllipse (capBounds.reduced (0.5f), juce::jmax (1.0f, capRadius * 0.09f));
+
+        // Specular highlight across the upper half.
+        {
+            const auto highlight = juce::Rectangle<float> (capRadius * 1.35f, capRadius * 0.95f)
+                                       .withCentre ({ centre.x, capBounds.getY() + capRadius * 0.52f });
+
+            juce::ColourGradient gloss (juce::Colours::white.withAlpha (0.85f),
+                                        highlight.getCentreX(), highlight.getY(),
+                                        juce::Colours::white.withAlpha (0.0f),
+                                        highlight.getCentreX(), highlight.getBottom(), false);
+
+            g.setGradientFill (gloss);
+            g.fillEllipse (highlight);
+        }
+
+        // Bounce light along the lower edge.
+        {
+            const auto bounce = juce::Rectangle<float> (capRadius * 1.15f, capRadius * 0.5f)
+                                    .withCentre ({ centre.x, capBounds.getBottom() - capRadius * 0.34f });
+
+            juce::ColourGradient reflection (cap.brighter (0.9f).withAlpha (0.0f),
+                                             bounce.getCentreX(), bounce.getY(),
+                                             cap.brighter (0.9f).withAlpha (0.55f),
+                                             bounce.getCentreX(), bounce.getBottom(), false);
+
+            g.setGradientFill (reflection);
+            g.fillEllipse (bounce);
+        }
+
+        // -- pointer ----------------------------------------------------------
+        // A notch cut into the rim rather than a line across the gloss, which
+        // would break the moulded look.
         juce::Path pointer;
-        const auto pointerLength = bodyRadius * 0.75f;
-        pointer.addRoundedRectangle (-1.0f, -bodyRadius + 1.0f, 2.0f, pointerLength, 1.0f);
+        const auto pointerWidth  = juce::jmax (2.0f, capRadius * 0.16f);
+        const auto pointerLength = capRadius * 0.52f;
+
+        pointer.addRoundedRectangle (-pointerWidth * 0.5f, -capRadius + capRadius * 0.1f,
+                                     pointerWidth, pointerLength, pointerWidth * 0.5f);
         pointer.applyTransform (juce::AffineTransform::rotation (angle).translated (centre));
 
-        g.setColour (slider.isEnabled() ? colours::text : colours::dimText);
+        g.setColour (juce::Colours::black.withAlpha (0.72f));
         g.fillPath (pointer);
     }
 
@@ -173,11 +286,13 @@ namespace nog::ui
                                                     static_cast<float> (width),
                                                     static_cast<float> (height));
 
-        g.setColour (colours::panelHeader);
-        g.fillRoundedRectangle (bounds, 3.0f);
+        paintGlassPanel (g, bounds, 3.0f, true);
 
-        g.setColour (box.hasKeyboardFocus (false) ? colours::accent : colours::border);
-        g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
+        if (box.hasKeyboardFocus (false))
+        {
+            g.setColour (colours::accent);
+            g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
+        }
 
         juce::Path arrow;
         const auto arrowX = bounds.getRight() - 13.0f;
@@ -198,15 +313,15 @@ namespace nog::ui
         const auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
         const auto on     = button.getToggleState() || shouldDrawButtonAsDown;
 
-        auto fill = on ? colours::accent.withAlpha (0.22f) : colours::panelHeader;
+        paintGlassPanel (g, bounds, 3.0f, true);
 
-        if (shouldDrawButtonAsHighlighted)
-            fill = fill.brighter (0.15f);
+        if (on || shouldDrawButtonAsHighlighted)
+        {
+            g.setColour (colours::accent.withAlpha (on ? 0.30f : 0.12f));
+            g.fillRoundedRectangle (bounds, 3.0f);
+        }
 
-        g.setColour (fill);
-        g.fillRoundedRectangle (bounds, 3.0f);
-
-        g.setColour (on ? colours::accent : colours::border);
+        g.setColour (on ? colours::accent : juce::Colours::white.withAlpha (0.16f));
         g.drawRoundedRectangle (bounds, 3.0f, 1.0f);
     }
 
@@ -218,15 +333,15 @@ namespace nog::ui
         const auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
         const auto on     = button.getToggleState();
 
-        auto fill = on ? colours::accent.withAlpha (0.28f) : colours::panelHeader;
+        paintGlassPanel (g, bounds, 3.0f, true);
 
-        if (shouldDrawButtonAsHighlighted)
-            fill = fill.brighter (0.15f);
+        if (on || shouldDrawButtonAsHighlighted)
+        {
+            g.setColour (colours::accent.withAlpha (on ? 0.34f : 0.12f));
+            g.fillRoundedRectangle (bounds, 3.0f);
+        }
 
-        g.setColour (fill);
-        g.fillRoundedRectangle (bounds, 3.0f);
-
-        g.setColour (on ? colours::accent : colours::border);
+        g.setColour (on ? colours::accent : juce::Colours::white.withAlpha (0.16f));
         g.drawRoundedRectangle (bounds, 3.0f, 1.0f);
 
         g.setColour (on ? juce::Colours::white : colours::dimText);

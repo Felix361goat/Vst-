@@ -19,7 +19,33 @@ namespace nog::ui
         inline const juce::Colour knobTrack    { 0xff2f3641 };
         inline const juce::Colour meter        { 0xff6ee7a8 };
         inline const juce::Colour meterClip    { 0xffff5f56 };
+
+        /** Control colours. Each module gets one, so a knob's colour says which
+            section it belongs to as well as looking the way it does. */
+        inline const juce::Colour candyRed     { 0xffd81f1f };
+        inline const juce::Colour candyBlue    { 0xff2340e0 };
+        inline const juce::Colour candyGreen   { 0xff2bbd2b };
+        inline const juce::Colour candyYellow  { 0xfff2c40e };
+        inline const juce::Colour candyOrange  { 0xffe8890f };
+        inline const juce::Colour candyPurple  { 0xff8f2bc9 };
     }
+
+    /** Slider property carrying a control's colour through to the look and
+        feel, so drawing stays decoupled from which module owns the knob. */
+    inline constexpr const char* knobColourProperty = "knobColour";
+
+    /** Paints a translucent panel over whatever is behind it.
+
+        Panels are deliberately see-through so the artwork behind the interface
+        stays visible. Readability comes from a graded tint that is darkest at
+        the top, where the labels are, plus a bright top edge and a soft inner
+        shadow that together read as a pane of glass rather than a flat
+        rectangle.
+
+        @param highlightTop  a brighter leading edge, for panel headers.
+    */
+    void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
+                          float cornerSize = 6.0f, bool highlightTop = true);
 
     /**
         Dark theme for the whole plugin.

@@ -9,7 +9,7 @@ namespace nog::ui
     {
         constexpr int slotTitleHeight = 20;
         constexpr int slotHeaderHeight = 30;
-        constexpr int knobRowHeight   = 62;
+        constexpr int knobRowHeight   = 76;
     }
 
     FxPanel::Slot::Slot (juce::AudioProcessorValueTreeState& stateToUse,
@@ -29,6 +29,9 @@ namespace nog::ui
         title.setColour (juce::Label::textColourId, colours::text);
 
         addAllChildren (*this, { &title, &enabled, &type, &a, &b, &c, &mix });
+
+        for (auto* knob : { &a, &b, &c, &mix })
+            knob->setAccentColour (colours::candyBlue);
 
         // Relabel now so the knobs are correct before the first timer tick.
         timerCallback();
@@ -58,12 +61,7 @@ namespace nog::ui
 
     void FxPanel::Slot::paint (juce::Graphics& g)
     {
-        const auto bounds = getLocalBounds().toFloat();
-
-        g.setColour (colours::panel);
-        g.fillRoundedRectangle (bounds, 4.0f);
-        g.setColour (colours::border);
-        g.drawRoundedRectangle (bounds.reduced (0.5f), 4.0f, 1.0f);
+        paintGlassPanel (g, getLocalBounds().toFloat(), 6.0f, true);
     }
 
     void FxPanel::Slot::resized()

@@ -69,6 +69,8 @@ namespace nog::ui
 
     void MatrixPanel::paint (juce::Graphics& g)
     {
+        paintGlassPanel (g, getLocalBounds().toFloat().reduced (2.0f), 6.0f, true);
+
         // Alternating row tints make a sixteen-row table scannable.
         auto bounds = getLocalBounds().reduced (4);
         bounds.removeFromTop (headerHeight);
@@ -79,7 +81,7 @@ namespace nog::ui
 
             if (i % 2 == 0)
             {
-                g.setColour (colours::panelHeader.withAlpha (0.4f));
+                g.setColour (juce::Colours::white.withAlpha (0.05f));
                 g.fillRoundedRectangle (row.toFloat().reduced (1.0f, 1.0f), 3.0f);
             }
         }

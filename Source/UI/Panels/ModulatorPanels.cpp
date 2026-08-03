@@ -7,7 +7,7 @@ namespace nog::ui
 {
     namespace
     {
-        constexpr int knobRowHeight  = 62;
+        constexpr int knobRowHeight  = 76;
         constexpr int displayHeight  = 66;
         constexpr int refreshHz      = 10;
 
@@ -68,9 +68,9 @@ namespace nog::ui
     {
         const auto bounds = getLocalBounds().toFloat().reduced (4.0f);
 
-        g.setColour (colours::background);
+        g.setColour (colours::background.withAlpha (0.55f));
         g.fillRoundedRectangle (bounds, 3.0f);
-        g.setColour (colours::border);
+        g.setColour (juce::Colours::white.withAlpha (0.14f));
         g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
 
         const auto attack   = lastValues[0];
@@ -162,6 +162,8 @@ namespace nog::ui
     // -----------------------------------------------------------------------
     EnvelopePanel::EnvelopePanel (juce::AudioProcessorValueTreeState& state, int index)
         : display      (state, index),
+          dragHandle   (static_cast<mod::Source> (static_cast<int> (mod::Source::Env1) + index),
+                        "ENV " + juce::String (index + 1)),
           attack       (state, ids::env (index, ids::envAttack), "Attack"),
           hold         (state, ids::env (index, ids::envHold), "Hold"),
           decay        (state, ids::env (index, ids::envDecay), "Decay"),
@@ -171,16 +173,33 @@ namespace nog::ui
           decayCurve   (state, ids::env (index, ids::envDecayCurve), "Dec Crv"),
           releaseCurve (state, ids::env (index, ids::envRelCurve), "Rel Crv")
     {
-        addAllChildren (*this, { &display,
+        addAllChildren (*this, { &display, &dragHandle,
                                  &attack, &hold, &decay, &sustain, &release,
                                  &attackCurve, &decayCurve, &releaseCurve });
+
+        for (auto* knob : { &attack, &hold, &decay, &sustain, &release,
+                            &attackCurve, &decayCurve, &releaseCurve })
+            knob->setAccentColour (colours::candyYellow);
+    }
+
+    void EnvelopePanel::paint (juce::Graphics& g)
+    {
+        paintGlassPanel (g, getLocalBounds().toFloat(), 6.0f, true);
     }
 
     void EnvelopePanel::resized()
     {
         auto bounds = getLocalBounds().reduced (4);
 
-        display.setBounds (bounds.removeFromTop (displayHeight));
+        auto displayArea = bounds.removeFromTop (displayHeight);
+
+        display.setBounds (displayArea);
+
+        // The drag handle sits over the top-right corner of the display, where
+        // it reads as belonging to this envelope.
+        dragHandle.setBounds (displayArea.removeFromRight (70).removeFromTop (22).reduced (5, 3));
+        dragHandle.toFront (false);
+
         bounds.removeFromTop (4);
 
         layoutRow (bounds.removeFromTop (knobRowHeight),
@@ -213,9 +232,9 @@ namespace nog::ui
     {
         const auto bounds = getLocalBounds().toFloat().reduced (4.0f);
 
-        g.setColour (colours::background);
+        g.setColour (colours::background.withAlpha (0.55f));
         g.fillRoundedRectangle (bounds, 3.0f);
-        g.setColour (colours::border);
+        g.setColour (juce::Colours::white.withAlpha (0.14f));
         g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
 
         const auto plot = bounds.reduced (6.0f);
@@ -257,7 +276,9 @@ namespace nog::ui
 
     // -----------------------------------------------------------------------
     LfoPanel::LfoPanel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix, int index)
-        : display  (state, index),
+        : display    (state, index),
+          dragHandle (static_cast<mod::Source> (static_cast<int> (mod::Source::Lfo1) + index),
+                      "LFO " + juce::String (index + 1)),
           shape    (state, ids::lfo (index, ids::lfoShape), "Shape"),
           syncMode (state, ids::lfo (index, ids::lfoSyncMode), "Sync"),
           division (state, ids::lfo (index, ids::lfoRateSync), "Division"),
@@ -268,18 +289,31 @@ namespace nog::ui
           rise     (state, ids::lfo (index, ids::lfoRise), "Rise"),
           smooth   (state, ids::lfo (index, ids::lfoSmooth), "Smooth")
     {
-        addAllChildren (*this, { &display,
+        addAllChildren (*this, { &display, &dragHandle,
                                  &shape, &syncMode, &division, &trigger, &bipolar,
                                  &rate, &phase, &rise, &smooth });
 
+        for (auto* knob : { &rate, &phase, &rise, &smooth })
+            knob->setAccentColour (colours::candyOrange);
+
         rate.showModulationFor (matrix, static_cast<mod::Dest> (static_cast<int> (mod::Dest::Lfo1Rate) + index));
+    }
+
+    void LfoPanel::paint (juce::Graphics& g)
+    {
+        paintGlassPanel (g, getLocalBounds().toFloat(), 6.0f, true);
     }
 
     void LfoPanel::resized()
     {
         auto bounds = getLocalBounds().reduced (4);
 
-        display.setBounds (bounds.removeFromTop (displayHeight));
+        auto displayArea = bounds.removeFromTop (displayHeight);
+
+        display.setBounds (displayArea);
+        dragHandle.setBounds (displayArea.removeFromRight (70).removeFromTop (22).reduced (5, 3));
+        dragHandle.toFront (false);
+
         bounds.removeFromTop (4);
 
         layoutRow (bounds.removeFromTop (44), { &shape, &syncMode, &division, &trigger }, 4);
@@ -296,8 +330,15 @@ namespace nog::ui
         for (int i = 0; i < ids::numMacros; ++i)
         {
             auto knob = std::make_unique<Knob> (state, ids::macro (i), "Macro " + juce::String (i + 1));
+            knob->setAccentColour (colours::candyPurple);
             addAndMakeVisible (*knob);
             macros[static_cast<size_t> (i)] = std::move (knob);
+
+            auto handle = std::make_unique<ModSourceChip> (
+                static_cast<mod::Source> (static_cast<int> (mod::Source::Macro1) + i),
+                "DRAG");
+            addAndMakeVisible (*handle);
+            handles[static_cast<size_t> (i)] = std::move (handle);
         }
     }
 
@@ -306,10 +347,79 @@ namespace nog::ui
         // Two by two rather than a single row: the macro section is tall and
         // narrow, so a 4-wide row would leave the knobs tiny.
         auto bounds = getLocalBounds().reduced (2);
-        const auto rowHeight = juce::jmin (bounds.getHeight() / 2, 90);
+        const auto rowHeight = juce::jmin (bounds.getHeight() / 2, 96);
 
-        layoutRow (bounds.removeFromTop (rowHeight), { macros[0].get(), macros[1].get() });
-        layoutRow (bounds.removeFromTop (rowHeight), { macros[2].get(), macros[3].get() });
+        const auto layoutPair = [this] (juce::Rectangle<int> area, int first, int second)
+        {
+            auto handleRow = area.removeFromBottom (16);
+
+            layoutRow (area, { macros[static_cast<size_t> (first)].get(),
+                               macros[static_cast<size_t> (second)].get() });
+
+            layoutRow (handleRow, { handles[static_cast<size_t> (first)].get(),
+                                    handles[static_cast<size_t> (second)].get() }, 22);
+        };
+
+        layoutPair (bounds.removeFromTop (rowHeight), 0, 1);
+        layoutPair (bounds.removeFromTop (rowHeight), 2, 3);
+    }
+
+    // -----------------------------------------------------------------------
+    MidiSourcesPanel::MidiSourcesPanel()
+    {
+        // Everything that modulates but is not a module with its own panel.
+        const std::pair<mod::Source, const char*> entries[] {
+            { mod::Source::Velocity,   "VELOCITY" },
+            { mod::Source::KeyTrack,   "KEY TRACK" },
+            { mod::Source::ModWheel,   "MOD WHEEL" },
+            { mod::Source::PitchBend,  "PITCH BEND" },
+            { mod::Source::Aftertouch, "AFTERTOUCH" },
+            { mod::Source::Random,     "RANDOM" }
+        };
+
+        for (const auto& [source, name] : entries)
+        {
+            auto chip = std::make_unique<ModSourceChip> (source, name);
+            addAndMakeVisible (*chip);
+            chips.push_back (std::move (chip));
+        }
+
+        help.setText ("Drag any of these onto a knob to modulate it. "
+                      "Right-click a knob to see or remove what is modulating it.",
+                      juce::dontSendNotification);
+        help.setFont (juce::Font (juce::FontOptions (11.0f)));
+        help.setColour (juce::Label::textColourId, colours::dimText);
+        help.setJustificationType (juce::Justification::topLeft);
+        addAndMakeVisible (help);
+    }
+
+    void MidiSourcesPanel::paint (juce::Graphics& g)
+    {
+        paintGlassPanel (g, getLocalBounds().toFloat(), 6.0f, true);
+    }
+
+    void MidiSourcesPanel::resized()
+    {
+        auto bounds = getLocalBounds().reduced (8);
+
+        help.setBounds (bounds.removeFromTop (34));
+        bounds.removeFromTop (6);
+
+        // Two rows of three, sized so the chips stay comfortably clickable.
+        const auto rowHeight = juce::jmin (26, bounds.getHeight() / 2);
+
+        std::vector<juce::Component*> row;
+
+        for (size_t start = 0; start < chips.size(); start += 3)
+        {
+            row.clear();
+
+            for (size_t i = start; i < juce::jmin (start + 3, chips.size()); ++i)
+                row.push_back (chips[i].get());
+
+            layoutRow (bounds.removeFromTop (rowHeight), row, 6);
+            bounds.removeFromTop (6);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -321,16 +431,18 @@ namespace nog::ui
         for (int i = 0; i < ids::numEnvelopes; ++i)
         {
             envelopes[static_cast<size_t> (i)] = std::make_unique<EnvelopePanel> (state, i);
-            tabs.addTab ("ENV " + juce::String (i + 1), colours::panel,
+            tabs.addTab ("ENV " + juce::String (i + 1), juce::Colours::transparentBlack,
                          envelopes[static_cast<size_t> (i)].get(), false);
         }
 
         for (int i = 0; i < ids::numLfos; ++i)
         {
             lfos[static_cast<size_t> (i)] = std::make_unique<LfoPanel> (state, matrix, i);
-            tabs.addTab ("LFO " + juce::String (i + 1), colours::panel,
+            tabs.addTab ("LFO " + juce::String (i + 1), juce::Colours::transparentBlack,
                          lfos[static_cast<size_t> (i)].get(), false);
         }
+
+        tabs.addTab ("MIDI", juce::Colours::transparentBlack, &midiSources, false);
 
         addAndMakeVisible (tabs);
     }

@@ -69,6 +69,18 @@ if(APPLE)
 endif()
 
 # ---------------------------------------------------------------------------
+# Embedded resources
+# ---------------------------------------------------------------------------
+# Compiled into the binary so the plugin has no external file dependencies -
+# a plugin that needs files next to it breaks the moment a user moves it.
+juce_add_binary_data(NogSuiteResources
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Resources/background.jpg)
+
+# Binary data is linked into a shared library, so it needs position-independent
+# code on Linux.
+set_target_properties(NogSuiteResources PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
+# ---------------------------------------------------------------------------
 # The plugin target
 # ---------------------------------------------------------------------------
 juce_add_plugin(NogSuite
@@ -101,6 +113,7 @@ target_compile_definitions(NogSuite
 
 target_link_libraries(NogSuite
     PRIVATE
+        NogSuiteResources
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC

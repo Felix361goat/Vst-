@@ -1,5 +1,7 @@
 #include "UI/Widgets.h"
 
+#include "Modulation/ModAssign.h"
+
 namespace nog::ui
 {
     namespace
@@ -22,13 +24,77 @@ namespace nog::ui
     }
 
     // -----------------------------------------------------------------------
-    Knob::Knob (juce::AudioProcessorValueTreeState& state,
+    juce::String makeModSourceDragDescription (mod::Source source)
+    {
+        return "nog.modsource:" + juce::String (static_cast<int> (source));
+    }
+
+    mod::Source modSourceFromDragDescription (const juce::var& description)
+    {
+        const auto text = description.toString();
+
+        if (! text.startsWith ("nog.modsource:"))
+            return mod::Source::None;
+
+        const auto index = text.fromFirstOccurrenceOf (":", false, false).getIntValue();
+
+        if (index <= 0 || index >= mod::numSources)
+            return mod::Source::None;
+
+        return static_cast<mod::Source> (index);
+    }
+
+    // -----------------------------------------------------------------------
+    ModSourceChip::ModSourceChip (mod::Source sourceToRepresent, juce::String labelText)
+        : source (sourceToRepresent), text (std::move (labelText))
+    {
+        setMouseCursor (juce::MouseCursor::DraggingHandCursor);
+        setTooltip ("Drag onto any knob to modulate it");
+    }
+
+    void ModSourceChip::paint (juce::Graphics& g)
+    {
+        const auto bounds = getLocalBounds().toFloat().reduced (0.5f);
+
+        g.setColour (highlighted ? colours::modulation.withAlpha (0.35f)
+                                 : colours::modulation.withAlpha (0.18f));
+        g.fillRoundedRectangle (bounds, 3.0f);
+
+        g.setColour (colours::modulation);
+        g.drawRoundedRectangle (bounds, 3.0f, 1.0f);
+
+        g.setFont (labelFont (10.5f, true));
+        g.drawText (text, bounds, juce::Justification::centred, false);
+    }
+
+    void ModSourceChip::mouseEnter (const juce::MouseEvent&)
+    {
+        highlighted = true;
+        repaint();
+    }
+
+    void ModSourceChip::mouseExit (const juce::MouseEvent&)
+    {
+        highlighted = false;
+        repaint();
+    }
+
+    void ModSourceChip::mouseDrag (const juce::MouseEvent&)
+    {
+        if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this))
+            if (! container->isDragAndDropActive())
+                container->startDragging (makeModSourceDragDescription (source), this);
+    }
+
+    // -----------------------------------------------------------------------
+    Knob::Knob (juce::AudioProcessorValueTreeState& stateToUse,
                 const juce::String& parameterID,
                 const juce::String& labelText)
+        : state (stateToUse)
     {
         slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, valueBoxHeight);
-        slider.setColour (juce::Slider::textBoxTextColourId, colours::dimText);
+        slider.setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
 
         // A wider drag distance makes fine adjustment possible without needing
         // a modifier key, which matters for cutoff and tuning controls.
@@ -40,12 +106,119 @@ namespace nog::ui
         nameLabel.setText (labelText, juce::dontSendNotification);
         nameLabel.setJustificationType (juce::Justification::centred);
         nameLabel.setFont (labelFont (11.0f));
-        nameLabel.setColour (juce::Label::textColourId, colours::dimText);
+        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white);
         nameLabel.setInterceptsMouseClicks (false, false);
         addAndMakeVisible (nameLabel);
 
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             state, parameterID, slider);
+
+        // The slider fills the knob, so right-clicks land on it rather than on
+        // this component; listening to it is what lets the modulation menu open.
+        slider.addMouseListener (this, false);
+    }
+
+    void Knob::mouseDown (const juce::MouseEvent& event)
+    {
+        if (event.mods.isPopupMenu())
+            showModulationMenu();
+    }
+
+    bool Knob::isInterestedInDragSource (const SourceDetails& details)
+    {
+        return dest != mod::Dest::None
+            && modSourceFromDragDescription (details.description) != mod::Source::None;
+    }
+
+    void Knob::itemDragEnter (const SourceDetails&)
+    {
+        dragOver = true;
+        repaint();
+    }
+
+    void Knob::itemDragExit (const SourceDetails&)
+    {
+        dragOver = false;
+        repaint();
+    }
+
+    void Knob::itemDropped (const SourceDetails& details)
+    {
+        dragOver = false;
+        repaint();
+
+        const auto source = modSourceFromDragDescription (details.description);
+
+        if (source == mod::Source::None || dest == mod::Dest::None)
+            return;
+
+        if (mod::assign (state, source, dest) < 0)
+        {
+            // Every slot is taken. Saying so is better than silently ignoring
+            // the drop and leaving the user wondering.
+            juce::NativeMessageBox::showMessageBoxAsync (
+                juce::MessageBoxIconType::InfoIcon,
+                "Modulation matrix full",
+                "All " + juce::String (ids::numMatrixSlots) + " slots are in use. "
+                "Clear one on the MATRIX tab to make room.");
+        }
+    }
+
+    void Knob::paintOverChildren (juce::Graphics& g)
+    {
+        if (! dragOver)
+            return;
+
+        g.setColour (colours::modulation);
+        g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), 4.0f, 2.0f);
+    }
+
+    void Knob::showModulationMenu()
+    {
+        if (dest == mod::Dest::None)
+            return;
+
+        const auto slots = mod::findSlotsForDestination (state, dest);
+
+        juce::PopupMenu menu;
+        menu.addSectionHeader (juce::String (mod::destNames()[static_cast<size_t> (dest)]));
+
+        if (slots.empty())
+        {
+            menu.addItem (juce::PopupMenu::Item ("No modulation assigned").setEnabled (false));
+        }
+        else
+        {
+            for (size_t i = 0; i < slots.size(); ++i)
+            {
+                const auto contents = mod::readSlot (state, slots[i]);
+                const auto name = juce::String (mod::sourceNames()[static_cast<size_t> (contents.source)])
+                                + "   " + juce::String (contents.amount * 100.0f, 0) + " %";
+
+                menu.addItem (static_cast<int> (i) + 1, "Remove  " + name);
+            }
+
+            menu.addSeparator();
+            menu.addItem (1000, "Remove all");
+        }
+
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this),
+                            [this, slots] (int result)
+                            {
+                                if (result == 0)
+                                    return;
+
+                                if (result == 1000)
+                                {
+                                    mod::clearDestination (state, dest);
+                                    return;
+                                }
+
+                                const auto index = static_cast<size_t> (result - 1);
+
+                                if (index < slots.size())
+                                    mod::clearSlot (state, slots[index]);
+                            });
     }
 
     void Knob::showModulationFor (const ModMatrix& matrixToWatch, mod::Dest destination)
@@ -59,6 +232,15 @@ namespace nog::ui
     void Knob::setLabelText (const juce::String& newText)
     {
         nameLabel.setText (newText, juce::dontSendNotification);
+    }
+
+    void Knob::setAccentColour (juce::Colour newColour)
+    {
+        // Passed through a property rather than a member so the look and feel
+        // can read it without knowing anything about this class.
+        slider.getProperties().set (knobColourProperty,
+                                    static_cast<juce::int64> (newColour.getARGB()));
+        slider.repaint();
     }
 
     void Knob::timerCallback()
@@ -110,7 +292,7 @@ namespace nog::ui
         nameLabel.setText (labelText, juce::dontSendNotification);
         nameLabel.setJustificationType (juce::Justification::centredLeft);
         nameLabel.setFont (labelFont (11.0f));
-        nameLabel.setColour (juce::Label::textColourId, colours::dimText);
+        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white);
         addAndMakeVisible (nameLabel);
 
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
@@ -166,17 +348,22 @@ namespace nog::ui
     {
         const auto bounds = getLocalBounds().toFloat();
 
-        g.setColour (colours::panel);
-        g.fillRoundedRectangle (bounds, 4.0f);
+        paintGlassPanel (g, bounds, 6.0f, true);
 
-        g.setColour (colours::panelHeader);
-        g.fillRoundedRectangle (bounds.withHeight (static_cast<float> (headerHeight) + 4.0f), 4.0f);
-        g.fillRect (bounds.withY (static_cast<float> (headerHeight) - 4.0f).withHeight (4.0f));
+        // A slightly denser band behind the title keeps it legible wherever the
+        // artwork happens to be bright.
+        {
+            juce::Graphics::ScopedSaveState saved (g);
 
-        g.setColour (colours::border);
-        g.drawRoundedRectangle (bounds.reduced (0.5f), 4.0f, 1.0f);
+            juce::Path clip;
+            clip.addRoundedRectangle (bounds, 6.0f);
+            g.reduceClipRegion (clip);
 
-        g.setColour (colours::text);
+            g.setColour (colours::panelHeader.withAlpha (0.55f));
+            g.fillRect (bounds.withHeight (static_cast<float> (headerHeight)));
+        }
+
+        g.setColour (juce::Colours::white);
         g.setFont (labelFont (11.5f, true));
         g.drawText (title.toUpperCase(),
                     getLocalBounds().withHeight (headerHeight).reduced (8, 0),
