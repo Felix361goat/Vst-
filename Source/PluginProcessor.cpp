@@ -11,6 +11,10 @@ namespace nog
         constexpr const char* stateVersionProperty = "stateVersion";
         constexpr const char* editorWidthProperty  = "editorWidth";
         constexpr const char* editorHeightProperty = "editorHeight";
+        constexpr const char* backgroundPathProperty = "backgroundImage";
+        constexpr const char* backgroundDimProperty  = "backgroundDim";
+
+        constexpr float defaultBackgroundDim = 0.42f;
 
         /** Longest tail the effects rack can produce, added to the envelope
             release when reporting the tail length to the host. */
@@ -124,6 +128,109 @@ namespace nog
     {
         apvts.state.setProperty (editorWidthProperty,  size.x, nullptr);
         apvts.state.setProperty (editorHeightProperty, size.y, nullptr);
+    }
+
+    juce::PropertiesFile& NogSuiteProcessor::getSettings() const
+    {
+        // One shared settings file per user, created on first use. Held in a
+        // function-local static so every instance sees the same preferences and
+        // a background chosen in one shows up in the next.
+        static juce::PropertiesFile::Options options = []
+        {
+            juce::PropertiesFile::Options o;
+            o.applicationName     = JucePlugin_Name;
+            o.filenameSuffix      = "settings";
+            o.osxLibrarySubFolder = "Application Support";
+
+            // Windows and macOS both have a designated place for this; on Linux
+            // the folder lands straight in $HOME, so it gets a leading dot
+            // rather than cluttering the user's home directory.
+           #if JUCE_LINUX || JUCE_BSD
+            o.folderName = juce::String (".") + JucePlugin_Manufacturer;
+           #else
+            o.folderName = JucePlugin_Manufacturer;
+           #endif
+
+            return o;
+        }();
+
+        static juce::PropertiesFile settings (options);
+        return settings;
+    }
+
+    juce::File NogSuiteProcessor::getBackgroundDirectory()
+    {
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                   .getChildFile (JucePlugin_Manufacturer)
+                   .getChildFile (JucePlugin_Name)
+                   .getChildFile ("Backgrounds");
+    }
+
+    juce::String NogSuiteProcessor::getBackgroundImagePath() const
+    {
+        const auto fromState = apvts.state.getProperty (backgroundPathProperty, {}).toString();
+
+        // A session that predates this setting, or one saved on another
+        // machine, falls back to whatever this user last chose.
+        if (fromState.isNotEmpty())
+            return fromState;
+
+        return getSettings().getValue (backgroundPathProperty, {});
+    }
+
+    void NogSuiteProcessor::setBackgroundImagePath (const juce::String& path)
+    {
+        apvts.state.setProperty (backgroundPathProperty, path, nullptr);
+
+        getSettings().setValue (backgroundPathProperty, path);
+        getSettings().saveIfNeeded();
+    }
+
+    float NogSuiteProcessor::getBackgroundDim() const
+    {
+        const auto stored = apvts.state.getProperty (backgroundDimProperty, {});
+
+        if (stored.isVoid())
+            return static_cast<float> (getSettings().getDoubleValue (backgroundDimProperty,
+                                                                     defaultBackgroundDim));
+
+        return juce::jlimit (0.0f, 0.95f, static_cast<float> (stored));
+    }
+
+    void NogSuiteProcessor::setBackgroundDim (float amount)
+    {
+        const auto clamped = juce::jlimit (0.0f, 0.95f, amount);
+
+        apvts.state.setProperty (backgroundDimProperty, clamped, nullptr);
+
+        getSettings().setValue (backgroundDimProperty, clamped);
+        getSettings().saveIfNeeded();
+    }
+
+    bool NogSuiteProcessor::chooseBackgroundImage (const juce::File& source)
+    {
+        if (! source.existsAsFile())
+            return false;
+
+        // Reject anything JUCE cannot decode before copying it, so a bad pick
+        // does not silently leave the background unchanged.
+        if (! juce::ImageFileFormat::loadFrom (source).isValid())
+            return false;
+
+        const auto directory = getBackgroundDirectory();
+
+        if (! directory.isDirectory())
+            directory.createDirectory();
+
+        // Copied rather than referenced: a background that breaks because the
+        // user tidied up their Downloads folder would be baffling.
+        const auto destination = directory.getChildFile (source.getFileName());
+
+        if (destination != source && ! source.copyFileTo (destination))
+            return false;
+
+        setBackgroundImagePath (destination.getFullPathName());
+        return true;
     }
 
     void NogSuiteProcessor::getStateInformation (juce::MemoryBlock& destData)

@@ -48,15 +48,34 @@ namespace nog
 
     private:
         /** Everything visible lives inside this, so a single transform on it
-            scales the entire interface. */
-        class Content final : public juce::Component
+            scales the entire interface.
+
+            Also owns the background: the built-in artwork, or whatever image
+            the user has chosen. It watches the plugin's state tree so a change
+            made anywhere is picked up without the editor having to be told.
+        */
+        class Content final : public juce::Component,
+                              private juce::ValueTree::Listener,
+                              private juce::AsyncUpdater
         {
         public:
-            Content();
+            explicit Content (NogSuiteProcessor& processorToUse);
+            ~Content() override;
+
             void paint (juce::Graphics& g) override;
 
         private:
-            juce::Image background;
+            void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier& property) override;
+
+            /** Reloading happens on the message thread, whichever thread the
+                state change arrived on. */
+            void handleAsyncUpdate() override;
+
+            void reloadBackground();
+
+            NogSuiteProcessor& processor;
+            juce::Image        background;
+            float              dim = 0.42f;
         };
 
         NogSuiteProcessor& processor;

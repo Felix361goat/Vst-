@@ -50,7 +50,10 @@ namespace nog::ui
             refreshPresetList();
         };
 
-        for (auto* button : { &previousButton, &nextButton, &saveButton, &initButton })
+        backgroundButton.onClick = [this] { showBackgroundMenu(); };
+        backgroundButton.setTooltip ("Choose the background image");
+
+        for (auto* button : { &previousButton, &nextButton, &saveButton, &initButton, &backgroundButton })
             addAndMakeVisible (button);
 
         voiceCount.setFont (juce::Font (juce::FontOptions (11.0f)));
@@ -115,6 +118,78 @@ namespace nog::ui
             }), false);
     }
 
+    void TopBar::showBackgroundMenu()
+    {
+        const auto currentDim = processor.getBackgroundDim();
+        const auto usingCustom = processor.getBackgroundImagePath().isNotEmpty();
+
+        juce::PopupMenu dimming;
+
+        // Named rather than a slider: three useful settings covers it, and a
+        // menu needs no room in the header.
+        const std::pair<const char*, float> levels[] {
+            { "Show more of the image", 0.20f },
+            { "Balanced",               0.42f },
+            { "Favour readability",     0.65f }
+        };
+
+        for (int i = 0; i < 3; ++i)
+            dimming.addItem (juce::PopupMenu::Item (levels[static_cast<size_t> (i)].first)
+                                 .setTicked (std::abs (currentDim - levels[static_cast<size_t> (i)].second) < 0.01f)
+                                 .setAction ([this, value = levels[static_cast<size_t> (i)].second]
+                                             { processor.setBackgroundDim (value); }));
+
+        juce::PopupMenu menu;
+        menu.addSectionHeader ("Background");
+        menu.addItem ("Choose image...", [this] { promptForBackgroundImage(); });
+        menu.addItem (juce::PopupMenu::Item ("Use the built-in artwork")
+                          .setEnabled (usingCustom)
+                          .setAction ([this] { processor.setBackgroundImagePath ({}); }));
+        menu.addSeparator();
+        menu.addSubMenu ("Dimming", dimming);
+        menu.addSeparator();
+        menu.addItem (juce::PopupMenu::Item ("Open backgrounds folder")
+                          .setAction ([]
+                          {
+                              const auto directory = NogSuiteProcessor::getBackgroundDirectory();
+
+                              if (! directory.isDirectory())
+                                  directory.createDirectory();
+
+                              directory.revealToUser();
+                          }));
+
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&backgroundButton));
+    }
+
+    void TopBar::promptForBackgroundImage()
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Choose a background image",
+            juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
+            "*.png;*.jpg;*.jpeg;*.gif;*.bmp");
+
+        const auto browserFlags = juce::FileBrowserComponent::openMode
+                                | juce::FileBrowserComponent::canSelectFiles;
+
+        fileChooser->launchAsync (browserFlags, [this] (const juce::FileChooser& chooser)
+        {
+            const auto file = chooser.getResult();
+
+            if (file == juce::File())
+                return;
+
+            // The image is copied into the plugin's own folder, so the
+            // background survives the original being moved or deleted.
+            if (! processor.chooseBackgroundImage (file))
+                juce::NativeMessageBox::showMessageBoxAsync (
+                    juce::MessageBoxIconType::WarningIcon,
+                    "Could not use that image",
+                    file.getFileName() + " could not be read as an image. "
+                    "PNG, JPEG, GIF and BMP are supported.");
+        });
+    }
+
     void TopBar::timerCallback()
     {
         meter.setLevel (processor.getOutputLevel());
@@ -140,7 +215,9 @@ namespace nog::ui
     {
         auto bounds = getLocalBounds().reduced (8, 6);
 
-        logo.setBounds (bounds.removeFromLeft (130));
+        logo.setBounds (bounds.removeFromLeft (108));
+        backgroundButton.setBounds (bounds.removeFromLeft (34).withSizeKeepingCentre (30, 22));
+        bounds.removeFromLeft (6);
 
         // Master level lives at the far right, with the meter beneath it.
         masterGain.setBounds (bounds.removeFromRight (66));

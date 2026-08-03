@@ -75,8 +75,36 @@ namespace nog
         juce::Point<int> getSavedEditorSize() const;
         void setSavedEditorSize (juce::Point<int> size);
 
+        // -- background artwork ---------------------------------------------
+        /** Path of the user's chosen background, or empty for the built-in
+            artwork. Falls back to the machine-wide preference when the loaded
+            session does not name one, so a chosen background follows the user
+            from project to project. */
+        juce::String getBackgroundImagePath() const;
+
+        /** Sets the background for this instance and remembers it as the
+            default for new ones. An empty path restores the built-in artwork. */
+        void setBackgroundImagePath (const juce::String& path);
+
+        /** How far the background is dimmed behind the panels, 0 to 1. Arbitrary
+            images vary wildly in brightness, so this is adjustable. */
+        float getBackgroundDim() const;
+        void setBackgroundDim (float amount);
+
+        /** Where chosen backgrounds are copied to, so that moving or deleting
+            the original file does not break the look. */
+        static juce::File getBackgroundDirectory();
+
+        /** Copies @p source into the backgrounds folder and selects it.
+            Returns false if the file could not be read as an image. */
+        bool chooseBackgroundImage (const juce::File& source);
+
     private:
         static BusesProperties getBusesLayout();
+
+        /** Machine-wide preferences: things that are a property of the user's
+            setup rather than of the patch, such as the chosen background. */
+        juce::PropertiesFile& getSettings() const;
 
         APVTS          apvts;
         ParameterStore parameters;

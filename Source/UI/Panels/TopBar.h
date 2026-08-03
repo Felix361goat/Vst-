@@ -33,6 +33,10 @@ namespace nog::ui
 
         void promptToSavePreset();
 
+        /** Menu for choosing the background image and how far it is dimmed. */
+        void showBackgroundMenu();
+        void promptForBackgroundImage();
+
         NogSuiteProcessor& processor;
 
         juce::Label      logo;
@@ -40,7 +44,12 @@ namespace nog::ui
         juce::TextButton nextButton     { ">" };
         juce::TextButton saveButton     { "SAVE" };
         juce::TextButton initButton     { "INIT" };
+        juce::TextButton backgroundButton { "BG" };
         juce::ComboBox   presetList;
+
+        // Held as a member because the chooser has to outlive the call that
+        // launches it.
+        std::unique_ptr<juce::FileChooser> fileChooser;
 
         juce::Label voiceCount;
         LevelMeter  meter;

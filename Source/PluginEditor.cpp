@@ -102,13 +102,73 @@ namespace nog
         };
     }
 
-    NogSuiteEditor::Content::Content()
+    NogSuiteEditor::Content::Content (NogSuiteProcessor& processorToUse)
+        : processor (processorToUse)
     {
-        background = juce::ImageCache::getFromMemory (BinaryData::background_jpg,
-                                                      BinaryData::background_jpgSize);
-
         // Children paint themselves; this only draws behind them.
         setInterceptsMouseClicks (false, true);
+
+        reloadBackground();
+        processor.getValueTreeState().state.addListener (this);
+    }
+
+    NogSuiteEditor::Content::~Content()
+    {
+        processor.getValueTreeState().state.removeListener (this);
+        cancelPendingUpdate();
+    }
+
+    void NogSuiteEditor::Content::valueTreePropertyChanged (juce::ValueTree&,
+                                                            const juce::Identifier& property)
+    {
+        // Only the two that affect the background; the tree also carries the
+        // editor size and the preset name.
+        if (property.toString() == "backgroundImage" || property.toString() == "backgroundDim")
+            triggerAsyncUpdate();
+    }
+
+    void NogSuiteEditor::Content::handleAsyncUpdate()
+    {
+        reloadBackground();
+        repaint();
+    }
+
+    void NogSuiteEditor::Content::reloadBackground()
+    {
+        dim = processor.getBackgroundDim();
+
+        const auto path = processor.getBackgroundImagePath();
+
+        if (path.isNotEmpty())
+        {
+            const juce::File file (path);
+
+            if (file.existsAsFile())
+            {
+                auto loaded = juce::ImageCache::getFromFile (file);
+
+                if (loaded.isValid())
+                {
+                    // A photo straight off a phone can be 4000 pixels wide.
+                    // Rescaling once here costs far less than resampling it on
+                    // every repaint.
+                    constexpr int maximumWidth = 2048;
+
+                    if (loaded.getWidth() > maximumWidth)
+                        loaded = loaded.rescaled (maximumWidth,
+                                                  loaded.getHeight() * maximumWidth / loaded.getWidth(),
+                                                  juce::Graphics::highResamplingQuality);
+
+                    background = loaded;
+                    return;
+                }
+            }
+        }
+
+        // No choice made, or the file has gone: fall back to the artwork that
+        // ships inside the binary, which cannot go missing.
+        background = juce::ImageCache::getFromMemory (BinaryData::background_jpg,
+                                                      BinaryData::background_jpgSize);
     }
 
     void NogSuiteEditor::Content::paint (juce::Graphics& g)
@@ -117,14 +177,14 @@ namespace nog
 
         if (background.isValid())
         {
-            // Fills the window, cropping rather than squashing, so the artwork
+            // Fills the window, cropping rather than squashing, so the image
             // keeps its proportions at any window shape.
             g.drawImage (background, getLocalBounds().toFloat(),
                          juce::RectanglePlacement::fillDestination);
 
-            // Knocked back just enough that white text on the translucent
-            // panels stays readable wherever the artwork is brightest.
-            g.setColour (ui::colours::background.withAlpha (0.42f));
+            // Knocked back so white text on the translucent panels stays
+            // readable however bright the chosen image happens to be.
+            g.setColour (ui::colours::background.withAlpha (dim));
             g.fillRect (getLocalBounds());
         }
     }
@@ -133,6 +193,7 @@ namespace nog
     NogSuiteEditor::NogSuiteEditor (NogSuiteProcessor& processorToUse)
         : AudioProcessorEditor (&processorToUse),
           processor (processorToUse),
+          content (processorToUse),
           topBar (processorToUse),
           fxPanel (processorToUse.getValueTreeState(), processorToUse.getEngine().getEffects()),
           matrixPanel (processorToUse.getValueTreeState()),
