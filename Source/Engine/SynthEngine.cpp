@@ -13,6 +13,9 @@ namespace nog
         // Forces the factory wavetables to be synthesised here, on whatever
         // thread constructs the plugin, rather than on the first audio callback.
         dsp::WavetableBank::factory();
+
+        for (auto& voice : voices)
+            voice.setSampleLibrary (&samples);
     }
 
     int SynthEngine::getOversamplingFactor() noexcept

@@ -21,12 +21,12 @@ namespace nog
         class SynthPage final : public juce::Component
         {
         public:
-            SynthPage (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix)
-                : osc1Panel (state, matrix, 0),
-                  osc2Panel (state, matrix, 1),
-                  subPanel (state, matrix),
-                  noisePanel (state, matrix),
-                  filterPanel (state, matrix)
+            SynthPage (NogSuiteProcessor& processor, const ModMatrix& matrix)
+                : osc1Panel (processor, matrix, 0),
+                  osc2Panel (processor, matrix, 1),
+                  subPanel (processor.getValueTreeState(), matrix),
+                  noisePanel (processor.getValueTreeState(), matrix),
+                  filterPanel (processor.getValueTreeState(), matrix)
             {
                 osc1Section.setContent (osc1Panel);
                 osc2Section.setContent (osc2Panel);
@@ -204,8 +204,7 @@ namespace nog
 
         addAndMakeVisible (content);
 
-        synthPage = std::make_unique<SynthPage> (processor.getValueTreeState(),
-                                                 processor.getEngine().getModMatrix());
+        synthPage = std::make_unique<SynthPage> (processor, processor.getEngine().getModMatrix());
         globalPage = std::make_unique<GlobalPage> (processor.getValueTreeState());
 
         mainTabs.setTabBarDepth (28);

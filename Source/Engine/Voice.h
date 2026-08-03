@@ -7,6 +7,7 @@
 #include "DSP/Lfo.h"
 #include "DSP/NoiseGenerator.h"
 #include "DSP/Oscillator.h"
+#include "DSP/SampleLibrary.h"
 #include "DSP/StateVariableFilter.h"
 #include "Modulation/ModMatrix.h"
 #include "Params/ParameterStore.h"
@@ -66,6 +67,9 @@ namespace nog
                               const ParameterStore& parameters, const ModMatrix& matrix,
                               double bpm);
 
+        /** Where the oscillators get their samples. Not owned. */
+        void setSampleLibrary (const dsp::SampleLibrary* library) noexcept { samples = library; }
+
     private:
         const dsp::Envelope& amplitudeEnvelope() const noexcept { return envelopes[0]; }
         dsp::Envelope& amplitudeEnvelope() noexcept { return envelopes[0]; }
@@ -112,6 +116,8 @@ namespace nog
         // Amplitude is interpolated across each sub-block from the previous
         // control-rate value to the new one.
         float previousAmplitude = 0.0f;
+
+        const dsp::SampleLibrary* samples = nullptr;
 
         std::array<dsp::Oscillator, ids::numOscillators> oscillators;
         dsp::Oscillator      subOscillator;

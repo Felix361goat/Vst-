@@ -64,6 +64,9 @@ namespace nog
             o.semi       = find<Int>    (apvts, ids::osc (i, ids::oscSemi));
             o.fine       = find<Float>  (apvts, ids::osc (i, ids::oscFine));
             o.toFilter   = find<Bool>   (apvts, ids::osc (i, ids::oscToFilter));
+            o.mode       = find<Choice> (apvts, ids::osc (i, ids::oscMode));
+            o.sampleLoop = find<Choice> (apvts, ids::osc (i, ids::oscSampleLoop));
+            o.sampleRoot = find<Int>    (apvts, ids::osc (i, ids::oscSampleRoot));
         }
 
         // -- sub / noise / filter -------------------------------------------

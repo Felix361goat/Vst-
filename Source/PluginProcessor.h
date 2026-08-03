@@ -99,6 +99,20 @@ namespace nog
             Returns false if the file could not be read as an image. */
         bool chooseBackgroundImage (const juce::File& source);
 
+        // -- oscillator samples ----------------------------------------------
+        /** Loads an audio file into an oscillator's sample slot. Message thread
+            only. Returns false if it could not be decoded. */
+        bool loadSampleForOscillator (int oscillatorIndex, const juce::File& file);
+
+        void clearSampleForOscillator (int oscillatorIndex);
+
+        /** Name of the sample loaded into an oscillator, or empty. */
+        juce::String getSampleName (int oscillatorIndex) const;
+
+        /** Re-reads the sample paths recorded in the state and loads them.
+            Called after a session or preset is restored. */
+        void reloadSamplesFromState();
+
     private:
         static BusesProperties getBusesLayout();
 

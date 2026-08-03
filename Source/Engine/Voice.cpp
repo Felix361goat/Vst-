@@ -247,8 +247,12 @@ namespace nog
             const auto pitchDest  = i == 0 ? mod::Dest::Osc1Pitch  : mod::Dest::Osc2Pitch;
 
             oscillator.setTable (&bank.getTable (p.wave->getIndex()));
+            oscillator.setSample (samples != nullptr ? samples->getSlot (i) : nullptr);
 
             dsp::Oscillator::Settings settings;
+            settings.mode         = p.mode->getIndex();
+            settings.loop         = p.sampleLoop->getIndex();
+            settings.rootNote     = p.sampleRoot->get();
             settings.warpMode     = p.warpMode->getIndex();
             settings.unisonVoices = p.unison->get();
             settings.blend        = p.blend->get();

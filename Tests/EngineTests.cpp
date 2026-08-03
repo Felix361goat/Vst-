@@ -19,6 +19,7 @@
 #include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 #include "Params/ParameterStore.h"
+#include "DSP/SampleLibrary.h"
 #include "State/FactoryPresets.h"
 
 namespace
@@ -880,7 +881,184 @@ namespace
         }
     };
 
-    ParameterTests      parameterTests;
+    // -----------------------------------------------------------------------
+    class SampleOscillatorTests final : public juce::UnitTest
+    {
+    public:
+        SampleOscillatorTests() : UnitTest ("Sample oscillator", "nog") {}
+
+        void runTest() override
+        {
+            // A short recognisable file written to disk, so the whole path is
+            // exercised: decoding, normalising, pitching and playback.
+            const auto file = juce::File::createTempFile (".wav");
+            const auto writeSucceeded = writeTestTone (file, 220.0, 0.5, 44100.0);
+
+            beginTest ("a test file can be written");
+            expect (writeSucceeded, "could not create a temporary wav to test with");
+
+            if (! writeSucceeded)
+                return;
+
+            beginTest ("a file loads, normalises and reports its length");
+            {
+                nog::dsp::SampleLibrary library;
+
+                expect (library.getSlot (0) == nullptr, "slots start empty");
+                expect (library.loadIntoSlot (0, file), "the file should load");
+
+                const auto* sample = library.getSlot (0);
+                expect (sample != nullptr);
+
+                if (sample == nullptr)
+                    return;
+
+                expectWithinAbsoluteError (static_cast<double> (sample->getLength()), 22050.0, 64.0);
+                expectWithinAbsoluteError (sample->getSourceSampleRate(), 44100.0, 1.0);
+
+                auto peak = 0.0f;
+
+                for (int i = 0; i < 512; ++i)
+                    peak = juce::jmax (peak, std::abs (sample->read (0, i / 512.0)));
+
+                // Loading normalises, so a quiet file and a loud one arrive at
+                // the oscillator at the same level.
+                expect (peak > 0.7f, "sample should be normalised, peak was " + juce::String (peak));
+            }
+
+            beginTest ("a rubbish file is refused rather than half-loaded");
+            {
+                nog::dsp::SampleLibrary library;
+                const auto notAudio = juce::File::createTempFile (".wav");
+                notAudio.replaceWithText ("this is not a wav file");
+
+                expect (! library.loadIntoSlot (0, notAudio));
+                expect (library.getSlot (0) == nullptr);
+
+                notAudio.deleteFile();
+            }
+
+            beginTest ("an oscillator in sample mode produces audio at the right pitch");
+            {
+                nog::dsp::SampleLibrary library;
+                expect (library.loadIntoSlot (0, file));
+
+                nog::dsp::Oscillator oscillator;
+                oscillator.prepare (testSampleRate);
+                oscillator.setSample (library.getSlot (0));
+
+                nog::dsp::Oscillator::Settings settings;
+                settings.mode     = static_cast<int> (nog::dsp::Oscillator::Mode::Sample);
+                settings.loop     = static_cast<int> (nog::dsp::Oscillator::Loop::Forward);
+                settings.rootNote = 60;
+                settings.level    = 1.0f;
+                oscillator.setSettings (settings);
+
+                expect (oscillator.isPlayingSample());
+
+                // Played at its root note, the file should come out at its
+                // original speed regardless of the host's sample rate.
+                oscillator.setFrequency (440.0f * std::exp2 ((60.0f - 69.0f) / 12.0f));
+                oscillator.noteOn();
+
+                auto peak = 0.0f;
+
+                for (int i = 0; i < 8192; ++i)
+                {
+                    auto left = 0.0f, right = 0.0f;
+                    oscillator.addNextSample (left, right);
+
+                    expect (std::isfinite (left) && std::isfinite (right));
+                    peak = juce::jmax (peak, std::abs (left));
+                }
+
+                expect (peak > 0.1f, "sample playback was silent");
+            }
+
+            beginTest ("a one-shot stops at the end and a loop does not");
+            {
+                nog::dsp::SampleLibrary library;
+                expect (library.loadIntoSlot (0, file));
+
+                const auto measureTail = [&library] (nog::dsp::Oscillator::Loop loop)
+                {
+                    nog::dsp::Oscillator oscillator;
+                    oscillator.prepare (testSampleRate);
+                    oscillator.setSample (library.getSlot (0));
+
+                    nog::dsp::Oscillator::Settings settings;
+                    settings.mode  = static_cast<int> (nog::dsp::Oscillator::Mode::Sample);
+                    settings.loop  = static_cast<int> (loop);
+                    settings.level = 1.0f;
+                    oscillator.setSettings (settings);
+                    oscillator.setFrequency (440.0f * std::exp2 ((60.0f - 69.0f) / 12.0f));
+                    oscillator.noteOn();
+
+                    // Half a second of source at 44.1k, played at 48k, runs out
+                    // well inside this.
+                    for (int i = 0; i < 40000; ++i)
+                    {
+                        auto l = 0.0f, r = 0.0f;
+                        oscillator.addNextSample (l, r);
+                    }
+
+                    auto peak = 0.0f;
+
+                    for (int i = 0; i < 4096; ++i)
+                    {
+                        auto l = 0.0f, r = 0.0f;
+                        oscillator.addNextSample (l, r);
+                        peak = juce::jmax (peak, std::abs (l));
+                    }
+
+                    return peak;
+                };
+
+                expectWithinAbsoluteError (measureTail (nog::dsp::Oscillator::Loop::OneShot), 0.0f, 1.0e-6f);
+                expect (measureTail (nog::dsp::Oscillator::Loop::Forward) > 0.1f,
+                        "a looping sample should still be sounding");
+            }
+
+            file.deleteFile();
+        }
+
+    private:
+        /** Writes a fixed sine to @p file so the tests have something real to
+            decode rather than a synthetic buffer. */
+        static bool writeTestTone (const juce::File& file, double frequency,
+                                   double seconds, double sampleRate)
+        {
+            const auto length = static_cast<int> (sampleRate * seconds);
+
+            juce::AudioBuffer<float> buffer (1, length);
+
+            for (int i = 0; i < length; ++i)
+                buffer.setSample (0, i, 0.4f * std::sin (juce::MathConstants<float>::twoPi
+                                                         * static_cast<float> (frequency * i / sampleRate)));
+
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
+
+            if (stream == nullptr)
+                return false;
+
+            const auto options = juce::AudioFormatWriterOptions()
+                                     .withSampleRate (sampleRate)
+                                     .withNumChannels (1)
+                                     .withBitsPerSample (16);
+
+            // Takes the stream by reference and claims it on success.
+            const auto writer = format.createWriterFor (stream, options);
+
+            if (writer == nullptr)
+                return false;
+
+            return writer->writeFromAudioSampleBuffer (buffer, 0, length);
+        }
+    };
+
+    ParameterTests          parameterTests;
+    SampleOscillatorTests   sampleOscillatorTests;
     FactoryPresetTests  factoryPresetTests;
     WavetableTests  wavetableTests;
     ModMatrixTests  modMatrixTests;

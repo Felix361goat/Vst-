@@ -4,6 +4,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include "Engine/Voice.h"
+#include "DSP/SampleLibrary.h"
 #include "FX/FXChain.h"
 #include "Modulation/ModMatrix.h"
 #include "Params/ParameterStore.h"
@@ -45,6 +46,11 @@ namespace nog
             generic controls are called. */
         const fx::FXChain& getEffects() const noexcept { return effects; }
 
+        /** The samples the oscillators can play. Loading is message-thread
+            only; see SampleLibrary for how the handover is made safe. */
+        dsp::SampleLibrary& getSampleLibrary() noexcept { return samples; }
+        const dsp::SampleLibrary& getSampleLibrary() const noexcept { return samples; }
+
     private:
         enum class VoiceMode { Poly = 0, Mono, Legato };
 
@@ -79,9 +85,10 @@ namespace nog
         VoiceMode getVoiceMode() const noexcept;
         int getPolyphony() const noexcept;
 
-        ParameterStore& parameters;
-        ModMatrix       matrix;
-        fx::FXChain     effects;
+        ParameterStore&    parameters;
+        ModMatrix          matrix;
+        fx::FXChain        effects;
+        dsp::SampleLibrary samples;
 
         std::array<Voice, maxVoices> voices;
 

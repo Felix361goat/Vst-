@@ -42,6 +42,9 @@ namespace nog
             juce::AudioParameterInt*    semi        = nullptr;
             juce::AudioParameterFloat*  fine        = nullptr;
             juce::AudioParameterBool*   toFilter    = nullptr;
+            juce::AudioParameterChoice* mode        = nullptr;
+            juce::AudioParameterChoice* sampleLoop  = nullptr;
+            juce::AudioParameterInt*    sampleRoot  = nullptr;
         };
 
         struct Sub

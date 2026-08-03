@@ -18,6 +18,9 @@ namespace nog::params
             return dsp::WavetableBank::getTableNames();
         }
 
+        juce::StringArray oscModes()        { return { "Wavetable", "Sample" }; }
+        juce::StringArray sampleLoopModes() { return { "One Shot", "Loop" }; }
+
         juce::StringArray subWaveforms()   { return { "Sine", "Triangle", "Saw", "Square" }; }
 
         juce::StringArray warpModes()
@@ -217,7 +220,12 @@ namespace nog::params
                          intParam   (ids::osc (index, ids::oscSemi), "Osc " + number + " Semi", -12, 12, 0),
                          floatParam (ids::osc (index, ids::oscFine), "Osc " + number + " Fine",
                                      linear (-100.0f, 100.0f), 0.0f, fmtCents, "ct"),
-                         boolParam  (ids::osc (index, ids::oscToFilter), "Osc " + number + " > Filter", true));
+                         boolParam  (ids::osc (index, ids::oscToFilter), "Osc " + number + " > Filter", true),
+                         choiceParam (ids::osc (index, ids::oscMode), "Osc " + number + " Mode",
+                                      choices::oscModes(), 0),
+                         choiceParam (ids::osc (index, ids::oscSampleLoop), "Osc " + number + " Loop",
+                                      choices::sampleLoopModes(), 0),
+                         intParam   (ids::osc (index, ids::oscSampleRoot), "Osc " + number + " Root", 0, 127, 60));
 
             return g;
         }

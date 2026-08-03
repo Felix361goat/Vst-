@@ -8,6 +8,11 @@ namespace nog::dsp
     {
         constexpr float maxDetuneCents    = 100.0f;   // per side, at detune = 1
         constexpr float centsToRatioScale = 1.0f / 1200.0f;
+
+        float midiNoteToHz (float note) noexcept
+        {
+            return 440.0f * std::exp2 ((note - 69.0f) / 12.0f);
+        }
     }
 
     void Oscillator::prepare (double newSampleRate) noexcept
@@ -19,7 +24,10 @@ namespace nog::dsp
     void Oscillator::reset() noexcept
     {
         for (auto& voice : unison)
+        {
             voice.phase = 0.0;
+            voice.finished = false;
+        }
 
         layoutDirty = true;
         updateUnisonLayout();
@@ -29,11 +37,26 @@ namespace nog::dsp
     {
         updateUnisonLayout();
 
+        const auto playingSample = isPlayingSample();
+
         for (int i = 0; i < activeUnisonVoices; ++i)
         {
-            const auto randomOffset = random.nextFloat() * settings.phaseRandom;
-            unison[static_cast<size_t> (i)].phase =
-                std::fmod (static_cast<double> (settings.phase + randomOffset), 1.0);
+            auto& voice = unison[static_cast<size_t> (i)];
+
+            if (playingSample)
+            {
+                // A sample starts where the user put the start offset. Randomising
+                // it the way a wavetable does would scatter the attack transient,
+                // which is usually the most recognisable part of the file.
+                voice.phase = juce::jlimit (0.0f, 0.999f, settings.morph);
+            }
+            else
+            {
+                const auto randomOffset = random.nextFloat() * settings.phaseRandom;
+                voice.phase = std::fmod (static_cast<double> (settings.phase + randomOffset), 1.0);
+            }
+
+            voice.finished = false;
         }
     }
 
@@ -92,6 +115,36 @@ namespace nog::dsp
         unisonNormalise = gainSum > 0.0f ? 1.0f / std::sqrt (gainSum) : 1.0f;
     }
 
+    double Oscillator::incrementFor (float voiceFrequency) const noexcept
+    {
+        if (isPlayingSample())
+        {
+            const auto length = sample->getLength();
+
+            if (length <= 1)
+                return 0.0;
+
+            // How far off the sample's own root the note is, applied on top of
+            // the rate conversion between the file and the host.
+            const auto rootFrequency = midiNoteToHz (static_cast<float> (settings.rootNote));
+            const auto pitchRatio = rootFrequency > 0.0f
+                                  ? static_cast<double> (voiceFrequency / rootFrequency)
+                                  : 1.0;
+
+            return sample->getBaseRatio (sampleRate) * pitchRatio / static_cast<double> (length);
+        }
+
+        return static_cast<double> (voiceFrequency) / sampleRate;
+    }
+
+    float Oscillator::readSource (double phase, double increment, int channel) const noexcept
+    {
+        if (isPlayingSample())
+            return sample->read (channel, phase);
+
+        return readTable (phase, increment);
+    }
+
     float Oscillator::readTable (double phase, double increment) const noexcept
     {
         if (table == nullptr || table->isEmpty())
@@ -102,17 +155,17 @@ namespace nog::dsp
         return table->getSample (framePosition, mip, phase - std::floor (phase));
     }
 
-    float Oscillator::warpedSample (double phase, double increment) const noexcept
+    float Oscillator::warpedSample (double phase, double increment, int channel) const noexcept
     {
         const auto amount = juce::jlimit (0.0f, 1.0f, settings.warpAmount);
 
         if (amount <= 0.0f)
-            return readTable (phase, increment);
+            return readSource (phase, increment, channel);
 
         switch (static_cast<Warp> (settings.warpMode))
         {
             case Warp::Off:
-                return readTable (phase, increment);
+                return readSource (phase, increment, channel);
 
             case Warp::Sync:
             {
@@ -120,19 +173,19 @@ namespace nog::dsp
                 // producing the hard-sync formant sweep. The increment is
                 // scaled too, so the mip level follows the real bandwidth.
                 const auto ratio = 1.0 + static_cast<double> (amount) * 3.0;
-                return readTable (std::fmod (phase * ratio, 1.0), increment * ratio);
+                return readSource (std::fmod (phase * ratio, 1.0), increment * ratio, channel);
             }
 
             case Warp::BendPlus:
             {
                 const auto exponent = 1.0 + static_cast<double> (amount) * 3.0;
-                return readTable (std::pow (phase, exponent), increment * exponent);
+                return readSource (std::pow (phase, exponent), increment * exponent, channel);
             }
 
             case Warp::BendMinus:
             {
                 const auto exponent = 1.0 / (1.0 + static_cast<double> (amount) * 3.0);
-                return readTable (std::pow (phase, exponent), increment / exponent);
+                return readSource (std::pow (phase, exponent), increment / exponent, channel);
             }
 
             case Warp::Pwm:
@@ -140,15 +193,15 @@ namespace nog::dsp
                 // Subtracting a phase-shifted copy turns any wave into a
                 // pulse-width-modulated version of itself.
                 const auto offset = 0.5 - static_cast<double> (amount) * 0.49;
-                return 0.5f * (readTable (phase, increment)
-                             - readTable (std::fmod (phase + offset, 1.0), increment));
+                return 0.5f * (readSource (phase, increment, channel)
+                             - readSource (std::fmod (phase + offset, 1.0), increment, channel));
             }
 
             case Warp::Mirror:
             {
                 const auto folded = phase < 0.5 ? phase * 2.0 : (1.0 - phase) * 2.0;
                 const auto mixed  = phase + (folded - phase) * static_cast<double> (amount);
-                return readTable (mixed, increment * 2.0);
+                return readSource (mixed, increment * 2.0, channel);
             }
 
             case Warp::Asymmetric:
@@ -157,25 +210,30 @@ namespace nog::dsp
                 const auto pivot  = 0.5 - static_cast<double> (amount) * 0.45;
                 const auto mapped = phase < pivot ? (phase / pivot) * 0.5
                                                   : 0.5 + ((phase - pivot) / (1.0 - pivot)) * 0.5;
-                return readTable (mapped, increment / juce::jmax (0.05, pivot * 2.0));
+                return readSource (mapped, increment / juce::jmax (0.05, pivot * 2.0), channel);
             }
 
             case Warp::Quantize:
             {
                 const auto steps   = juce::jmax (2.0, std::round (64.0 * (1.0 - static_cast<double> (amount)) + 2.0));
                 const auto stepped = std::floor (phase * steps) / steps;
-                return readTable (stepped, increment);
+                return readSource (stepped, increment, channel);
             }
         }
 
-        return readTable (phase, increment);
+        return readSource (phase, increment, channel);
     }
 
     void Oscillator::addNextSample (float& left, float& right) noexcept
     {
         updateUnisonLayout();
 
-        if (settings.level <= 0.0f || frequency <= 0.0f || table == nullptr)
+        const auto playingSample = isPlayingSample();
+
+        if (settings.level <= 0.0f || frequency <= 0.0f)
+            return;
+
+        if (! playingSample && table == nullptr)
             return;
 
         // Equal-power pan for the oscillator as a whole, applied on top of the
@@ -187,6 +245,13 @@ namespace nog::dsp
 
         const auto gain = settings.level * unisonNormalise;
 
+        // A stereo file is read twice, once per side; a mono one is read once
+        // and shared, which is both correct and half the work.
+        const auto stereoSource = playingSample && sample->getNumChannels() > 1;
+        const auto looping = playingSample
+                          && static_cast<Loop> (settings.loop) == Loop::Forward;
+        const auto loopStart = static_cast<double> (juce::jlimit (0.0f, 0.999f, settings.morph));
+
         auto sumLeft  = 0.0f;
         auto sumRight = 0.0f;
 
@@ -194,22 +259,35 @@ namespace nog::dsp
         {
             auto& voice = unison[static_cast<size_t> (i)];
 
-            const auto voiceFrequency = frequency * voice.detuneRatio;
-            const auto increment      = static_cast<double> (voiceFrequency) / sampleRate;
-
-            // Anything at or above Nyquist can only alias, so it is dropped.
-            if (increment >= 0.5)
+            if (voice.finished)
                 continue;
 
-            const auto sample = warpedSample (voice.phase, increment);
+            const auto voiceFrequency = frequency * voice.detuneRatio;
+            const auto increment      = incrementFor (voiceFrequency);
 
-            sumLeft  += sample * voice.gainLeft;
-            sumRight += sample * voice.gainRight;
+            // Anything at or above Nyquist can only alias. Samples are exempt:
+            // their increment is a fraction of the file, not of a cycle.
+            if (! playingSample && increment >= 0.5)
+                continue;
+
+            const auto sampleLeft  = warpedSample (voice.phase, increment, 0);
+            const auto sampleRight = stereoSource ? warpedSample (voice.phase, increment, 1)
+                                                  : sampleLeft;
+
+            sumLeft  += sampleLeft  * voice.gainLeft;
+            sumRight += sampleRight * voice.gainRight;
 
             voice.phase += increment;
 
             if (voice.phase >= 1.0)
-                voice.phase -= std::floor (voice.phase);
+            {
+                if (! playingSample)
+                    voice.phase -= std::floor (voice.phase);
+                else if (looping)
+                    voice.phase = loopStart;
+                else
+                    voice.finished = true;   // one-shot has run out
+            }
         }
 
         left  += sumLeft  * gain * panLeft;

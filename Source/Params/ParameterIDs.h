@@ -71,6 +71,9 @@ namespace nog::ids
     inline constexpr const char* oscSemi        = "semi";
     inline constexpr const char* oscFine        = "fine";
     inline constexpr const char* oscToFilter    = "tofilter";
+    inline constexpr const char* oscMode        = "mode";        // wavetable / sample
+    inline constexpr const char* oscSampleLoop  = "smploop";
+    inline constexpr const char* oscSampleRoot  = "smproot";
 
     // -- sub oscillator -----------------------------------------------------
     inline constexpr const char* subEnable      = "sub_enable";

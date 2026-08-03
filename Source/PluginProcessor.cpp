@@ -16,6 +16,16 @@ namespace nog
 
         constexpr float defaultBackgroundDim = 0.42f;
 
+        /** State property holding the file an oscillator's sample came from.
+            The audio itself is never written into the session - a few megabytes
+            per instance in every project file would be unreasonable - so a
+            missing file simply means the oscillator falls back to its
+            wavetable. */
+        juce::String samplePathProperty (int oscillatorIndex)
+        {
+            return "osc" + juce::String (oscillatorIndex + 1) + "SamplePath";
+        }
+
         /** Longest tail the effects rack can produce, added to the envelope
             release when reporting the tail length to the host. */
         constexpr double effectsTailSeconds = 4.0;
@@ -233,6 +243,47 @@ namespace nog
         return true;
     }
 
+    bool NogSuiteProcessor::loadSampleForOscillator (int oscillatorIndex, const juce::File& file)
+    {
+        if (! engine.getSampleLibrary().loadIntoSlot (oscillatorIndex, file))
+            return false;
+
+        apvts.state.setProperty (samplePathProperty (oscillatorIndex),
+                                 file.getFullPathName(), nullptr);
+        return true;
+    }
+
+    void NogSuiteProcessor::clearSampleForOscillator (int oscillatorIndex)
+    {
+        engine.getSampleLibrary().clearSlot (oscillatorIndex);
+        apvts.state.setProperty (samplePathProperty (oscillatorIndex), {}, nullptr);
+    }
+
+    juce::String NogSuiteProcessor::getSampleName (int oscillatorIndex) const
+    {
+        return engine.getSampleLibrary().getSlotName (oscillatorIndex);
+    }
+
+    void NogSuiteProcessor::reloadSamplesFromState()
+    {
+        for (int i = 0; i < ids::numOscillators; ++i)
+        {
+            const auto path = apvts.state.getProperty (samplePathProperty (i), {}).toString();
+
+            if (path.isEmpty())
+            {
+                engine.getSampleLibrary().clearSlot (i);
+                continue;
+            }
+
+            // A session moved between machines can name a file that is no longer
+            // there. Falling back to the wavetable is better than refusing to
+            // open the project.
+            if (! engine.getSampleLibrary().loadIntoSlot (i, juce::File (path)))
+                engine.getSampleLibrary().clearSlot (i);
+        }
+    }
+
     void NogSuiteProcessor::getStateInformation (juce::MemoryBlock& destData)
     {
         auto state = apvts.copyState();
@@ -273,6 +324,9 @@ namespace nog
         }
 
         apvts.replaceState (tree);
+
+        // The tree names sample files by path; they have to be read back in.
+        reloadSamplesFromState();
     }
 }
 

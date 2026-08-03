@@ -303,8 +303,12 @@ namespace nog::presets
             .env (0, 1.0f, 220.0f, 0.0f, 180.0f, 0.0f, 0.0f, 0.5f)
             .env (1, 0.5f, 90.0f, 0.0f, 80.0f)
             .route (Src::Env2, Dst::Osc1Pitch, 0.03f)
-            .lfoSynced (0, 5, 7)
-            .route (Src::Lfo1, Dst::FilterCutoff, 0.3f, true)
+            // Unipolar on purpose: a bipolar sample and hold can land negative
+            // exactly on the attack and shut the filter before the note is
+            // audible at all. Opening only upwards keeps the character and
+            // guarantees every note speaks.
+            .lfoSynced (0, 5, 7, false)
+            .route (Src::Lfo1, Dst::FilterCutoff, 0.30f)
             .fx (FX::Delay, 0.3f, 0.16f, 0.4f, 0.95f)
             .fx (FX::Reverb, 0.3f, 0.7f, 0.3f, 1.0f)
             .master (-8.0f)

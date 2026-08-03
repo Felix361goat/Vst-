@@ -1,6 +1,7 @@
 #include "UI/Panels/SynthPanels.h"
 
 #include "Params/ParameterIDs.h"
+#include "PluginProcessor.h"
 
 namespace nog::ui
 {
@@ -30,30 +31,39 @@ namespace nog::ui
     }
 
     // -----------------------------------------------------------------------
-    OscillatorPanel::OscillatorPanel (juce::AudioProcessorValueTreeState& state,
+    OscillatorPanel::OscillatorPanel (NogSuiteProcessor& processorToUse,
                                       const ModMatrix& matrix, int index)
-        : enable      (state, ids::osc (index, ids::oscEnable), "ON"),
-          toFilter    (state, ids::osc (index, ids::oscToFilter), "> FILTER"),
-          wave        (state, ids::osc (index, ids::oscWave), {}),
-          warpMode    (state, ids::osc (index, ids::oscWarpMode), {}),
-          level       (state, ids::osc (index, ids::oscLevel), "Level"),
-          pan         (state, ids::osc (index, ids::oscPan), "Pan"),
-          wtPos       (state, ids::osc (index, ids::oscWtPos), "WT Pos"),
-          warp        (state, ids::osc (index, ids::oscWarpAmount), "Warp"),
-          detune      (state, ids::osc (index, ids::oscDetune), "Detune"),
-          unison      (state, ids::osc (index, ids::oscUnison), "Unison"),
-          blend       (state, ids::osc (index, ids::oscBlend), "Blend"),
-          width       (state, ids::osc (index, ids::oscUniWidth), "Width"),
-          phase       (state, ids::osc (index, ids::oscPhase), "Phase"),
-          phaseRandom (state, ids::osc (index, ids::oscPhaseRand), "Rand"),
-          octave      (state, ids::osc (index, ids::oscOctave), "Octave"),
-          semi        (state, ids::osc (index, ids::oscSemi), "Semi"),
-          fine        (state, ids::osc (index, ids::oscFine), "Fine")
+        : processor       (processorToUse),
+          oscillatorIndex (index),
+          enable      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscEnable), "ON"),
+          toFilter    (processorToUse.getValueTreeState(), ids::osc (index, ids::oscToFilter), "> FILTER"),
+          mode        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscMode), {}),
+          wave        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscWave), {}),
+          warpMode    (processorToUse.getValueTreeState(), ids::osc (index, ids::oscWarpMode), {}),
+          level       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscLevel), "Level"),
+          pan         (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPan), "Pan"),
+          wtPos       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscWtPos), "WT Pos"),
+          warp        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscWarpAmount), "Warp"),
+          detune      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscDetune), "Detune"),
+          unison      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscUnison), "Unison"),
+          blend       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscBlend), "Blend"),
+          width       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscUniWidth), "Width"),
+          phase       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPhase), "Phase"),
+          phaseRandom (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPhaseRand), "Rand"),
+          octave      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscOctave), "Octave"),
+          semi        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscSemi), "Semi"),
+          fine        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscFine), "Fine")
     {
-        addAllChildren (*this, { &enable, &toFilter, &wave, &warpMode,
+        addAllChildren (*this, { &enable, &toFilter, &mode, &wave, &warpMode, &sampleButton,
                                  &level, &pan, &wtPos, &warp, &detune,
                                  &unison, &blend, &width, &phase, &phaseRandom,
                                  &octave, &semi, &fine });
+
+        sampleButton.onClick = [this] { showSampleMenu(); };
+        sampleButton.setTooltip ("Load an audio file for this oscillator to play");
+
+        updateModeVisibility();
+        startTimerHz (6);
 
         const auto levelDest  = index == 0 ? mod::Dest::Osc1Level  : mod::Dest::Osc2Level;
         const auto panDest    = index == 0 ? mod::Dest::Osc1Pan    : mod::Dest::Osc2Pan;
@@ -79,6 +89,119 @@ namespace nog::ui
         phase.showModulationFor (matrix, phaseDest);
     }
 
+    void OscillatorPanel::timerCallback()
+    {
+        const auto currentMode = mode.box.getSelectedItemIndex();
+        const auto name = processor.getSampleName (oscillatorIndex);
+
+        if (currentMode == lastMode && name == lastSampleName)
+            return;
+
+        lastMode = currentMode;
+        lastSampleName = name;
+
+        // The button doubles as the readout: there is no room in the header for
+        // a separate label, and the file name is the only thing worth showing.
+        sampleButton.setButtonText (name.isNotEmpty() ? name.toUpperCase() : "LOAD SAMPLE");
+
+        updateModeVisibility();
+    }
+
+    void OscillatorPanel::updateModeVisibility()
+    {
+        const auto sampleMode = mode.box.getSelectedItemIndex() == 1;
+
+        wave.setVisible (! sampleMode);
+        sampleButton.setVisible (sampleMode);
+
+        // In sample mode the morph control becomes the playback start offset,
+        // so it is relabelled rather than hidden.
+        wtPos.setLabelText (sampleMode ? "Start" : "WT Pos");
+    }
+
+    void OscillatorPanel::showSampleMenu()
+    {
+        const auto loaded = processor.getSampleName (oscillatorIndex).isNotEmpty();
+        auto& state = processor.getValueTreeState();
+        const auto index = oscillatorIndex;
+
+        juce::PopupMenu menu;
+        menu.addSectionHeader ("Sample");
+        menu.addItem ("Load audio file...", [this] { promptForSample(); });
+        menu.addItem (juce::PopupMenu::Item ("Clear")
+                          .setEnabled (loaded)
+                          .setAction ([this] { processor.clearSampleForOscillator (oscillatorIndex); }));
+        menu.addSeparator();
+
+        // Playback options live here rather than on the panel, where there is
+        // no room for controls that only apply to one of the two modes.
+        if (auto* loop = dynamic_cast<juce::AudioParameterChoice*> (
+                state.getParameter (ids::osc (index, ids::oscSampleLoop))))
+        {
+            juce::PopupMenu loopMenu;
+
+            for (int i = 0; i < loop->choices.size(); ++i)
+                loopMenu.addItem (juce::PopupMenu::Item (loop->choices[i])
+                                      .setTicked (loop->getIndex() == i)
+                                      .setAction ([loop, i]
+                                      {
+                                          loop->beginChangeGesture();
+                                          loop->setValueNotifyingHost (loop->convertTo0to1 (static_cast<float> (i)));
+                                          loop->endChangeGesture();
+                                      }));
+
+            menu.addSubMenu ("Playback", loopMenu);
+        }
+
+        if (auto* root = dynamic_cast<juce::AudioParameterInt*> (
+                state.getParameter (ids::osc (index, ids::oscSampleRoot))))
+        {
+            juce::PopupMenu rootMenu;
+
+            // One entry per octave of C is enough: the note the file plays back
+            // untransposed is nearly always a round number.
+            for (int note = 24; note <= 96; note += 12)
+                rootMenu.addItem (juce::PopupMenu::Item (juce::MidiMessage::getMidiNoteName (note, true, true, 4))
+                                      .setTicked (root->get() == note)
+                                      .setAction ([root, note]
+                                      {
+                                          root->beginChangeGesture();
+                                          root->setValueNotifyingHost (root->convertTo0to1 (static_cast<float> (note)));
+                                          root->endChangeGesture();
+                                      }));
+
+            menu.addSubMenu ("Root note", rootMenu);
+        }
+
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&sampleButton));
+    }
+
+    void OscillatorPanel::promptForSample()
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Choose an audio file",
+            juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+            "*.wav;*.aiff;*.aif;*.flac;*.ogg;*.mp3");
+
+        const auto browserFlags = juce::FileBrowserComponent::openMode
+                                | juce::FileBrowserComponent::canSelectFiles;
+
+        fileChooser->launchAsync (browserFlags, [this] (const juce::FileChooser& chooser)
+        {
+            const auto file = chooser.getResult();
+
+            if (file == juce::File())
+                return;
+
+            if (! processor.loadSampleForOscillator (oscillatorIndex, file))
+                juce::NativeMessageBox::showMessageBoxAsync (
+                    juce::MessageBoxIconType::WarningIcon,
+                    "Could not load that file",
+                    file.getFileName() + " could not be read as audio, or contains only silence. "
+                    "WAV, AIFF, FLAC and Ogg are supported.");
+        });
+    }
+
     void OscillatorPanel::resized()
     {
         auto bounds = getLocalBounds();
@@ -86,7 +209,15 @@ namespace nog::ui
         auto topRow = bounds.removeFromTop (controlRowHeight);
         enable.setBounds (topRow.removeFromLeft (46).reduced (2, 4));
         toFilter.setBounds (topRow.removeFromRight (74).reduced (2, 4));
-        layoutRow (topRow.reduced (0, 4), { &wave, &warpMode });
+
+        // Mode picker, then whichever source selector that mode calls for.
+        mode.setBounds (topRow.removeFromLeft (86).reduced (2, 4));
+
+        auto sourceArea = topRow.removeFromLeft (topRow.getWidth() / 2);
+        wave.setBounds (sourceArea.reduced (2, 4));
+        sampleButton.setBounds (sourceArea.reduced (2, 5));
+
+        warpMode.setBounds (topRow.reduced (2, 4));
 
         layoutRow (bounds.removeFromTop (knobRowHeight), { &level, &pan, &wtPos, &warp, &detune });
         layoutRow (bounds.removeFromTop (knobRowHeight), { &unison, &blend, &width, &phase, &phaseRandom });
