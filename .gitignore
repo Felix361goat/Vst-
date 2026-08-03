@@ -1,0 +1,26 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+
+# JUCE / CMake fetched dependencies
+_deps/
+JuceLibraryCode/
+*.vst3/
+*.component/
+
+# IDE
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/
+.cache/
+compile_commands.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local user presets copied during testing
+Presets/User/

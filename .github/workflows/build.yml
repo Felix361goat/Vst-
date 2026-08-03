@@ -1,0 +1,104 @@
+name: Build
+
+# Produces ready-to-install plugin builds for Windows and macOS on every push.
+# The container this repository is developed in is Linux-only, so CI is the
+# path by which a usable FL Studio plugin actually gets produced.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            pluginval_url: https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Windows.zip
+            pluginval_bin: ./pluginval.exe
+          - name: macOS
+            os: macos-latest
+            pluginval_url: https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_macOS.zip
+            pluginval_bin: ./pluginval.app/Contents/MacOS/pluginval
+          - name: Linux
+            os: ubuntu-latest
+            pluginval_url: https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Linux.zip
+            pluginval_bin: ./pluginval
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # JUCE needs a fair number of X11 and audio headers on Linux; the other
+      # two platforms build against their system SDKs with nothing extra.
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev libjack-jackd2-dev libcurl4-openssl-dev \
+            libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
+            libxinerama-dev libxrandr-dev libxrender-dev \
+            libglu1-mesa-dev mesa-common-dev xvfb
+
+      # Caches the JUCE checkout so the framework is not re-cloned every run.
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-juce-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel 4
+
+      - name: Run unit tests
+        run: ctest --test-dir build -C ${{ env.BUILD_TYPE }} --output-on-failure
+
+      - name: Fetch pluginval
+        shell: bash
+        run: |
+          curl -sSL -o pluginval.zip "${{ matrix.pluginval_url }}"
+          unzip -oq pluginval.zip
+          chmod +x "${{ matrix.pluginval_bin }}" || true
+
+      # Strictness 10 is pluginval's maximum: it fuzzes parameters, hammers the
+      # state and editor from background threads, and runs every bus layout.
+      # Catching that here is much cheaper than catching it inside FL Studio.
+      - name: Validate the VST3
+        shell: bash
+        run: |
+          VST3=$(find build -name '*.vst3' -maxdepth 6 | head -1)
+          echo "validating $VST3"
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            xvfb-run -a "${{ matrix.pluginval_bin }}" --strictness-level 10 --validate "$VST3"
+          else
+            "${{ matrix.pluginval_bin }}" --strictness-level 10 --validate "$VST3"
+          fi
+
+      - name: Collect artefacts
+        shell: bash
+        run: |
+          mkdir -p artefacts
+          cp -R build/NogSuite_artefacts/${{ env.BUILD_TYPE }}/VST3/* artefacts/ 2>/dev/null || true
+          cp -R build/NogSuite_artefacts/${{ env.BUILD_TYPE }}/AU/* artefacts/ 2>/dev/null || true
+          ls -R artefacts
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: NOG-Suite-${{ matrix.name }}
+          path: artefacts
+          if-no-files-found: error
