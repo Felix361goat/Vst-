@@ -722,6 +722,67 @@ namespace
                 }
             }
 
+            beginTest ("the dimension widener widens and still folds to mono");
+            {
+                // Two claims worth checking. It has to actually separate the
+                // channels, or it is doing nothing; and the centre has to
+                // survive being summed to mono, which a plain Haas widener
+                // fails - it cancels, and the part disappears on a phone.
+                TestProcessor processor;
+                processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                auto& slot = processor.parameters.fx[0];
+                slot.enable->setValueNotifyingHost (1.0f);
+                slot.type->setValueNotifyingHost (slot.type->convertTo0to1 (
+                    static_cast<float> (nog::fx::FXChain::Type::Dimension)));
+                slot.mix->setValueNotifyingHost (1.0f);
+
+                // Mono keep fully up: that is the setting whose whole purpose
+                // is surviving the fold, so it is the one worth asserting on.
+                slot.c->setValueNotifyingHost (1.0f);
+
+                juce::AudioBuffer<float> buffer (2, testBlockSize);
+                juce::MidiBuffer midi;
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+                auto separation = 0.0;
+                auto monoEnergy = 0.0;
+                auto stereoEnergy = 0.0;
+
+                // Skip the first blocks: the delay lines start empty, so the
+                // widener has nothing to work with until they fill.
+                for (int block = 0; block < 24; ++block)
+                {
+                    processor.processBlock (buffer, midi);
+                    midi.clear();
+
+                    expect (isBufferHealthy (buffer));
+
+                    if (block < 8)
+                        continue;
+
+                    for (int i = 0; i < testBlockSize; ++i)
+                    {
+                        const auto left  = static_cast<double> (buffer.getSample (0, i));
+                        const auto right = static_cast<double> (buffer.getSample (1, i));
+                        const auto mono  = (left + right) * 0.5;
+
+                        separation   += std::abs (left - right);
+                        monoEnergy   += mono * mono;
+                        stereoEnergy += (left * left + right * right) * 0.5;
+                    }
+                }
+
+                expect (separation > 1.0,
+                        "the channels should differ, total separation was "
+                            + juce::String (separation, 4));
+
+                expect (stereoEnergy > 0.0);
+                expect (monoEnergy > stereoEnergy * 0.7,
+                        "summing to mono should keep most of the level, kept "
+                            + juce::String (monoEnergy / juce::jmax (1.0e-12, stereoEnergy), 3));
+            }
+
             beginTest ("sustain pedal holds notes until it is released");
             {
                 TestProcessor processor;

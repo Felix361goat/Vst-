@@ -604,6 +604,60 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
+
+        // -- dimension -------------------------------------------------------
+
+        // Width from time rather than from detune: the leads above get their
+        // spread from a unison stack, which costs voices and blurs the pitch.
+        // This one is a single narrow stack through the widener instead, so it
+        // stays in tune and still fills the sides.
+        list.push_back (Build ("Sparkle Wide Dimension", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.62f)
+            .osc (1, wt::HarmonicSweep, 0.78f, 0.28f)
+            .tune (1, 1, 0, 5.0f)
+            .unison (0, 3, 0.10f, 0.5f, 0.6f, 0.10f)
+            .filter (flt::LP24, 2800.0f, 0.11f, 0.08f, 1.0f, 0.78f)
+            .env (0, 4.0f, 950.0f, 0.74f, 400.0f)
+            .env (1, 2.0f, 260.0f, 0.28f, 300.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.28f)
+            .fx (FX::Dimension, 0.55f, 0.45f, 0.30f, 0.9f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.70f, 0.55f)
+            .fx (FX::Delay, 0.20f, 0.30f, 0.32f, 0.8f)
+            .fx (FX::Reverb, 0.30f, 0.72f, 0.26f, 1.0f)
+            .master (-9.0f)
+            .done());
+
+        list.push_back (Build ("Dimension Chords", "Chords")
+            .voices (12)
+            .osc (0, wt::BasicShapes, 0.40f, 0.55f)
+            .osc (1, wt::FmBell, 0.30f, 0.20f)
+            .tune (1, 1)
+            .unison (0, 3, 0.09f, 0.5f, 0.6f)
+            .filter (flt::LP24, 2200.0f, 0.08f, 0.0f, 1.0f, 0.62f)
+            .env (0, 18.0f, 1500.0f, 0.72f, 700.0f)
+            .fx (FX::Dimension, 0.60f, 0.55f, 0.22f, 1.0f)
+            .fx (FX::Delay, 0.18f, 0.32f, 0.28f, 0.7f)
+            .fx (FX::Reverb, 0.40f, 0.84f, 0.24f, 1.0f)
+            .master (-11.0f)
+            .done());
+
+        list.push_back (Build ("Dimension Pluck", "Pluck")
+            .voices (12)
+            .osc (0, wt::BasicShapes, wt::saw, 0.62f)
+            .osc (1, wt::FmBell, 0.34f, 0.24f)
+            .tune (1, 1)
+            .unison (0, 3, 0.10f, 0.5f, 0.6f)
+            .filter (flt::LP24, 1600.0f, 0.16f, 0.06f, 1.0f, 0.7f)
+            .env (0, 1.0f, 700.0f, 0.08f, 380.0f)
+            .env (1, 0.5f, 220.0f, 0.0f, 180.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.42f)
+            .fx (FX::Dimension, 0.50f, 0.40f, 0.35f, 0.95f)
+            .fx (FX::Delay, 0.22f, 0.26f, 0.32f, 0.85f)
+            .fx (FX::Reverb, 0.34f, 0.76f, 0.26f, 1.0f)
+            .master (-10.0f)
+            .done());
+
         return list;
     }
 }

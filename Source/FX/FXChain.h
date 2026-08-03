@@ -49,10 +49,10 @@ namespace nog::fx
         enum class Type
         {
             Bypass = 0, Distortion, BitCrusher, Chorus, Flanger,
-            Phaser, Delay, Reverb, Eq, Compressor
+            Phaser, Delay, Reverb, Eq, Compressor, Dimension
         };
 
-        static constexpr int numTypes = 10;
+        static constexpr int numTypes = 11;
 
         FXChain();
         ~FXChain();

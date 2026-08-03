@@ -463,6 +463,135 @@ namespace nog::fx
             juce::dsp::Compressor<float> compressor;
         };
 
+        /**
+            A stereo widener in the Dimension / Hyper mould.
+
+            Two short, slowly modulated delays panned hard against each other,
+            with the modulation in antiphase so the left and right paths are
+            never at the same delay. That difference is what the ear reads as
+            width - a chorus widens by detuning, this widens by disagreeing
+            about time, which leaves the pitch alone.
+
+            The mono component is kept intact: only the difference between the
+            channels is widened, so the result still folds down to mono without
+            cancelling, which a naive Haas widener does not.
+
+            A: size, B: rate, C: mono keep.
+        */
+        class DimensionEffect final : public Effect
+        {
+        public:
+            void prepare (const juce::dsp::ProcessSpec& spec) override
+            {
+                sampleRate = spec.sampleRate;
+
+                const auto maximumDelay = static_cast<int> (sampleRate * 0.05) + 4;
+
+                for (auto& line : lines)
+                {
+                    line.assign (static_cast<size_t> (maximumDelay), 0.0f);
+                    line.shrink_to_fit();
+                }
+
+                reset();
+            }
+
+            void reset() override
+            {
+                for (auto& line : lines)
+                    std::fill (line.begin(), line.end(), 0.0f);
+
+                writeIndex = 0;
+                phase = 0.0f;
+            }
+
+            void setParameters (float a, float b, float c) override
+            {
+                baseDelay  = juce::jmap (a, 4.0f, 28.0f);        // milliseconds
+                sweepDepth = juce::jmap (a, 0.6f, 4.0f);         // milliseconds
+                rate       = juce::jmap (b, 0.05f, 1.6f);        // hertz
+                monoKeep   = juce::jlimit (0.0f, 1.0f, c);
+            }
+
+            void process (juce::dsp::AudioBlock<float>& block) override
+            {
+                const auto numChannels = static_cast<int> (block.getNumChannels());
+                const auto numSamples  = static_cast<int> (block.getNumSamples());
+
+                if (numChannels < 2 || lines[0].empty())
+                    return;
+
+                auto* left  = block.getChannelPointer (0);
+                auto* right = block.getChannelPointer (1);
+
+                const auto size = static_cast<int> (lines[0].size());
+                const auto increment = rate / static_cast<float> (sampleRate);
+
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    const auto sweep = std::sin (phase * juce::MathConstants<float>::twoPi);
+
+                    // Antiphase: when one side is at its longest the other is at
+                    // its shortest, which is where the width comes from.
+                    const auto delayLeft  = (baseDelay + sweepDepth * sweep) * 0.001f * static_cast<float> (sampleRate);
+                    const auto delayRight = (baseDelay - sweepDepth * sweep) * 0.001f * static_cast<float> (sampleRate);
+
+                    lines[0][static_cast<size_t> (writeIndex)] = left[i];
+                    lines[1][static_cast<size_t> (writeIndex)] = right[i];
+
+                    const auto wetLeft  = read (0, delayLeft, size);
+                    const auto wetRight = read (1, delayRight, size);
+
+                    // Rebuild from mid and side rather than using the wet
+                    // channels directly, so the centre survives a mono fold.
+                    const auto mid  = (left[i] + right[i]) * 0.5f;
+                    const auto side = (wetLeft - wetRight) * 0.5f;
+
+                    left[i]  = mid * monoKeep + side;
+                    right[i] = mid * monoKeep - side;
+
+                    if (++writeIndex >= size)
+                        writeIndex = 0;
+
+                    phase += increment;
+
+                    if (phase >= 1.0f)
+                        phase -= 1.0f;
+                }
+            }
+
+            std::array<const char*, 3> getControlNames() const override
+            {
+                return { "Size", "Rate", "Mono" };
+            }
+
+        private:
+            float read (int channel, float delaySamples, int size) const noexcept
+            {
+                const auto position = static_cast<float> (writeIndex) - delaySamples;
+                const auto wrapped  = position < 0.0f ? position + static_cast<float> (size) : position;
+
+                const auto index = static_cast<int> (wrapped);
+                const auto fraction = wrapped - static_cast<float> (index);
+
+                const auto& line = lines[static_cast<size_t> (channel)];
+                const auto a = line[static_cast<size_t> (index % size)];
+                const auto b = line[static_cast<size_t> ((index + 1) % size)];
+
+                return a + (b - a) * fraction;
+            }
+
+            std::array<std::vector<float>, 2> lines;
+
+            double sampleRate = 44100.0;
+            int    writeIndex = 0;
+            float  phase      = 0.0f;
+            float  baseDelay  = 12.0f;
+            float  sweepDepth = 2.0f;
+            float  rate       = 0.4f;
+            float  monoKeep   = 1.0f;
+        };
+
         std::unique_ptr<Effect> createEffect (FXChain::Type type)
         {
             switch (type)
@@ -477,6 +606,7 @@ namespace nog::fx
                 case FXChain::Type::Reverb:     return std::make_unique<ReverbEffect>();
                 case FXChain::Type::Eq:         return std::make_unique<EqEffect>();
                 case FXChain::Type::Compressor: return std::make_unique<CompressorEffect>();
+                case FXChain::Type::Dimension:  return std::make_unique<DimensionEffect>();
             }
 
             return std::make_unique<BypassEffect>();

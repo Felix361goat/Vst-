@@ -24,7 +24,7 @@ a team. The point is to find the gaps that a user would actually notice.
 
 ## Gaps, ranked by what a user would notice first
 
-### 1. No factory presets — the biggest gap by far
+### 1. No factory presets — built
 
 Every one of the three ships with a browsable, categorised preset library.
 NOG Suite ships with nothing but an init patch, so it opens silent-ish and gives
@@ -38,7 +38,7 @@ every part of the engine, which is worth something on its own.
 **Verdict: do this first.** Highest value per unit of work of anything on this
 list.
 
-### 2. Nothing shows the waveform
+### 2. Nothing shows the waveform — oscillator display built
 
 Serum's rotating 3D wavetable view and Vital's animated oscillator display are
 signature. NOG Suite draws its envelopes and LFOs but never shows the actual
@@ -82,14 +82,15 @@ against the others it is missing:
 - **Bit crusher / decimator** — sample-rate and bit-depth reduction. Cheap to
   write, distinctive, and absent from the current rack.
 - **Flanger** — currently only reachable as a very short delay.
-- **Hyper / Dimension** — Serum's unison-style widener, heavily used on leads.
+- ~~**Hyper / Dimension**~~ — built. Two short antiphase delays panned hard
+  apart, rebuilt from mid and side so the centre survives a mono fold.
 - **Convolution reverb** — Serum 2 added one; a large job.
 
 Slots also cannot be reordered; the chain is fixed 1 to 6.
 
 **Verdict: bit crusher and flanger are quick wins. Reordering is a UI job.**
 
-### 6. Modulation is linear only
+### 6. Modulation is linear only — via scaling built, curves outstanding
 
 Vital's remap system and Serum 2's editable modulation curves both let a source
 be reshaped per routing — a linear envelope driving a destination exponentially,
@@ -112,21 +113,23 @@ feature: a breakpoint editor, and storing the shape in the patch.
 
 **Verdict: raise the counts cheaply; defer drawable shapes.**
 
-### 8. Unison has no table spread
+### 8. Unison has no table spread — built
 
 Vital offsets each unison voice's position within the wavetable, so a stack does
 not just detune but also varies in timbre. It is one control and it sounds
 considerably richer than detune alone.
 
-**Verdict: cheap, and punches above its weight.**
+**Verdict: cheap, and punches above its weight. Built — one control per
+oscillator, zero by default so no existing patch changed.**
 
-### 9. No sample, granular or spectral oscillator
+### 9. No granular or spectral oscillator — sample built
 
 Serum 2 has all three; Vital has sample and spectral warping. This is the
 largest single gap in raw capability and by far the most work — each is a
 synthesis engine in its own right.
 
-**Verdict: defer. Real wavetables first.**
+**Verdict: the sample oscillator is built, along with a bank of forty-two
+generated sources. Granular and spectral remain deferred.**
 
 ### 10. Smaller things worth noting
 
