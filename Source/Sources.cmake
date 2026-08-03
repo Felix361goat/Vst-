@@ -20,6 +20,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/DSP/WavetableBank.cpp
     ${NOG_SOURCE_DIR}/DSP/Sample.cpp
     ${NOG_SOURCE_DIR}/DSP/SampleLibrary.cpp
+    ${NOG_SOURCE_DIR}/DSP/SampleBank.cpp
     ${NOG_SOURCE_DIR}/Engine/Voice.cpp
     ${NOG_SOURCE_DIR}/Engine/SynthEngine.cpp
     ${NOG_SOURCE_DIR}/FX/FXChain.cpp

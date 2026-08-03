@@ -28,6 +28,11 @@ namespace nog::dsp
         */
         static Ptr load (const juce::File& file, juce::AudioFormatManager& formats);
 
+        /** Wraps audio that was generated rather than read from disk.
+            Normalises in the same way loading does. */
+        static Ptr fromBuffer (juce::String sampleName, juce::AudioBuffer<float> audio,
+                               double rate);
+
         const juce::String& getName() const noexcept { return name; }
         int getNumChannels() const noexcept { return buffer.getNumChannels(); }
         int getLength() const noexcept { return buffer.getNumSamples(); }

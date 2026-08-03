@@ -19,6 +19,7 @@
 #include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 #include "Params/ParameterStore.h"
+#include "DSP/SampleBank.h"
 #include "DSP/SampleLibrary.h"
 #include "State/FactoryPresets.h"
 
@@ -1017,6 +1018,54 @@ namespace
                 expectWithinAbsoluteError (measureTail (nog::dsp::Oscillator::Loop::OneShot), 0.0f, 1.0e-6f);
                 expect (measureTail (nog::dsp::Oscillator::Loop::Forward) > 0.1f,
                         "a looping sample should still be sounding");
+            }
+
+            beginTest ("every built-in character sample generates usable audio");
+            {
+                // These are synthesised rather than recorded, so a bad formula
+                // would otherwise show up as a silent or exploding oscillator
+                // with nothing to inspect.
+                const auto& bank = nog::dsp::SampleBank::factory();
+                const auto names = nog::dsp::SampleBank::getNames();
+
+                expect (names.size() == nog::dsp::SampleBank::getCount());
+                expect (names.size() >= 8, "expected a useful set of built-ins");
+
+                for (int i = 0; i < nog::dsp::SampleBank::getCount(); ++i)
+                {
+                    const auto sample = bank.get (i);
+
+                    expect (sample != nullptr, names[i] + " failed to generate");
+
+                    if (sample == nullptr)
+                        continue;
+
+                    expect (sample->getLength() > 1000, names[i] + " is too short to be useful");
+
+                    auto peak = 0.0f;
+                    auto energy = 0.0;
+
+                    for (int n = 0; n < 4096; ++n)
+                    {
+                        const auto value = sample->read (0, n / 4096.0);
+
+                        expect (std::isfinite (value), names[i] + " contains non-finite samples");
+
+                        peak = juce::jmax (peak, std::abs (value));
+                        energy += static_cast<double> (value) * value;
+                    }
+
+                    expect (peak > 0.05f, names[i] + " is effectively silent");
+
+                    // Normalisation puts the stored peak at 1, but reading is
+                    // cubic and a cubic overshoots at a discontinuity - the
+                    // chiptune samples are hard-edged squares, so an
+                    // interpolated read genuinely exceeds the stored maximum.
+                    // The bound is here to catch a runaway, not the overshoot.
+                    expect (peak <= 1.5f,
+                            names[i] + " is far above unity (peak " + juce::String (peak) + ")");
+                    expect (energy > 1.0, names[i] + " carries almost no energy");
+                }
             }
 
             file.deleteFile();

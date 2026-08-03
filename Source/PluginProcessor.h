@@ -104,6 +104,9 @@ namespace nog
             only. Returns false if it could not be decoded. */
         bool loadSampleForOscillator (int oscillatorIndex, const juce::File& file);
 
+        /** Loads one of the generated character samples into an oscillator. */
+        bool loadBuiltInSample (int oscillatorIndex, int builtInIndex);
+
         void clearSampleForOscillator (int oscillatorIndex);
 
         /** Name of the sample loaded into an oscillator, or empty. */

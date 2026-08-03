@@ -1,6 +1,7 @@
 #include "UI/Panels/SynthPanels.h"
 
 #include "Params/ParameterIDs.h"
+#include "DSP/SampleBank.h"
 #include "PluginProcessor.h"
 
 namespace nog::ui
@@ -128,6 +129,17 @@ namespace nog::ui
         juce::PopupMenu menu;
         menu.addSectionHeader ("Sample");
         menu.addItem ("Load audio file...", [this] { promptForSample(); });
+
+        // The generated character samples: things a wavetable cannot be,
+        // because they are transients or evolve over their own length.
+        juce::PopupMenu builtIns;
+        const auto builtInNames = dsp::SampleBank::getNames();
+
+        for (int i = 0; i < builtInNames.size(); ++i)
+            builtIns.addItem (builtInNames[i], [this, i] { processor.loadBuiltInSample (oscillatorIndex, i); });
+
+        menu.addSubMenu ("Built-in", builtIns);
+
         menu.addItem (juce::PopupMenu::Item ("Clear")
                           .setEnabled (loaded)
                           .setAction ([this] { processor.clearSampleForOscillator (oscillatorIndex); }));

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include "DSP/SampleBank.h"
 #include "Params/ParameterLayout.h"
 #include "PluginEditor.h"
 
@@ -253,6 +254,18 @@ namespace nog
         return true;
     }
 
+    bool NogSuiteProcessor::loadBuiltInSample (int oscillatorIndex, int builtInIndex)
+    {
+        if (! engine.getSampleLibrary().loadBuiltIn (oscillatorIndex, builtInIndex))
+            return false;
+
+        // Recorded by index rather than by path: a generated sample has no file
+        // behind it, and it regenerates identically on any machine.
+        apvts.state.setProperty (samplePathProperty (oscillatorIndex),
+                                 "builtin:" + juce::String (builtInIndex), nullptr);
+        return true;
+    }
+
     void NogSuiteProcessor::clearSampleForOscillator (int oscillatorIndex)
     {
         engine.getSampleLibrary().clearSlot (oscillatorIndex);
@@ -273,6 +286,16 @@ namespace nog
             if (path.isEmpty())
             {
                 engine.getSampleLibrary().clearSlot (i);
+                continue;
+            }
+
+            if (path.startsWith ("builtin:"))
+            {
+                const auto index = path.fromFirstOccurrenceOf (":", false, false).getIntValue();
+
+                if (! engine.getSampleLibrary().loadBuiltIn (i, index))
+                    engine.getSampleLibrary().clearSlot (i);
+
                 continue;
             }
 

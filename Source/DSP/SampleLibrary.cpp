@@ -1,5 +1,7 @@
 #include "DSP/SampleLibrary.h"
 
+#include "DSP/SampleBank.h"
+
 namespace nog::dsp
 {
     SampleLibrary::SampleLibrary()
@@ -26,6 +28,25 @@ namespace nog::dsp
 
         // Retained before it is published, so that the moment the audio thread
         // can see the pointer there is already an owner keeping it alive.
+        retained.add (sample);
+        current[index] = sample;
+
+        slots[index].store (sample.get(), std::memory_order_release);
+        return true;
+    }
+
+    bool SampleLibrary::loadBuiltIn (int slot, int builtInIndex)
+    {
+        if (! juce::isPositiveAndBelow (slot, numSlots))
+            return false;
+
+        auto sample = SampleBank::factory().get (builtInIndex);
+
+        if (sample == nullptr)
+            return false;
+
+        const auto index = static_cast<size_t> (slot);
+
         retained.add (sample);
         current[index] = sample;
 

@@ -46,6 +46,25 @@ namespace nog::dsp
         return sample;
     }
 
+    Sample::Ptr Sample::fromBuffer (juce::String sampleName, juce::AudioBuffer<float> audio, double rate)
+    {
+        if (audio.getNumSamples() <= 0 || audio.getNumChannels() <= 0)
+            return {};
+
+        const auto peak = audio.getMagnitude (0, audio.getNumSamples());
+
+        if (peak <= 1.0e-6f)
+            return {};
+
+        Ptr sample (new Sample());
+        sample->name = std::move (sampleName);
+        sample->sourceSampleRate = rate > 0.0 ? rate : 44100.0;
+        sample->buffer = std::move (audio);
+        sample->buffer.applyGain (1.0f / peak);
+
+        return sample;
+    }
+
     float Sample::read (int channel, double position) const noexcept
     {
         const auto length = buffer.getNumSamples();

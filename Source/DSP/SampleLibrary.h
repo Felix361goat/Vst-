@@ -33,6 +33,9 @@ namespace nog::dsp
             Returns false if the file could not be decoded. */
         bool loadIntoSlot (int slot, const juce::File& file);
 
+        /** Loads one of the generated character samples. Message thread only. */
+        bool loadBuiltIn (int slot, int builtInIndex);
+
         /** Empties a slot. The oscillator falls back to its wavetable. */
         void clearSlot (int slot);
 
