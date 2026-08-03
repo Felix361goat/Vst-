@@ -44,10 +44,15 @@ namespace nog::fx
     class FXChain
     {
     public:
-        // Order must match params::choices::effectTypes().
-        enum class Type { Bypass = 0, Distortion, Chorus, Phaser, Delay, Reverb, Eq, Compressor };
+        // Order must match params::choices::effectTypes(). New types go on the
+        // end: the value is a choice index that ends up in saved patches.
+        enum class Type
+        {
+            Bypass = 0, Distortion, BitCrusher, Chorus, Flanger,
+            Phaser, Delay, Reverb, Eq, Compressor
+        };
 
-        static constexpr int numTypes = 8;
+        static constexpr int numTypes = 10;
 
         FXChain();
         ~FXChain();

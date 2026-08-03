@@ -44,7 +44,8 @@ namespace nog::params
 
         juce::StringArray effectTypes()
         {
-            return { "Bypass", "Distortion", "Chorus", "Phaser", "Delay", "Reverb", "EQ", "Compressor" };
+            return { "Bypass", "Distortion", "Bit Crusher", "Chorus", "Flanger",
+                     "Phaser", "Delay", "Reverb", "EQ", "Compressor" };
         }
 
         juce::StringArray tempoDivisions()

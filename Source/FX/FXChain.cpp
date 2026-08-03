@@ -78,6 +78,130 @@ namespace nog::fx
             Duplicator filter;
         };
 
+        /** A: bit depth, B: sample rate, C: output.
+
+            Two separate kinds of digital damage: quantising the amplitude, and
+            holding each sample for several output samples. Both are deliberately
+            un-smoothed, because the aliasing is the point.
+        */
+        class BitCrusherEffect final : public Effect
+        {
+        public:
+            void prepare (const juce::dsp::ProcessSpec& spec) override
+            {
+                sampleRate = spec.sampleRate;
+                held.assign (spec.numChannels, 0.0f);
+                reset();
+            }
+
+            void reset() override
+            {
+                std::fill (held.begin(), held.end(), 0.0f);
+                holdCounter = 0.0f;
+            }
+
+            void setParameters (float a, float b, float c) override
+            {
+                // 16 bits down to 1. Inverted so the knob opens up into damage.
+                const auto bits = juce::jmap (1.0f - a, 1.0f, 16.0f);
+                levels = std::pow (2.0f, bits) - 1.0f;
+
+                // Hold each sample for this many output samples.
+                const auto targetRate = juce::jmap (1.0f - b,
+                                                    static_cast<float> (sampleRate),
+                                                    500.0f);
+                step = juce::jmax (1.0f, static_cast<float> (sampleRate) / juce::jmax (1.0f, targetRate));
+
+                output = c * 2.0f;
+            }
+
+            void process (juce::dsp::AudioBlock<float>& block) override
+            {
+                const auto numChannels = block.getNumChannels();
+                const auto numSamples  = block.getNumSamples();
+
+                if (held.size() < numChannels)
+                    held.assign (numChannels, 0.0f);
+
+                for (size_t i = 0; i < numSamples; ++i)
+                {
+                    // The counter is shared across channels so the sample-and-hold
+                    // stays phase-locked and the image does not wander.
+                    holdCounter += 1.0f;
+                    const auto refresh = holdCounter >= step;
+
+                    if (refresh)
+                        holdCounter -= step;
+
+                    for (size_t channel = 0; channel < numChannels; ++channel)
+                    {
+                        auto* samples = block.getChannelPointer (channel);
+
+                        if (refresh)
+                        {
+                            const auto quantised = std::round (samples[i] * levels) / levels;
+                            held[channel] = quantised;
+                        }
+
+                        samples[i] = held[channel] * output;
+                    }
+                }
+            }
+
+            std::array<const char*, 3> getControlNames() const override
+            {
+                return { "Bits", "Rate", "Output" };
+            }
+
+        private:
+            double             sampleRate  = 44100.0;
+            float              levels      = 65535.0f;
+            float              step        = 1.0f;
+            float              holdCounter = 0.0f;
+            float              output      = 1.0f;
+            std::vector<float> held;
+        };
+
+        /** A: rate, B: depth, C: feedback.
+
+            A flanger is a chorus with a much shorter delay and far more
+            feedback, which is what turns the pitch wobble into a comb sweep.
+        */
+        class FlangerEffect final : public Effect
+        {
+        public:
+            void prepare (const juce::dsp::ProcessSpec& spec) override
+            {
+                chorus.prepare (spec);
+                reset();
+            }
+
+            void reset() override { chorus.reset(); }
+
+            void setParameters (float a, float b, float c) override
+            {
+                chorus.setRate (juce::jmap (a, 0.02f, 6.0f));
+                chorus.setDepth (juce::jmap (b, 0.1f, 1.0f));
+                chorus.setFeedback (juce::jmap (c, -0.95f, 0.95f));
+                chorus.setCentreDelay (2.0f);   // chorus sits around 12 ms
+                chorus.setMix (1.0f);
+            }
+
+            void process (juce::dsp::AudioBlock<float>& block) override
+            {
+                juce::dsp::ProcessContextReplacing<float> context (block);
+                chorus.process (context);
+            }
+
+            std::array<const char*, 3> getControlNames() const override
+            {
+                return { "Rate", "Depth", "Feedback" };
+            }
+
+        private:
+            juce::dsp::Chorus<float> chorus;
+        };
+
         /** A: rate, B: depth, C: feedback. */
         class ChorusEffect final : public Effect
         {
@@ -345,7 +469,9 @@ namespace nog::fx
             {
                 case FXChain::Type::Bypass:     return std::make_unique<BypassEffect>();
                 case FXChain::Type::Distortion: return std::make_unique<DistortionEffect>();
+                case FXChain::Type::BitCrusher: return std::make_unique<BitCrusherEffect>();
                 case FXChain::Type::Chorus:     return std::make_unique<ChorusEffect>();
+                case FXChain::Type::Flanger:    return std::make_unique<FlangerEffect>();
                 case FXChain::Type::Phaser:     return std::make_unique<PhaserEffect>();
                 case FXChain::Type::Delay:      return std::make_unique<DelayEffect>();
                 case FXChain::Type::Reverb:     return std::make_unique<ReverbEffect>();
