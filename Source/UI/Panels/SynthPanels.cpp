@@ -53,12 +53,13 @@ namespace nog::ui
           phaseRandom (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPhaseRand), "Rand"),
           octave      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscOctave), "Octave"),
           semi        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscSemi), "Semi"),
-          fine        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscFine), "Fine")
+          fine        (processorToUse.getValueTreeState(), ids::osc (index, ids::oscFine), "Fine"),
+          display     (processorToUse, index)
     {
         addAllChildren (*this, { &enable, &toFilter, &mode, &wave, &warpMode, &sampleButton,
                                  &level, &pan, &wtPos, &warp, &detune,
                                  &unison, &blend, &width, &phase, &phaseRandom,
-                                 &octave, &semi, &fine });
+                                 &octave, &semi, &fine, &display });
 
         sampleButton.onClick = [this] { showSampleMenu(); };
         sampleButton.setTooltip ("Load an audio file for this oscillator to play");
@@ -76,6 +77,7 @@ namespace nog::ui
         // Osc 1 and Osc 2 get their own colours so a glance tells you which
         // half of the page you are working on.
         const auto capColour = index == 0 ? colours::candyRed : colours::candyBlue;
+        display.setAccentColour (capColour);
 
         for (auto* knob : { &level, &pan, &wtPos, &warp, &detune,
                             &unison, &blend, &width, &phase, &phaseRandom,
@@ -233,7 +235,13 @@ namespace nog::ui
 
         layoutRow (bounds.removeFromTop (knobRowHeight), { &level, &pan, &wtPos, &warp, &detune });
         layoutRow (bounds.removeFromTop (knobRowHeight), { &unison, &blend, &width, &phase, &phaseRandom });
-        layoutRow (bounds.removeFromTop (knobRowHeight), { &octave, &semi, &fine });
+        // The tuning knobs need three of the five columns the rows above use,
+        // so the display takes the space that would otherwise be blank.
+        auto lastRow = bounds.removeFromTop (knobRowHeight);
+        const auto cell = lastRow.getWidth() / 5;
+
+        layoutRow (lastRow.removeFromLeft (cell * 3), { &octave, &semi, &fine });
+        display.setBounds (lastRow.reduced (4, 8));
     }
 
     // -----------------------------------------------------------------------

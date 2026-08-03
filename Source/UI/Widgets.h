@@ -3,8 +3,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "DSP/Oscillator.h"
 #include "Modulation/ModMatrix.h"
 #include "UI/NogLookAndFeel.h"
+
+namespace nog
+{
+    class NogSuiteProcessor;
+}
 
 namespace nog::ui
 {
@@ -139,6 +145,58 @@ namespace nog::ui
 
     private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
+    };
+
+    /**
+        Draws the shape an oscillator is currently making.
+
+        Every control on the oscillator panel changes the waveform, and until
+        now the only way to find out how was to play a note and listen. The
+        display renders through a real Oscillator configured from the same
+        parameters the voices read, so the wavetable frame, the morph position
+        and the warp all show up exactly as they will sound.
+
+        In sample mode it draws the whole file's peak envelope instead, with a
+        marker at the start offset - a single cycle of a two-second recording
+        would say nothing.
+    */
+    class WaveDisplay final : public juce::Component,
+                              private juce::Timer
+    {
+    public:
+        WaveDisplay (NogSuiteProcessor& processor, int oscillatorIndex);
+
+        void paint (juce::Graphics& g) override;
+
+        void setAccentColour (juce::Colour colour) { accent = colour; repaint(); }
+
+    private:
+        void timerCallback() override;
+
+        /** Re-reads the parameters and rebuilds the path. Returns false when
+            nothing has changed, so a still panel costs one comparison. */
+        bool refresh();
+
+        void buildWavetablePath();
+        void buildSamplePath();
+
+        NogSuiteProcessor& processor;
+        int index;
+
+        dsp::Oscillator oscillator;
+        juce::Path      path;
+        juce::Colour    accent { colours::candyRed };
+
+        // What the path was built from, so it is only rebuilt when it must be.
+        int    lastWave  = -1;
+        int    lastMode  = -1;
+        int    lastWarpMode = -1;
+        float  lastMorph = -1.0f;
+        float  lastWarp  = -1.0f;
+        const dsp::Sample* lastSample = nullptr;
+
+        bool showingSample = false;
+        float sampleStart = 0.0f;
     };
 
     /** A titled container that draws the panel background. */

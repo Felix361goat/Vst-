@@ -53,6 +53,8 @@ namespace nog::ui
         Knob level, pan, wtPos, warp, detune;
         Knob unison, blend, width, phase, phaseRandom;
         Knob octave, semi, fine;
+
+        WaveDisplay display;
     };
 
     class SubPanel final : public juce::Component

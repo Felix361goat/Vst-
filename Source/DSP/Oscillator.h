@@ -121,6 +121,15 @@ namespace nog::dsp
         */
         void addNextSample (float& left, float& right) noexcept;
 
+        /** One point of the shape this oscillator is currently making, for
+            drawing. Reads the top mip level and applies the warp, so what the
+            editor draws is what the voices play rather than an approximation
+            of it. Not for the audio thread: it ignores unison and panning. */
+        float previewAt (double phase) const noexcept
+        {
+            return warpedSample (phase, 1.0e-4, 0);
+        }
+
     private:
         struct UnisonVoice
         {
