@@ -61,6 +61,15 @@ namespace nog
 
         juce::String getCurrentPresetName() const;
 
+        /** The state-tree property naming the sample loaded into an oscillator.
+            Either a file path or "builtin:N". */
+        static juce::String samplePathProperty (int oscillatorIndex);
+
+        /** Called after any load has rewritten the state tree, so the owner can
+            pull the named samples back into the engine. Samples are not
+            parameters, so nothing else would notice they changed. */
+        std::function<void()> onSampleStateChanged;
+
     private:
         void setCurrentPresetName (const juce::String& name);
 
@@ -69,6 +78,13 @@ namespace nog
 
         /** Applies a factory patch: init defaults first, then its overrides. */
         void loadFactory (const juce::String& name);
+
+        void notifySampleStateChanged();
+
+        /** Every parameter back to its default, without touching the samples. */
+        void resetParameters();
+
+        static constexpr int numSampleSlots = 2;
 
         juce::AudioProcessorValueTreeState& state;
     };

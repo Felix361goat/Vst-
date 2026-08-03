@@ -24,7 +24,7 @@ namespace nog
             wavetable. */
         juce::String samplePathProperty (int oscillatorIndex)
         {
-            return "osc" + juce::String (oscillatorIndex + 1) + "SamplePath";
+            return PresetManager::samplePathProperty (oscillatorIndex);
         }
 
         /** Longest tail the effects rack can produce, added to the envelope
@@ -47,6 +47,11 @@ namespace nog
           presets (apvts)
     {
         parameters.attach (apvts);
+
+        // Loading a patch rewrites the state tree, including which sample each
+        // oscillator wants. Nothing else would notice, because samples are not
+        // parameters.
+        presets.onSampleStateChanged = [this] { reloadSamplesFromState(); };
     }
 
     NogSuiteProcessor::~NogSuiteProcessor() = default;
@@ -263,6 +268,16 @@ namespace nog
         // behind it, and it regenerates identically on any machine.
         apvts.state.setProperty (samplePathProperty (oscillatorIndex),
                                  "builtin:" + juce::String (builtInIndex), nullptr);
+
+        // The pitched instruments are generated at different notes, so tune the
+        // oscillator to whichever one this is. Loading a bass and having it play
+        // an octave out would be a bug the player has to fix by hand.
+        if (auto* root = apvts.getParameter (ids::osc (oscillatorIndex, ids::oscSampleRoot)))
+        {
+            const auto note = dsp::SampleBank::getRootNote (builtInIndex);
+            root->setValueNotifyingHost (root->convertTo0to1 (static_cast<float> (note)));
+        }
+
         return true;
     }
 

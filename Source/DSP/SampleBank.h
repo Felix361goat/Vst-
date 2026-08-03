@@ -34,6 +34,15 @@ namespace nog::dsp
         /** True for the ones meant to be looped rather than played as a hit. */
         static bool isLooping (int index);
 
+        /** The MIDI note the sample was generated at. Loading a built-in sets
+            the oscillator's root from this, so a Grand Piano lands in tune
+            without the player having to work out what pitch it was made at. */
+        static int getRootNote (int index);
+
+        /** True for the modelled instruments, which have a definite pitch. The
+            noise and blip samples do not, and their root note is a placeholder. */
+        static bool isPitched (int index);
+
         Sample::Ptr get (int index) const;
 
     private:

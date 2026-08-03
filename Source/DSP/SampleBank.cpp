@@ -378,27 +378,376 @@ namespace nog::dsp
             return buffer;
         }
 
+        // -- physically modelled instruments --------------------------------
+        //
+        // Everything above is a noise or a blip: material a wavetable cannot
+        // be. What follows is the other thing a wavetable cannot be, and the
+        // reason every pluck patch used to sound like a relative of every
+        // other one - a string or a bar whose partials are not in an exact
+        // harmonic series and do not all decay at the same rate.
+        //
+        // These are modelled rather than recorded for the same reasons as the
+        // rest of the bank: no download, no licensing, identical everywhere.
+
+        /** MIDI note to Hz, for writing generator pitches as note numbers. */
+        float noteHz (int note)
+        {
+            return 440.0f * std::pow (2.0f, (static_cast<float> (note) - 69.0f) / 12.0f);
+        }
+
+        /** Fades the last few milliseconds so the end of the file is silent.
+            Without this every one-shot ends on a click. */
+        void fadeTail (juce::AudioBuffer<float>& buffer, double seconds = 0.03)
+        {
+            const auto length = buffer.getNumSamples();
+            const auto fade   = juce::jmin (length, lengthFor (seconds));
+            auto* out = buffer.getWritePointer (0);
+
+            for (int i = 0; i < fade; ++i)
+                out[length - fade + i] *= 1.0f - static_cast<float> (i) / static_cast<float> (fade);
+        }
+
+        /**
+            Karplus-Strong plucked string.
+
+            A delay line one period long is filled with a noise burst and then
+            fed back through a lowpass. The lowpass is the whole point: it makes
+            the top of the spectrum die before the bottom, so the note gets
+            duller as it decays instead of merely quieter. That is the
+            difference between a plucked string and a sine with an envelope on
+            it, and it is why these read as an instrument.
+
+            @param damping   loop filter coefficient; 1 is bright and ringing,
+                             0.3 is a heavily muted thud
+            @param feedback  loop gain, which sets the overall decay length
+            @param pick      where along the string it was plucked, 0..0.5;
+                             this combs a notch into the excitation
+            @param drive     tanh saturation, for the electric voices
+        */
+        juce::AudioBuffer<float> pluckedString (float frequency, double seconds,
+                                                float brightness, float damping,
+                                                float feedback, float pick,
+                                                int seed, float drive = 0.0f)
+        {
+            const auto length = lengthFor (seconds);
+            const auto delay  = juce::jmax (2, juce::roundToInt (rate / frequency));
+
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            std::vector<float> line (static_cast<size_t> (delay), 0.0f);
+
+            // The excitation is a noise burst lowpassed to taste: a nylon
+            // string starts far duller than a steel one.
+            Noise noise (seed);
+            auto lp = 0.0f;
+
+            for (int i = 0; i < delay; ++i)
+            {
+                lp += brightness * (noise.next() - lp);
+                line[static_cast<size_t> (i)] = lp;
+            }
+
+            // Comb the burst to place the pick. A string plucked at 1/5 of its
+            // length has no 5th harmonic, which is most of what tells nylon
+            // from steel from a bridge pickup.
+            const auto pickDelay = juce::jlimit (1, delay - 1,
+                                                 juce::roundToInt (pick * static_cast<float> (delay)));
+
+            for (int i = delay - 1; i >= pickDelay; --i)
+                line[static_cast<size_t> (i)] -= line[static_cast<size_t> (i - pickDelay)];
+
+            auto index = 0;
+            auto loopLast = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto current = line[static_cast<size_t> (index)];
+
+                out[i] = drive > 0.0f ? std::tanh (current * (1.0f + drive * 6.0f)) / (1.0f + drive)
+                                      : current;
+
+                loopLast = damping * current + (1.0f - damping) * loopLast;
+                line[static_cast<size_t> (index)] = loopLast * feedback;
+
+                if (++index >= delay)
+                    index = 0;
+            }
+
+            fadeTail (buffer);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeNylonGuitar()
+        {
+            // Plucked near the middle with a fingertip: dull excitation, fast
+            // loss of the highs, and the 3rd harmonic notched out.
+            return pluckedString (noteHz (48), 2.6, 0.22f, 0.42f, 0.9965f, 0.33f, 4801);
+        }
+
+        juce::AudioBuffer<float> makeSteelGuitar()
+        {
+            // A pick near the bridge: bright burst, slow damping, long ring.
+            return pluckedString (noteHz (48), 3.2, 0.70f, 0.72f, 0.9985f, 0.14f, 4802);
+        }
+
+        juce::AudioBuffer<float> makeElectricGuitar()
+        {
+            // Same string, driven. The saturation is gentle enough to stay
+            // clean on soft notes and thicken the attack on hard ones.
+            return pluckedString (noteHz (48), 3.0, 0.55f, 0.66f, 0.9988f, 0.18f, 4803, 0.45f);
+        }
+
+        juce::AudioBuffer<float> makeMutedPluck()
+        {
+            // Palm mute: the hand kills the loop almost immediately, leaving
+            // pitch but no sustain. This is the afroswing guitar figure.
+            return pluckedString (noteHz (48), 0.9, 0.45f, 0.30f, 0.988f, 0.25f, 4804, 0.2f);
+        }
+
+        juce::AudioBuffer<float> makeFingerBass()
+        {
+            // An octave down and heavily damped, which is what a wound string
+            // played with a fingertip does.
+            return pluckedString (noteHz (36), 2.4, 0.18f, 0.38f, 0.9985f, 0.30f, 4805, 0.15f);
+        }
+
+        /**
+            Additive grand piano.
+
+            Three things separate a piano from a sawtooth with a decay on it,
+            and all three are here: the partials are stretched sharp by string
+            stiffness so they are not exact multiples of the fundamental; the
+            high partials die far sooner than the low ones; and each note is
+            three strings tuned a hair apart, so the tone beats and never sits
+            still.
+        */
+        juce::AudioBuffer<float> makeGrandPiano()
+        {
+            const auto length = lengthFor (3.6);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+
+            const auto f0 = noteHz (48);
+            constexpr auto numPartials = 28;
+            constexpr auto inharmonicity = 0.00035f;   // string stiffness
+
+            // A real hammer strikes about an eighth of the way along, which
+            // kills every 8th partial.
+            constexpr auto strikePoint = 8.0f;
+
+            const float stringDetune[] { 0.0f, 0.6f, -0.5f };   // in cents
+
+            for (const auto cents : stringDetune)
+            {
+                const auto stringF0 = f0 * std::pow (2.0f, cents / 1200.0f);
+
+                for (int n = 1; n <= numPartials; ++n)
+                {
+                    const auto ratio = static_cast<float> (n)
+                                     * std::sqrt (1.0f + inharmonicity * static_cast<float> (n * n));
+                    const auto frequency = stringF0 * ratio;
+
+                    if (frequency > 18000.0f)
+                        break;
+
+                    const auto strike = std::abs (std::sin (static_cast<float> (n)
+                                                            * juce::MathConstants<float>::pi / strikePoint));
+                    const auto amplitude = strike / static_cast<float> (n) / 3.0f;
+
+                    // Higher partials decay faster; this ratio is what makes
+                    // the tone soften into the tail.
+                    const auto rateOfDecay = 1.1f + static_cast<float> (n) * 0.42f;
+                    const auto increment = frequency / static_cast<float> (rate);
+
+                    auto phase = 0.0f;
+
+                    for (int i = 0; i < length; ++i)
+                    {
+                        out[i] += std::sin (phase * twoPi) * amplitude * decay (i, length, rateOfDecay);
+                        phase += increment;
+
+                        if (phase >= 1.0f)
+                            phase -= 1.0f;
+                    }
+                }
+            }
+
+            // The hammer itself: a short filtered thump under the attack.
+            Noise noise (4806);
+            auto lp = 0.0f;
+            const auto thump = lengthFor (0.05);
+
+            for (int i = 0; i < thump; ++i)
+            {
+                lp += 0.12f * (noise.next() - lp);
+                out[i] += lp * decay (i, thump, 5.0f) * 0.5f;
+            }
+
+            fadeTail (buffer, 0.1);
+            return buffer;
+        }
+
+        /**
+            Electric piano - a struck tine in front of a pickup.
+
+            The bark on the attack is a high partial with its own fast decay,
+            and a touch of FM on the fundamental gives the growl that shows up
+            when you hit one hard.
+        */
+        juce::AudioBuffer<float> makeElectricPiano()
+        {
+            const auto length = lengthFor (3.2);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            const auto f0 = noteHz (48);
+            const auto increment = f0 / static_cast<float> (rate);
+
+            auto phase = 0.0f;
+            auto modPhase = 0.0f;
+            auto tinePhase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                // Index falls away quickly, so the growl is an attack event
+                // rather than a permanent colour.
+                const auto index = 2.4f * decay (i, length, 14.0f);
+                const auto body  = std::sin (phase * twoPi + index * std::sin (modPhase * twoPi));
+
+                const auto tine  = std::sin (tinePhase * twoPi) * decay (i, length, 22.0f) * 0.5f;
+
+                out[i] = (body * decay (i, length, 2.6f) + tine) * 0.75f;
+
+                phase     += increment;
+                modPhase  += increment;
+                tinePhase += increment * 7.0f;
+
+                phase     -= std::floor (phase);
+                modPhase  -= std::floor (modPhase);
+                tinePhase -= std::floor (tinePhase);
+            }
+
+            fadeTail (buffer, 0.08);
+            return buffer;
+        }
+
+        /** A struck bar or tine: partials in no harmonic series at all. The
+            @p partials are ratios to the fundamental. */
+        juce::AudioBuffer<float> struckBar (float frequency, double seconds,
+                                            const std::vector<float>& partials,
+                                            const std::vector<float>& amplitudes,
+                                            float decayShape, int seed, float noiseAmount)
+        {
+            const auto length = lengthFor (seconds);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+
+            for (size_t p = 0; p < partials.size(); ++p)
+            {
+                const auto partialFrequency = frequency * partials[p];
+
+                if (partialFrequency > 18000.0f)
+                    continue;
+
+                const auto increment = partialFrequency / static_cast<float> (rate);
+
+                // The high bars ring out shortest, as they do on a real one.
+                const auto rateOfDecay = decayShape * (0.8f + partials[p] * 0.5f);
+                auto phase = 0.0f;
+
+                for (int i = 0; i < length; ++i)
+                {
+                    out[i] += std::sin (phase * twoPi) * amplitudes[p] * decay (i, length, rateOfDecay);
+                    phase += increment;
+                    phase -= std::floor (phase);
+                }
+            }
+
+            // The mallet or thumbnail hitting the bar.
+            Noise noise (seed);
+            auto lp = 0.0f;
+            const auto click = lengthFor (0.02);
+
+            for (int i = 0; i < click; ++i)
+            {
+                lp += 0.4f * (noise.next() - lp);
+                out[i] += lp * decay (i, click, 6.0f) * noiseAmount;
+            }
+
+            fadeTail (buffer, 0.05);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeKalimba()
+        {
+            // A thumb piano tine is nearly a free bar: the second mode sits
+            // way above the fourth harmonic, which is the whole character.
+            return struckBar (noteHz (60), 1.8,
+                              { 1.0f, 4.2f, 10.8f, 20.1f },
+                              { 0.85f, 0.22f, 0.09f, 0.03f },
+                              2.4f, 4807, 0.35f);
+        }
+
+        juce::AudioBuffer<float> makeSteelDrum()
+        {
+            // A tuned pan note is built around the octave and the twelfth,
+            // with enough of the odd modes left in to sound like metal.
+            return struckBar (noteHz (60), 2.2,
+                              { 1.0f, 2.0f, 3.0f, 4.05f, 5.4f, 6.9f },
+                              { 0.7f, 0.5f, 0.3f, 0.16f, 0.09f, 0.05f },
+                              1.6f, 4808, 0.4f);
+        }
+
+        juce::AudioBuffer<float> makeMarimbaBar()
+        {
+            // A marimba bar is undercut so the second mode lands two octaves
+            // and a major third up. That interval is the instrument.
+            return struckBar (noteHz (60), 1.4,
+                              { 1.0f, 4.0f, 9.2f, 16.0f },
+                              { 0.9f, 0.25f, 0.08f, 0.03f },
+                              3.0f, 4809, 0.45f);
+        }
+
         struct Definition
         {
             const char* name;
             Generator   generate;
             bool        looping;
+            int         rootNote;   // the MIDI note it was generated at
+            bool        pitched;    // false for the noises, whose root is a placeholder
         };
 
         const std::vector<Definition>& definitions()
         {
             static const std::vector<Definition> list {
-                { "Chip Coin",     makeChipCoin,     false },
-                { "Arcade Laser",  makeArcadeLaser,  false },
-                { "Chip Power Up", makeChipPowerUp,  false },
-                { "Metal Hit",     makeMetalHit,     false },
-                { "Glass Break",   makeGlassBreak,   false },
-                { "Click Tick",    makeClickTick,    false },
-                { "Tape Hiss",     makeTapeHiss,     true  },
-                { "Vinyl Crackle", makeVinylCrackle, true  },
-                { "Radio Static",  makeRadioStatic,  true  },
-                { "Voice Ah",      makeVoiceAh,      true  },
-                { "Retro Engine",  makeRetroEngine,  true  }
+                // Pitched instruments first: they are what most patches want.
+                { "Nylon Guitar",    makeNylonGuitar,    false, 48, true },
+                { "Steel Guitar",    makeSteelGuitar,    false, 48, true },
+                { "Electric Guitar", makeElectricGuitar, false, 48, true },
+                { "Muted Pluck",     makeMutedPluck,     false, 48, true },
+                { "Finger Bass",     makeFingerBass,     false, 36, true },
+                { "Grand Piano",     makeGrandPiano,     false, 48, true },
+                { "Electric Piano",  makeElectricPiano,  false, 48, true },
+                { "Kalimba",         makeKalimba,        false, 60, true },
+                { "Steel Drum",      makeSteelDrum,      false, 60, true },
+                { "Marimba Bar",     makeMarimbaBar,     false, 60, true },
+
+                { "Chip Coin",     makeChipCoin,     false, 60, false },
+                { "Arcade Laser",  makeArcadeLaser,  false, 60, false },
+                { "Chip Power Up", makeChipPowerUp,  false, 60, false },
+                { "Metal Hit",     makeMetalHit,     false, 60, false },
+                { "Glass Break",   makeGlassBreak,   false, 60, false },
+                { "Click Tick",    makeClickTick,    false, 60, false },
+                { "Tape Hiss",     makeTapeHiss,     true,  60, false },
+                { "Vinyl Crackle", makeVinylCrackle, true,  60, false },
+                { "Radio Static",  makeRadioStatic,  true,  60, false },
+                { "Voice Ah",      makeVoiceAh,      true,  60, false },
+                { "Retro Engine",  makeRetroEngine,  true,  60, false }
             };
 
             return list;
@@ -438,6 +787,22 @@ namespace nog::dsp
             return false;
 
         return definitions()[static_cast<size_t> (index)].looping;
+    }
+
+    int SampleBank::getRootNote (int index)
+    {
+        if (! juce::isPositiveAndBelow (index, getCount()))
+            return 60;
+
+        return definitions()[static_cast<size_t> (index)].rootNote;
+    }
+
+    bool SampleBank::isPitched (int index)
+    {
+        if (! juce::isPositiveAndBelow (index, getCount()))
+            return false;
+
+        return definitions()[static_cast<size_t> (index)].pitched;
     }
 
     Sample::Ptr SampleBank::get (int index) const

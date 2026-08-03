@@ -1071,10 +1071,120 @@ namespace
                 }
             }
 
+            beginTest ("built-in instruments are in tune with their root note");
+            {
+                // A modelled string or bar is only useful if it plays the pitch
+                // it says it does: the oscillator transposes from the declared
+                // root, so a sample that is a semitone out is a sample that is
+                // out of tune in every patch that uses it.
+                const auto& bank  = nog::dsp::SampleBank::factory();
+                const auto  names = nog::dsp::SampleBank::getNames();
+
+                for (int i = 0; i < nog::dsp::SampleBank::getCount(); ++i)
+                {
+                    if (! nog::dsp::SampleBank::isPitched (i))
+                        continue;
+
+                    const auto root   = nog::dsp::SampleBank::getRootNote (i);
+                    const auto sample = bank.get (i);
+
+                    if (sample == nullptr)
+                        continue;
+
+                    const auto expected = 440.0 * std::pow (2.0, (root - 69) / 12.0);
+                    const auto measured = estimateFundamental (*sample);
+
+                    // Two percent is about a third of a semitone: tight enough
+                    // to catch an octave or semitone error, loose enough for
+                    // the delay line to be quantised to a whole sample.
+                    expect (std::abs (measured - expected) / expected < 0.02,
+                            names[i] + " should sound near " + juce::String (expected, 1)
+                                + " Hz but measured " + juce::String (measured, 1) + " Hz");
+                }
+            }
+
             file.deleteFile();
         }
 
     private:
+        /** Autocorrelation pitch estimate over a window just after the attack.
+
+            Autocorrelation rather than an FFT because these are inharmonic by
+            design: a piano's partials are stretched sharp and a kalimba's
+            second mode is nowhere near an octave, so the loudest bin is not
+            reliably the fundamental. The period is. */
+        static double estimateFundamental (const nog::dsp::Sample& sample)
+        {
+            constexpr int window = 16384;
+
+            const auto length = sample.getLength();
+            const auto rate   = sample.getSourceSampleRate();
+
+            // Skip the attack: the hammer thump and pick noise are broadband
+            // and would drag the correlation towards very short lags.
+            const auto start = static_cast<int> (rate * 0.08);
+
+            if (length < start + 2 * window)
+                return 0.0;
+
+            std::vector<float> data (static_cast<size_t> (2 * window));
+
+            for (size_t n = 0; n < data.size(); ++n)
+                data[n] = sample.read (0, (start + static_cast<int> (n)) / static_cast<double> (length));
+
+            // Search the lag range that covers every root note in the bank,
+            // roughly 40 Hz to 1200 Hz.
+            const auto minLag = juce::jmax (2, static_cast<int> (rate / 1200.0));
+            const auto maxLag = juce::jmin (window - 1, static_cast<int> (rate / 40.0));
+
+            auto reference = 0.0;
+
+            for (int n = 0; n < window; ++n)
+                reference += static_cast<double> (data[static_cast<size_t> (n)]) * data[static_cast<size_t> (n)];
+
+            std::vector<double> scores (static_cast<size_t> (maxLag + 1), 0.0);
+
+            for (int lag = minLag; lag <= maxLag; ++lag)
+            {
+                auto correlation = 0.0;
+                auto energy = 0.0;
+
+                for (int n = 0; n < window; ++n)
+                {
+                    correlation += static_cast<double> (data[static_cast<size_t> (n)])
+                                 * data[static_cast<size_t> (n + lag)];
+                    energy += static_cast<double> (data[static_cast<size_t> (n + lag)])
+                            * data[static_cast<size_t> (n + lag)];
+                }
+
+                // Normalising by both windows keeps the score in -1..1, so a
+                // decaying tone does not make short lags win by default.
+                const auto denominator = std::sqrt (reference * energy);
+                scores[static_cast<size_t> (lag)] = denominator > 0.0 ? correlation / denominator : 0.0;
+            }
+
+            const auto best = *std::max_element (scores.begin() + minLag, scores.end());
+
+            // Take the first *peak* that comes close to the best rather than
+            // the best itself. A signal that repeats every N samples also
+            // repeats every 2N and 3N, so the global maximum lands on a
+            // sub-multiple as often as not. Requiring a local maximum matters
+            // as much as the threshold: on an inharmonic tone the correlation
+            // curve is broad, and a plain threshold trips on the rising flank
+            // and reports a pitch several percent sharp.
+            for (int lag = minLag + 1; lag < maxLag; ++lag)
+            {
+                const auto score = scores[static_cast<size_t> (lag)];
+
+                if (score > best * 0.9
+                    && score >= scores[static_cast<size_t> (lag - 1)]
+                    && score > scores[static_cast<size_t> (lag + 1)])
+                    return rate / lag;
+            }
+
+            return 0.0;
+        }
+
         /** Writes a fixed sine to @p file so the tests have something real to
             decode rather than a synthetic buffer. */
         static bool writeTestTone (const juce::File& file, double frequency,

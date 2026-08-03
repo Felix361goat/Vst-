@@ -92,7 +92,9 @@ namespace nog
 
         // Reset first: a preset only stores what differs from the defaults, so
         // without this it would inherit whatever the previous patch left behind.
-        loadDefault();
+        // The samples are set below rather than cleared here, so a patch that
+        // wants one does not have to load it twice.
+        resetParameters();
 
         for (const auto& [id, value] : preset->values)
         {
@@ -109,7 +111,29 @@ namespace nog
             }
         }
 
+        for (int i = 0; i < numSampleSlots; ++i)
+        {
+            const auto builtIn = preset->builtInSamples[static_cast<size_t> (i)];
+
+            state.state.setProperty (samplePathProperty (i),
+                                     builtIn >= 0 ? juce::var ("builtin:" + juce::String (builtIn))
+                                                  : juce::var(),
+                                     nullptr);
+        }
+
+        notifySampleStateChanged();
         setCurrentPresetName (name);
+    }
+
+    juce::String PresetManager::samplePathProperty (int oscillatorIndex)
+    {
+        return "osc" + juce::String (oscillatorIndex + 1) + "SamplePath";
+    }
+
+    void PresetManager::notifySampleStateChanged()
+    {
+        if (onSampleStateChanged)
+            onSampleStateChanged();
     }
 
     juce::String PresetManager::getCurrentPresetName() const
@@ -170,6 +194,10 @@ namespace nog
             return;
 
         state.replaceState (tree);
+
+        // A user preset is a whole state tree, so it carries its own sample
+        // properties; the engine still has to be told to act on them.
+        notifySampleStateChanged();
         setCurrentPresetName (name);
     }
 
@@ -193,12 +221,23 @@ namespace nog
         load (names[next]);
     }
 
-    void PresetManager::loadDefault()
+    void PresetManager::resetParameters()
     {
         for (auto* parameter : state.processor.getParameters())
             if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
                 ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    }
 
+    void PresetManager::loadDefault()
+    {
+        resetParameters();
+
+        // An init patch has no sample loaded. Without this the previous patch's
+        // sample would stay in the engine and keep sounding.
+        for (int i = 0; i < numSampleSlots; ++i)
+            state.state.setProperty (samplePathProperty (i), juce::var(), nullptr);
+
+        notifySampleStateChanged();
         setCurrentPresetName ("Init");
     }
 

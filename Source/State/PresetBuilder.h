@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DSP/SampleBank.h"
 #include "FX/FXChain.h"
 #include "Modulation/ModDefs.h"
 #include "Params/ParameterIDs.h"
@@ -61,6 +62,22 @@ namespace nog::presets
         }
 
         Build& oscOff (int index) { return set (ids::osc (index, ids::oscEnable), 0.0f); }
+
+        /** Points an oscillator at one of the built-in samples instead of a
+            wavetable. @p builtIn indexes dsp::SampleBank; the root note comes
+            from the bank, so a patch never has to know what pitch the sample
+            was generated at. */
+        Build& sampleOsc (int index, int builtIn, float level, bool loop = false)
+        {
+            preset.builtInSamples[static_cast<size_t> (index)] = builtIn;
+
+            set (ids::osc (index, ids::oscEnable), 1.0f);
+            set (ids::osc (index, ids::oscMode), 1.0f);
+            set (ids::osc (index, ids::oscSampleLoop), loop ? 1.0f : 0.0f);
+            set (ids::osc (index, ids::oscSampleRoot),
+                 static_cast<float> (dsp::SampleBank::getRootNote (builtIn)));
+            return set (ids::osc (index, ids::oscLevel), level);
+        }
 
         Build& unison (int index, int voices, float detune, float blend = 0.5f, float width = 0.7f)
         {
