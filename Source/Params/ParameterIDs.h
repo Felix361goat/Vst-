@@ -72,6 +72,7 @@ namespace nog::ids
     inline constexpr const char* oscUnison      = "unison";
     inline constexpr const char* oscDetune      = "detune";
     inline constexpr const char* oscBlend       = "blend";
+    inline constexpr const char* oscUniSpread   = "uspread";
     inline constexpr const char* oscUniWidth    = "uniwidth";
     inline constexpr const char* oscPhase       = "phase";
     inline constexpr const char* oscPhaseRand   = "phaserand";

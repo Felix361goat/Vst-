@@ -56,6 +56,12 @@ namespace nog::dsp
             float detune       = 0.2f;   // 0..1
             float blend        = 0.5f;   // 0..1, centre versus side voices
             float width        = 0.5f;   // 0..1, stereo spread of side voices
+
+            /** How far the unison stack fans out across the table's frames.
+                Detune alone gives every voice the same timbre at a different
+                pitch; this gives them different timbres too, which is what
+                makes a wide stack move rather than merely beat. */
+            float tableSpread  = 0.0f;   // 0..1
             float phase        = 0.0f;   // 0..1, start phase
             float phaseRandom  = 1.0f;   // 0..1
             float pan          = 0.0f;   // -1..1
@@ -127,7 +133,7 @@ namespace nog::dsp
             of it. Not for the audio thread: it ignores unison and panning. */
         float previewAt (double phase) const noexcept
         {
-            return warpedSample (phase, 1.0e-4, 0);
+            return warpedSample (phase, 1.0e-4, 0, framePosition);
         }
 
     private:
@@ -137,6 +143,9 @@ namespace nog::dsp
             float  detuneRatio = 1.0f;
             float  gainLeft    = 0.0f;
             float  gainRight   = 0.0f;
+
+            /** Frame this voice reads, in table frames rather than 0..1. */
+            float  frame       = 0.0f;
 
             /** Set when a one-shot sample has played past its end. */
             bool   finished    = false;
@@ -148,9 +157,9 @@ namespace nog::dsp
         void updateUnisonLayout() noexcept;
 
         /** Reads the source at @p phase, applying the selected warp. */
-        float warpedSample (double phase, double increment, int channel) const noexcept;
+        float warpedSample (double phase, double increment, int channel, float frame) const noexcept;
 
-        float readTable (double phase, double increment) const noexcept;
+        float readTable (double phase, double increment, float frame) const noexcept;
 
         /** Phase increment per output sample for one unison voice. In sample
             mode this is a fraction of the file rather than of a cycle, which is
@@ -158,7 +167,7 @@ namespace nog::dsp
         double incrementFor (float voiceFrequency) const noexcept;
 
         /** One sample of the source at @p phase, before warping. */
-        float readSource (double phase, double increment, int channel) const noexcept;
+        float readSource (double phase, double increment, int channel, float frame) const noexcept;
 
         const Wavetable* table  = nullptr;
         const Sample*    sample = nullptr;

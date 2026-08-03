@@ -529,6 +529,81 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
+
+        // -- unison spread ---------------------------------------------------
+        //
+        // These fan the unison stack across the table's frames as well as
+        // detuning it, so the voices differ in timbre and not only in pitch.
+        // Sparkle Lead and its siblings above are left exactly as they were.
+
+        list.push_back (Build ("Sparkle Lead Fanned", "Lead")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.58f)
+            .osc (1, wt::HarmonicSweep, 0.80f, 0.30f)
+            .tune (1, 1, 0, 6.0f)
+            .unison (0, 7, 0.16f, 0.55f, 0.88f, 0.14f)
+            .unison (1, 3, 0.10f, 0.5f, 0.6f, 0.25f)
+            .filter (flt::LP24, 2700.0f, 0.11f, 0.09f, 1.0f, 0.78f)
+            .env (0, 4.0f, 950.0f, 0.74f, 400.0f)
+            .env (1, 2.0f, 270.0f, 0.28f, 300.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.28f)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.70f, 0.55f)
+            .fx (FX::Delay, 0.22f, 0.30f, 0.34f, 0.8f)
+            .fx (FX::Reverb, 0.32f, 0.74f, 0.26f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        // A wide fan across Harmonic Sweep: the edges of the stack are a very
+        // different spectrum from the centre, so the chord moves as it decays.
+        list.push_back (Build ("Spectral Fan Chords", "Chords")
+            .voices (12)
+            .osc (0, wt::HarmonicSweep, 0.50f, 0.55f)
+            .osc (1, wt::BasicShapes, wt::triangle, 0.22f)
+            .tune (1, 1)
+            .unison (0, 7, 0.13f, 0.55f, 0.92f, 0.55f)
+            .filter (flt::LP24, 2400.0f, 0.08f, 0.05f, 1.0f, 0.68f)
+            .env (0, 20.0f, 1600.0f, 0.72f, 800.0f)
+            .lfoFree (0, 0, 0.15f)
+            .route (Src::Lfo1, Dst::Osc1WtPos, 0.14f, true)
+            .fx (FX::Eq, 1.0f, 0.46f, 0.68f, 0.55f)
+            .fx (FX::Delay, 0.20f, 0.32f, 0.30f, 0.75f)
+            .fx (FX::Reverb, 0.42f, 0.85f, 0.24f, 1.0f)
+            .master (-12.0f)
+            .done());
+
+        list.push_back (Build ("Fanned Supersaw", "Trance")
+            .voices (8)
+            .osc (0, wt::BasicShapes, wt::saw, 0.65f)
+            .oscOff (1)
+            .unison (0, 9, 0.22f, 0.62f, 1.0f, 0.18f)
+            .filter (flt::LP24, 2400.0f, 0.16f, 0.14f, 1.0f, 0.72f)
+            .env (0, 3.0f, 800.0f, 0.78f, 360.0f)
+            .env (1, 1.0f, 220.0f, 0.20f, 240.0f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.30f)
+            .fx (FX::Eq, 1.0f, 0.44f, 0.70f, 0.58f)
+            .fx (FX::Delay, 0.26f, 0.26f, 0.36f, 0.9f)
+            .fx (FX::Reverb, 0.32f, 0.76f, 0.26f, 1.0f)
+            .master (-11.0f)
+            .done());
+
+        list.push_back (Build ("Fanned Growl Lead", "Lead")
+            .voices (6)
+            .osc (0, wt::Growl, 0.40f, 0.62f)
+            .osc (1, wt::BasicShapes, wt::saw, 0.26f)
+            .tune (1, 0, 0, -9.0f)
+            .unison (0, 5, 0.12f, 0.55f, 0.85f, 0.45f)
+            .filter (flt::LP24, 2200.0f, 0.20f, 0.20f, 1.0f, 0.65f)
+            .env (0, 4.0f, 850.0f, 0.75f, 320.0f)
+            .lfoSynced (0, 0, 5)
+            .route (Src::Lfo1, Dst::Osc1WtPos, 0.22f, true)
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::FilterCutoff, 0.30f, true)
+            .fx (FX::Distortion, 0.22f, 0.24f, 0.45f, 0.5f)
+            .fx (FX::Delay, 0.24f, 0.26f, 0.34f, 0.85f)
+            .fx (FX::Reverb, 0.28f, 0.70f, 0.28f, 1.0f)
+            .oversample (1)
+            .master (-11.0f)
+            .done());
+
         return list;
     }
 }

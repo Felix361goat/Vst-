@@ -49,6 +49,7 @@ namespace nog::ui
           unison      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscUnison), "Unison"),
           blend       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscBlend), "Blend"),
           width       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscUniWidth), "Width"),
+          spread      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscUniSpread), "Spread"),
           phase       (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPhase), "Phase"),
           phaseRandom (processorToUse.getValueTreeState(), ids::osc (index, ids::oscPhaseRand), "Rand"),
           octave      (processorToUse.getValueTreeState(), ids::osc (index, ids::oscOctave), "Octave"),
@@ -58,7 +59,7 @@ namespace nog::ui
     {
         addAllChildren (*this, { &enable, &toFilter, &mode, &wave, &warpMode, &sampleButton,
                                  &level, &pan, &wtPos, &warp, &detune,
-                                 &unison, &blend, &width, &phase, &phaseRandom,
+                                 &unison, &blend, &width, &spread, &phase, &phaseRandom,
                                  &octave, &semi, &fine, &display });
 
         sampleButton.onClick = [this] { showSampleMenu(); };
@@ -80,7 +81,7 @@ namespace nog::ui
         display.setAccentColour (capColour);
 
         for (auto* knob : { &level, &pan, &wtPos, &warp, &detune,
-                            &unison, &blend, &width, &phase, &phaseRandom,
+                            &unison, &blend, &width, &spread, &phase, &phaseRandom,
                             &octave, &semi, &fine })
             knob->setAccentColour (capColour);
 
@@ -234,7 +235,7 @@ namespace nog::ui
         warpMode.setBounds (topRow.reduced (2, 4));
 
         layoutRow (bounds.removeFromTop (knobRowHeight), { &level, &pan, &wtPos, &warp, &detune });
-        layoutRow (bounds.removeFromTop (knobRowHeight), { &unison, &blend, &width, &phase, &phaseRandom });
+        layoutRow (bounds.removeFromTop (knobRowHeight), { &unison, &blend, &width, &spread, &phase, &phaseRandom });
         // The tuning knobs need three of the five columns the rows above use,
         // so the display takes the space that would otherwise be blank.
         auto lastRow = bounds.removeFromTop (knobRowHeight);

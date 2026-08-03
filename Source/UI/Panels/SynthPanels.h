@@ -51,7 +51,7 @@ namespace nog::ui
         int lastMode = -1;
 
         Knob level, pan, wtPos, warp, detune;
-        Knob unison, blend, width, phase, phaseRandom;
+        Knob unison, blend, width, spread, phase, phaseRandom;
         Knob octave, semi, fine;
 
         WaveDisplay display;

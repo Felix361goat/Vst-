@@ -270,6 +270,7 @@ namespace nog
             settings.unisonVoices = p.unison->get();
             settings.blend        = p.blend->get();
             settings.width        = p.uniWidth->get();
+            settings.tableSpread  = p.uniSpread->get();
             settings.phaseRandom  = p.phaseRand->get();
 
             settings.level      = p.enable->get() ? parameters.modulated (levelDest,  frame.getOffset (levelDest))  : 0.0f;

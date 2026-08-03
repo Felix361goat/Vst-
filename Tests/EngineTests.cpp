@@ -1135,6 +1135,57 @@ namespace
                 expect (peak > 0.7f, "sample should be normalised, peak was " + juce::String (peak));
             }
 
+            beginTest ("unison spread fans the stack across the table");
+            {
+                // Detune alone gives every unison voice the same waveform at a
+                // different pitch. Spread gives them different waveforms too,
+                // which has to be audible or the control does nothing.
+                const auto renderWith = [] (float spread)
+                {
+                    nog::dsp::Oscillator oscillator;
+                    oscillator.prepare (testSampleRate);
+                    oscillator.setTable (&nog::dsp::WavetableBank::factory().getTable (1));
+
+                    nog::dsp::Oscillator::Settings settings;
+                    settings.unisonVoices = 7;
+                    settings.detune       = 0.2f;
+                    settings.morph        = 0.5f;
+                    settings.tableSpread  = spread;
+                    settings.phaseRandom  = 0.0f;
+                    settings.level        = 1.0f;
+                    oscillator.setSettings (settings);
+
+                    oscillator.setFrequency (220.0f);
+                    oscillator.noteOn();
+
+                    std::vector<float> out (4096);
+
+                    for (auto& value : out)
+                    {
+                        auto left = 0.0f, right = 0.0f;
+                        oscillator.addNextSample (left, right);
+                        value = left;
+                    }
+
+                    return out;
+                };
+
+                const auto flat   = renderWith (0.0f);
+                const auto fanned = renderWith (1.0f);
+
+                auto difference = 0.0;
+
+                for (size_t i = 0; i < flat.size(); ++i)
+                {
+                    expect (std::isfinite (fanned[i]));
+                    difference += std::abs (static_cast<double> (flat[i] - fanned[i]));
+                }
+
+                expect (difference > 1.0,
+                        "spread should change the sound, total difference was "
+                            + juce::String (difference, 4));
+            }
+
             beginTest ("a one-shot sample plays at full level from its start");
             {
                 // One-shot is what every instrument patch uses, and it takes a

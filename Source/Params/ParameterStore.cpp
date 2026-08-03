@@ -65,6 +65,7 @@ namespace nog
             o.detune     = find<Float>  (apvts, ids::osc (i, ids::oscDetune));
             o.blend      = find<Float>  (apvts, ids::osc (i, ids::oscBlend));
             o.uniWidth   = find<Float>  (apvts, ids::osc (i, ids::oscUniWidth));
+            o.uniSpread  = find<Float>  (apvts, ids::osc (i, ids::oscUniSpread));
             o.phase      = find<Float>  (apvts, ids::osc (i, ids::oscPhase));
             o.phaseRand  = find<Float>  (apvts, ids::osc (i, ids::oscPhaseRand));
             o.octave     = find<Int>    (apvts, ids::osc (i, ids::oscOctave));

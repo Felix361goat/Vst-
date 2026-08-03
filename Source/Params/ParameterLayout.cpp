@@ -231,6 +231,10 @@ namespace nog::params
                                      linear (0.0f, 1.0f), 0.5f, fmtPercent),
                          floatParam (ids::osc (index, ids::oscUniWidth), "Osc " + number + " Uni Width",
                                      linear (0.0f, 1.0f), 0.5f, fmtPercent),
+                         // Zero by default: a patch saved before this existed
+                         // has to load sounding exactly as it did.
+                         floatParam (ids::osc (index, ids::oscUniSpread), "Osc " + number + " Uni Spread",
+                                     linear (0.0f, 1.0f), 0.0f, fmtPercent),
                          floatParam (ids::osc (index, ids::oscPhase), "Osc " + number + " Phase",
                                      linear (0.0f, 1.0f), 0.0f, fmtPercent),
                          floatParam (ids::osc (index, ids::oscPhaseRand), "Osc " + number + " Rand Phase",

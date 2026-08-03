@@ -36,6 +36,7 @@ namespace nog
             juce::AudioParameterFloat*  detune      = nullptr;
             juce::AudioParameterFloat*  blend       = nullptr;
             juce::AudioParameterFloat*  uniWidth    = nullptr;
+            juce::AudioParameterFloat*  uniSpread   = nullptr;
             juce::AudioParameterFloat*  phase       = nullptr;
             juce::AudioParameterFloat*  phaseRand   = nullptr;
             juce::AudioParameterInt*    octave      = nullptr;

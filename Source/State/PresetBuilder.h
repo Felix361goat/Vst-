@@ -86,11 +86,15 @@ namespace nog::presets
             return set (ids::osc (index, ids::oscLevel), level);
         }
 
-        Build& unison (int index, int voices, float detune, float blend = 0.5f, float width = 0.7f)
+        /** @p spread fans the stack across the table's frames as well as
+            detuning it, so the voices differ in timbre and not only in pitch. */
+        Build& unison (int index, int voices, float detune, float blend = 0.5f,
+                       float width = 0.7f, float spread = 0.0f)
         {
             set (ids::osc (index, ids::oscUnison), static_cast<float> (voices));
             set (ids::osc (index, ids::oscDetune), detune);
             set (ids::osc (index, ids::oscBlend), blend);
+            set (ids::osc (index, ids::oscUniSpread), spread);
             return set (ids::osc (index, ids::oscUniWidth), width);
         }
 
