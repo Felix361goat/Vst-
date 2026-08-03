@@ -67,12 +67,19 @@ namespace nog::presets
             wavetable. @p builtIn indexes dsp::SampleBank; the root note comes
             from the bank, so a patch never has to know what pitch the sample
             was generated at. */
-        Build& sampleOsc (int index, int builtIn, float level, bool loop = false)
+        Build& sampleOsc (int index, int builtIn, float level, bool loop = false,
+                          float start = 0.0f)
         {
             preset.builtInSamples[static_cast<size_t> (index)] = builtIn;
 
             set (ids::osc (index, ids::oscEnable), 1.0f);
             set (ids::osc (index, ids::oscMode), 1.0f);
+
+            // In sample mode this parameter is the playback start offset, and
+            // its default is halfway - which is right for a wavetable and wrong
+            // for a sample, where it would skip the attack entirely. A patch
+            // that wants to start late says so.
+            set (ids::osc (index, ids::oscWtPos), start);
             set (ids::osc (index, ids::oscSampleLoop), loop ? 1.0f : 0.0f);
             set (ids::osc (index, ids::oscSampleRoot),
                  static_cast<float> (dsp::SampleBank::getRootNote (builtIn)));

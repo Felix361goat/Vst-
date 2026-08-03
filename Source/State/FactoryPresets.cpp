@@ -24,6 +24,7 @@ namespace nog::presets
     std::vector<Preset> ambientPresets();
     std::vector<Preset> houseTechnoPresets();
     std::vector<Preset> instrumentPresets();
+    std::vector<Preset> characterPresets();
 
     juce::StringArray categories()
     {
@@ -49,6 +50,7 @@ namespace nog::presets
             };
 
             append (instrumentPresets());
+            append (characterPresets());
             append (bassPresets());
             append (leadPresets());
             append (pluckPresets());

@@ -34,6 +34,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/State/Presets/ModernPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/ClassicPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/InstrumentPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/CharacterPresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES

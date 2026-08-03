@@ -867,6 +867,62 @@ namespace
                 }
             }
 
+            beginTest ("sample presets set their own start offset");
+            {
+                // In sample mode the morph parameter becomes the playback start
+                // offset, and its default is halfway - correct for a wavetable,
+                // and for a sample it skips the attack. A patch that inherits
+                // that default loses the pick or the hammer, which is the part
+                // that makes it sound like an instrument.
+                for (const auto& preset : presets)
+                {
+                    for (int i = 0; i < static_cast<int> (preset.builtInSamples.size()); ++i)
+                    {
+                        if (preset.builtInSamples[static_cast<size_t> (i)] < 0)
+                            continue;
+
+                        const auto id = nog::ids::osc (i, nog::ids::oscWtPos);
+                        const auto declared = std::any_of (preset.values.begin(), preset.values.end(),
+                                                           [&id] (const auto& pair) { return pair.first == id; });
+
+                        expect (declared,
+                                preset.name + " loads a sample on oscillator " + juce::String (i + 1)
+                                    + " without setting its start offset");
+                    }
+                }
+            }
+
+            beginTest ("a sample preset renders identically every time");
+            {
+                // Oscillators start at a random phase by default, which is right
+                // for a wavetable and disastrous for a sample: it starts the file
+                // at a random point, so a decaying one-shot comes out at a random
+                // and usually tiny level. Rendering the same patch twice is the
+                // cheapest way to catch that class of bug, because a sample patch
+                // that only sometimes sounds is otherwise very hard to pin down.
+                for (const auto& preset : presets)
+                {
+                    // Only the patches whose whole signal path is the sample.
+                    // A wavetable oscillator, a sub, a noise layer, a sample-and-
+                    // hold LFO and a random arpeggiator are all legitimately
+                    // different from one note to the next.
+                    const auto sampleOnly = preset.builtInSamples[0] >= 0
+                                         && preset.builtInSamples[1] < 0
+                                         && ! usesWavetableOscillator (preset, 1)
+                                         && ! hasRandomElement (preset);
+
+                    if (! sampleOnly)
+                        continue;
+
+                    const auto first  = renderFingerprint (preset, true);
+                    const auto second = renderFingerprint (preset, true);
+
+                    expect (std::abs (first - second) < 1.0e-6 * juce::jmax (1.0, std::abs (first)),
+                            preset.name + " renders differently each time (" + juce::String (first, 4)
+                                + " then " + juce::String (second, 4) + ")");
+                }
+            }
+
             beginTest ("every preset releases to silence");
             {
                 for (const auto& preset : presets)
@@ -899,6 +955,53 @@ namespace
         }
 
     private:
+        /** True if the preset switches on the given oscillator and leaves it in
+            wavetable mode. */
+        static bool usesWavetableOscillator (const nog::presets::Preset& preset, int index)
+        {
+            const auto valueOf = [&preset] (const juce::String& id) -> float
+            {
+                for (const auto& [name, value] : preset.values)
+                    if (name == id)
+                        return value;
+
+                return -1.0f;   // not mentioned
+            };
+
+            const auto enabled = valueOf (nog::ids::osc (index, nog::ids::oscEnable));
+            const auto mode    = valueOf (nog::ids::osc (index, nog::ids::oscMode));
+
+            return enabled > 0.5f && mode < 0.5f;
+        }
+
+        /** True if the preset contains something that is meant to differ from
+            one note to the next. */
+        static bool hasRandomElement (const nog::presets::Preset& preset)
+        {
+            const auto valueOf = [&preset] (const juce::String& id) -> float
+            {
+                for (const auto& [name, value] : preset.values)
+                    if (name == id)
+                        return value;
+
+                return -1.0f;
+            };
+
+            if (valueOf (nog::ids::subEnable) > 0.5f || valueOf (nog::ids::noiseEnable) > 0.5f)
+                return true;
+
+            // Random and As Played both reorder, but only Random differs run to run.
+            if (valueOf (nog::ids::arpEnable) > 0.5f
+                && valueOf (nog::ids::arpMode) >= static_cast<float> (nog::Arpeggiator::Mode::Random))
+                return true;
+
+            for (int i = 0; i < nog::ids::numLfos; ++i)
+                if (valueOf (nog::ids::lfo (i, nog::ids::lfoShape)) >= 5.0f)   // Random S&H upwards
+                    return true;
+
+            return false;
+        }
+
         /** Sum of absolute output over a short note, as a cheap stand-in for
             "what this patch sounds like". Two renders that agree to five
             decimal places came from the same signal path. */
@@ -990,6 +1093,43 @@ namespace
                 // Loading normalises, so a quiet file and a loud one arrive at
                 // the oscillator at the same level.
                 expect (peak > 0.7f, "sample should be normalised, peak was " + juce::String (peak));
+            }
+
+            beginTest ("a one-shot sample plays at full level from its start");
+            {
+                // One-shot is what every instrument patch uses, and it takes a
+                // different path through the oscillator than the looping mode
+                // the test below covers. A one-shot that comes out quiet, or
+                // that stops early, is silently wrong rather than obviously so.
+                nog::dsp::SampleLibrary library;
+                expect (library.loadBuiltIn (0, 5), "the grand piano should load");
+
+                nog::dsp::Oscillator oscillator;
+                oscillator.prepare (testSampleRate);
+                oscillator.setSample (library.getSlot (0));
+
+                nog::dsp::Oscillator::Settings settings;
+                settings.mode     = static_cast<int> (nog::dsp::Oscillator::Mode::Sample);
+                settings.loop     = static_cast<int> (nog::dsp::Oscillator::Loop::OneShot);
+                settings.rootNote = nog::dsp::SampleBank::getRootNote (5);
+                settings.level    = 1.0f;
+                settings.morph    = 0.0f;
+                oscillator.setSettings (settings);
+
+                oscillator.setFrequency (440.0f * std::exp2 ((settings.rootNote - 69.0f) / 12.0f));
+                oscillator.noteOn();
+
+                auto peak = 0.0f;
+
+                for (int i = 0; i < 8192; ++i)
+                {
+                    auto left = 0.0f, right = 0.0f;
+                    oscillator.addNextSample (left, right);
+                    peak = juce::jmax (peak, std::abs (left));
+                }
+
+                expect (peak > 0.3f,
+                        "a one-shot should play near full level, peak was " + juce::String (peak, 6));
             }
 
             beginTest ("a rubbish file is refused rather than half-loaded");

@@ -93,6 +93,25 @@ namespace nog::dsp
             layoutDirty = true;
         }
 
+        /** Points the oscillator at the source a note is about to start on.
+
+            noteOn() has to know which source it is starting: a wavetable begins
+            at a random phase, a sample begins at its start offset. The per-block
+            settings update runs after the note has already been triggered, which
+            is too late - a sample note-on that thinks it is a wavetable starts
+            at a random point in the file, which for a decaying one-shot means a
+            random and usually very quiet fragment of it.
+        */
+        void prepareSourceForNoteOn (const Sample* newSample, int newMode, int newLoop,
+                                     int newRootNote, float startOffset) noexcept
+        {
+            sample            = newSample;
+            settings.mode     = newMode;
+            settings.loop     = newLoop;
+            settings.rootNote = newRootNote;
+            settings.morph    = startOffset;
+        }
+
         void setFrequency (float hz) noexcept { frequency = juce::jmax (0.0f, hz); }
 
         /** Adds this oscillator's output into @p left and @p right.

@@ -71,6 +71,19 @@ namespace nog
         // legato line does not restart the timbre, only the envelopes.
         if (! retrigger)
         {
+            for (int i = 0; i < ids::numOscillators; ++i)
+            {
+                const auto& p = parameters.osc[static_cast<size_t> (i)];
+
+                // The full settings update runs later in the block, but noteOn
+                // needs to know now whether it is starting a wavetable or a
+                // sample, and where.
+                oscillators[static_cast<size_t> (i)].prepareSourceForNoteOn (
+                    samples != nullptr ? samples->getSlot (i) : nullptr,
+                    p.mode->getIndex(), p.sampleLoop->getIndex(),
+                    p.sampleRoot->get(), p.wtPos->get());
+            }
+
             for (auto& oscillator : oscillators)
                 oscillator.noteOn();
 
