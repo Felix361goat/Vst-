@@ -16,6 +16,8 @@ namespace nog
 
         for (auto& voice : voices)
             voice.setSampleLibrary (&samples);
+
+        arpEvents.reserve (64);
     }
 
     int SynthEngine::getOversamplingFactor() noexcept
@@ -47,6 +49,60 @@ namespace nog
         return 0;
     }
 
+    Arpeggiator::Settings SynthEngine::getArpSettings() const
+    {
+        Arpeggiator::Settings settings;
+        settings.enabled  = parameters.arpEnable->get();
+        settings.mode     = parameters.arpMode->getIndex();
+        settings.division = parameters.arpRate->getIndex();
+        settings.octaves  = parameters.arpOctaves->get();
+        settings.gate     = parameters.arpGate->get();
+        settings.swing    = parameters.arpSwing->get();
+
+        return settings;
+    }
+
+    void SynthEngine::renderSegment (juce::AudioBuffer<float>& target, int startSample,
+                                     int numSamples, double bpm)
+    {
+        if (numSamples <= 0)
+            return;
+
+        const auto settings = getArpSettings();
+
+        if (! settings.enabled && ! arpeggiator.hasHeldNotes())
+        {
+            renderVoices (target, startSample, numSamples, bpm);
+            return;
+        }
+
+        // The arp reports what it produced across the segment; each event is a
+        // note-on or note-off at a sample offset, and the audio between them is
+        // rendered separately so the timing is exact.
+        arpEvents.clear();
+        arpeggiator.process (numSamples, bpm, settings, arpEvents);
+
+        auto position = 0;
+
+        for (const auto& event : arpEvents)
+        {
+            const auto offset = juce::jlimit (0, numSamples, event.offset);
+
+            if (offset > position)
+            {
+                renderVoices (target, startSample + position, offset - position, bpm);
+                position = offset;
+            }
+
+            if (event.isNoteOn)
+                startNote (event.note, event.velocity, 1);
+            else
+                stopNote (event.note, 1);
+        }
+
+        renderVoices (target, startSample + position, numSamples - position, bpm);
+    }
+
     void SynthEngine::prepareVoices()
     {
         // Voices run at the oversampled rate, so everything inside them - the
@@ -55,6 +111,10 @@ namespace nog
 
         for (auto& voice : voices)
             voice.prepare (voiceRate);
+
+        // The arp runs at the host rate, not the oversampled one: its clock is
+        // in real time and the segment lengths it is given are host samples.
+        arpeggiator.prepare (sampleRate * static_cast<double> (getOversamplingFactor()));
     }
 
     void SynthEngine::prepare (double newSampleRate, int maximumBlockSize, int channels)
@@ -99,6 +159,7 @@ namespace nog
             voice.reset();
 
         effects.reset();
+        arpeggiator.reset();
         sustainedNotes.fill (false);
         sustainPedalDown = false;
         monoNoteStack.clearQuick();
@@ -277,17 +338,26 @@ namespace nog
         monoNoteStack.clearQuick();
         monoVelocityStack.clearQuick();
         sustainedNotes.fill (false);
+        arpeggiator.reset();
     }
 
     void SynthEngine::handleMidiMessage (const juce::MidiMessage& message)
     {
         if (message.isNoteOn())
         {
-            startNote (message.getNoteNumber(), message.getFloatVelocity(), message.getChannel());
+            // With the arp on, a key press feeds the pattern rather than
+            // sounding a voice directly.
+            if (parameters.arpEnable->get())
+                arpeggiator.noteOn (message.getNoteNumber(), message.getFloatVelocity());
+            else
+                startNote (message.getNoteNumber(), message.getFloatVelocity(), message.getChannel());
         }
         else if (message.isNoteOff())
         {
-            stopNote (message.getNoteNumber(), message.getChannel());
+            arpeggiator.noteOff (message.getNoteNumber());
+
+            if (! parameters.arpEnable->get())
+                stopNote (message.getNoteNumber(), message.getChannel());
         }
         else if (message.isAllNotesOff() || message.isAllSoundOff())
         {
@@ -360,13 +430,13 @@ namespace nog
             const auto eventPosition = juce::jlimit (0, hostNumSamples, metadata.samplePosition) * factor;
             const auto segment       = eventPosition - position;
 
-            renderVoices (target, position, segment, bpm);
+            renderSegment (target, position, segment, bpm);
             position += segment;
 
             handleMidiMessage (metadata.getMessage());
         }
 
-        renderVoices (target, position, target.getNumSamples() - position, bpm);
+        renderSegment (target, position, target.getNumSamples() - position, bpm);
     }
 
     void SynthEngine::renderVoicesOversampled (juce::AudioBuffer<float>& buffer,

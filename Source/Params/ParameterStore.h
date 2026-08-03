@@ -151,6 +151,14 @@ namespace nog
         juce::AudioParameterFloat*  velocitySens   = nullptr;
         juce::AudioParameterChoice* oversampling   = nullptr;
 
+        // -- arpeggiator ----------------------------------------------------
+        juce::AudioParameterBool*   arpEnable  = nullptr;
+        juce::AudioParameterChoice* arpMode    = nullptr;
+        juce::AudioParameterChoice* arpRate    = nullptr;
+        juce::AudioParameterInt*    arpOctaves = nullptr;
+        juce::AudioParameterFloat*  arpGate    = nullptr;
+        juce::AudioParameterFloat*  arpSwing   = nullptr;
+
         // -- modules --------------------------------------------------------
         std::array<Oscillator, ids::numOscillators> osc;
         std::array<Envelope,   ids::numEnvelopes>   env;

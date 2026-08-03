@@ -19,6 +19,11 @@ namespace nog::params
         }
 
         juce::StringArray oscModes()        { return { "Wavetable", "Sample" }; }
+
+        juce::StringArray arpModes()
+        {
+            return { "Up", "Down", "Up / Down", "Down / Up", "As Played", "Random", "Chord" };
+        }
         juce::StringArray sampleLoopModes() { return { "One Shot", "Loop" }; }
 
         juce::StringArray subWaveforms()   { return { "Sine", "Triangle", "Saw", "Square" }; }
@@ -177,6 +182,20 @@ namespace nog::params
                          floatParam (ids::velocitySens, "Velocity Sens",
                                      linear (0.0f, 1.0f), 0.75f, fmtPercent),
                          choiceParam (ids::oversampling, "Oversampling", choices::oversamplingModes(), 0));
+
+            return g;
+        }
+
+        std::unique_ptr<Group> buildArpGroup()
+        {
+            auto g = group ("arp", "Arpeggiator");
+
+            g->addChild (boolParam   (ids::arpEnable, "Arp On", false),
+                         choiceParam (ids::arpMode, "Arp Mode", choices::arpModes(), 0),
+                         choiceParam (ids::arpRate, "Arp Rate", choices::tempoDivisions(), 7),
+                         intParam    (ids::arpOctaves, "Arp Octaves", 1, 4, 1),
+                         floatParam  (ids::arpGate, "Arp Gate", linear (0.05f, 1.0f), 0.5f, fmtPercent),
+                         floatParam  (ids::arpSwing, "Arp Swing", linear (0.0f, 1.0f), 0.0f, fmtPercent));
 
             return g;
         }
@@ -385,7 +404,7 @@ namespace nog::params
     {
         Layout layout;
 
-        layout.add (buildGlobalGroup());
+        layout.add (buildGlobalGroup(), buildArpGroup());
 
         for (int i = 0; i < ids::numOscillators; ++i)
             layout.add (buildOscillatorGroup (i));

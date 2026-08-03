@@ -5,6 +5,7 @@
 
 #include "Engine/Voice.h"
 #include "DSP/SampleLibrary.h"
+#include "Engine/Arpeggiator.h"
 #include "FX/FXChain.h"
 #include "Modulation/ModMatrix.h"
 #include "Params/ParameterStore.h"
@@ -55,6 +56,14 @@ namespace nog
         enum class VoiceMode { Poly = 0, Mono, Legato };
 
         void handleMidiMessage (const juce::MidiMessage& message);
+
+        /** Current arpeggiator settings, read from the parameters. */
+        Arpeggiator::Settings getArpSettings() const;
+
+        /** Renders @p numSamples, splitting where the arpeggiator fires so its
+            notes land on the sample they are due rather than at block edges. */
+        void renderSegment (juce::AudioBuffer<float>& target, int startSample, int numSamples,
+                            double bpm);
         void renderVoices (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, double bpm);
 
         /** Renders every voice, oversampled if the parameter asks for it. */
@@ -89,6 +98,10 @@ namespace nog
         ModMatrix          matrix;
         fx::FXChain        effects;
         dsp::SampleLibrary samples;
+        Arpeggiator        arpeggiator;
+
+        // Reused across blocks so the audio thread never allocates for it.
+        std::vector<Arpeggiator::Event> arpEvents;
 
         std::array<Voice, maxVoices> voices;
 

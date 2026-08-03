@@ -87,7 +87,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("Y2K Trance Pluck", "Pluck")
+        list.push_back (Build ("Classic Trance Pluck", "Pluck")
             .voices (8)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .oscOff (1)

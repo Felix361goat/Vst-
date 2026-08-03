@@ -207,7 +207,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("Y2K Offbeat Bass", "Bass")
+        list.push_back (Build ("Offbeat Trance Bass", "Bass")
             .voices (4, 0)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .oscOff (1)

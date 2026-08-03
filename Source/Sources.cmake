@@ -23,6 +23,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/DSP/SampleBank.cpp
     ${NOG_SOURCE_DIR}/Engine/Voice.cpp
     ${NOG_SOURCE_DIR}/Engine/SynthEngine.cpp
+    ${NOG_SOURCE_DIR}/Engine/Arpeggiator.cpp
     ${NOG_SOURCE_DIR}/FX/FXChain.cpp
     ${NOG_SOURCE_DIR}/State/FactoryPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/BassPresets.cpp

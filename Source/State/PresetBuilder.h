@@ -214,6 +214,18 @@ namespace nog::presets
             return set (ids::fx (slot, ids::fxParamC), c);
         }
 
+        /** Turns the arpeggiator on. @p division indexes tempoDivisions();
+            7 is a sixteenth, 6 an eighth. */
+        Build& arp (int mode, int division, int octaves = 1, float gate = 0.5f, float swing = 0.0f)
+        {
+            set (ids::arpEnable, 1.0f);
+            set (ids::arpMode, static_cast<float> (mode));
+            set (ids::arpRate, static_cast<float> (division));
+            set (ids::arpOctaves, static_cast<float> (octaves));
+            set (ids::arpGate, gate);
+            return set (ids::arpSwing, swing);
+        }
+
         Build& macro (int index, float value) { return set (ids::macro (index), value); }
 
         Build& set (const juce::String& id, float value)

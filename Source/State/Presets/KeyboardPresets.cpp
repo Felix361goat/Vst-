@@ -157,7 +157,7 @@ namespace nog::presets
     {
         std::vector<Preset> list;
 
-        list.push_back (Build ("Nylon Guitar", "Guitar")
+        list.push_back (Build ("Nylon String", "Plucked")
             .voices (12)
             .osc (0, wt::OddEven, 0.60f, 0.72f)
             .osc (1, wt::BasicShapes, 0.35f, 0.30f)
@@ -173,7 +173,7 @@ namespace nog::presets
             .master (-7.0f)
             .done());
 
-        list.push_back (Build ("Steel String", "Guitar")
+        list.push_back (Build ("Steel String", "Plucked")
             .voices (12)
             .osc (0, wt::HarmonicSweep, 0.62f, 0.7f)
             .osc (1, wt::OddEven, 0.5f, 0.28f)
@@ -188,7 +188,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Afro Guitar Pluck", "Guitar")
+        list.push_back (Build ("Afro String Pluck", "Plucked")
             .voices (12)
             .osc (0, wt::OddEven, 0.55f, 0.72f)
             .osc (1, wt::BasicShapes, wt::sine, 0.25f)
@@ -204,7 +204,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Muted Guitar", "Guitar")
+        list.push_back (Build ("Muted String", "Plucked")
             .voices (12)
             .osc (0, wt::OddEven, 0.45f, 0.75f)
             .oscOff (1)
@@ -218,7 +218,7 @@ namespace nog::presets
             .master (-7.0f)
             .done());
 
-        list.push_back (Build ("Clean Electric", "Guitar")
+        list.push_back (Build ("Clean Electric String", "Plucked")
             .voices (12)
             .osc (0, wt::OddEven, 0.7f, 0.7f)
             .osc (1, wt::BasicShapes, 0.4f, 0.25f)
@@ -232,7 +232,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Overdrive Guitar", "Guitar")
+        list.push_back (Build ("Overdrive String", "Plucked")
             .voices (8)
             .osc (0, wt::OddEven, 0.75f, 0.7f)
             .oscOff (1)
@@ -247,7 +247,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Harmonic Guitar", "Guitar")
+        list.push_back (Build ("String Harmonics", "Plucked")
             .voices (12)
             .osc (0, wt::FmBell, 0.32f, 0.6f)
             .osc (1, wt::OddEven, 0.6f, 0.35f)
@@ -259,7 +259,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Twelve String", "Guitar")
+        list.push_back (Build ("Twelve String", "Plucked")
             .voices (12)
             .osc (0, wt::OddEven, 0.6f, 0.6f)
             .osc (1, wt::OddEven, 0.6f, 0.4f)

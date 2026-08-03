@@ -108,4 +108,20 @@ namespace nog::ui
         Knob polyphony, glideTime, bendRange, velocitySens;
         juce::Label help;
     };
+
+    /** The arpeggiator. Without this the Arp and Sequence patches sound one
+        note and stop, which is what they used to do. */
+    class ArpPanel final : public juce::Component
+    {
+    public:
+        explicit ArpPanel (juce::AudioProcessorValueTreeState& state);
+
+        void resized() override;
+
+    private:
+        ToggleBox enable;
+        ChoiceBox mode, rate;
+        Knob octaves, gate, swing;
+        juce::Label help;
+    };
 }

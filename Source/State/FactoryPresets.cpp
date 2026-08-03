@@ -28,9 +28,9 @@ namespace nog::presets
     {
         // The order the browser presents them in: the things most reached for
         // first, then the more specialised ones.
-        return { "Bass", "Lead", "Pluck", "Chords", "Keys", "Guitar",
+        return { "Bass", "Lead", "Pluck", "Chords", "Keys", "Plucked",
                  "Bell", "Pad", "Arp", "Sequence",
-                 "Future Bass", "Trap", "Drill", "House", "Y2K", "Synthwave",
+                 "Future Bass", "Trap", "Drill", "House", "Trance", "Synthwave",
                  "Strings", "Brass", "Ambient", "FX" };
     }
 

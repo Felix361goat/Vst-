@@ -80,10 +80,11 @@ namespace nog
         {
         public:
             explicit GlobalPage (juce::AudioProcessorValueTreeState& state)
-                : panel (state)
+                : panel (state), arpPanel (state)
             {
                 section.setContent (panel);
-                addAndMakeVisible (section);
+                arpSection.setContent (arpPanel);
+                addAllChildren (*this, { &section, &arpSection });
             }
 
             void resized() override
@@ -92,13 +93,17 @@ namespace nog
 
                 // Fixed size and left-aligned; stretching eight controls across
                 // a wide window would only make them harder to hit.
-                section.setBounds (bounds.removeFromTop (juce::jmin (200, bounds.getHeight()))
-                                         .removeFromLeft (juce::jmin (620, bounds.getWidth())));
+                auto row = bounds.removeFromTop (juce::jmin (200, bounds.getHeight()));
+                section.setBounds (row.removeFromLeft (juce::jmin (620, row.getWidth())));
+                row.removeFromLeft (12);
+                arpSection.setBounds (row.removeFromLeft (juce::jmin (480, row.getWidth())));
             }
 
         private:
             SectionPanel section { "Global" };
+            SectionPanel arpSection { "Arpeggiator" };
             GlobalPanel  panel;
+            ArpPanel     arpPanel;
         };
     }
 

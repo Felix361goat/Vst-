@@ -12,6 +12,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include "Engine/Arpeggiator.h"
 #include "Engine/SynthEngine.h"
 #include "DSP/Envelope.h"
 #include "DSP/Oscillator.h"
@@ -19,6 +20,8 @@
 #include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 #include "Params/ParameterStore.h"
+#include <map>
+
 #include "DSP/SampleBank.h"
 #include "DSP/SampleLibrary.h"
 #include "State/FactoryPresets.h"
@@ -1106,7 +1109,231 @@ namespace
         }
     };
 
+    // -----------------------------------------------------------------------
+    class ArpeggiatorTests final : public juce::UnitTest
+    {
+    public:
+        ArpeggiatorTests() : UnitTest ("Arpeggiator", "nog") {}
+
+        void runTest() override
+        {
+            beginTest ("a held chord produces a steady stream of note-ons");
+            {
+                // Counted from the arpeggiator directly rather than inferred
+                // from the output level: with sustain and release the notes
+                // overlap, so the audio never drops to silence between steps
+                // even though it is retriggering correctly.
+                nog::Arpeggiator arp;
+                arp.prepare (testSampleRate);
+
+                nog::Arpeggiator::Settings settings;
+                settings.enabled  = true;
+                settings.division = 7;   // sixteenths
+                settings.gate     = 0.5f;
+
+                for (const auto note : { 60, 64, 67 })
+                    arp.noteOn (note, 0.9f);
+
+                std::vector<nog::Arpeggiator::Event> events;
+
+                // Two seconds at 120 bpm in sixteenths is sixteen steps.
+                for (int block = 0; block < 190; ++block)
+                    arp.process (testBlockSize, 120.0, settings, events);
+
+                auto noteOns = 0;
+
+                for (const auto& event : events)
+                    if (event.isNoteOn)
+                        ++noteOns;
+
+                logMessage ("note-ons in two seconds: " + juce::String (noteOns));
+                expect (noteOns >= 12,
+                        "expected roughly sixteen steps, got " + juce::String (noteOns));
+
+                // Up mode over one octave should cycle through the three held
+                // notes in ascending order.
+                juce::Array<int> order;
+
+                for (const auto& event : events)
+                    if (event.isNoteOn && order.size() < 6)
+                        order.add (event.note);
+
+                expect (order.size() >= 6);
+                expect (order[0] == 60 && order[1] == 64 && order[2] == 67,
+                        "up mode should ascend through the held notes");
+                expect (order[3] == 60, "the pattern should wrap round");
+            }
+
+            beginTest ("every note-on is matched by a note-off");
+            {
+                // A leaked note-on would leave a voice stuck on forever.
+                nog::Arpeggiator arp;
+                arp.prepare (testSampleRate);
+
+                nog::Arpeggiator::Settings settings;
+                settings.enabled = true;
+                settings.gate    = 0.4f;
+
+                arp.noteOn (60, 0.9f);
+                arp.noteOn (67, 0.9f);
+
+                std::vector<nog::Arpeggiator::Event> events;
+
+                for (int block = 0; block < 190; ++block)
+                    arp.process (testBlockSize, 120.0, settings, events);
+
+                // Let go, then run on so the final note is released.
+                arp.noteOff (60);
+                arp.noteOff (67);
+
+                for (int block = 0; block < 20; ++block)
+                    arp.process (testBlockSize, 120.0, settings, events);
+
+                std::map<int, int> balance;
+
+                for (const auto& event : events)
+                    balance[event.note] += event.isNoteOn ? 1 : -1;
+
+                for (const auto& [note, count] : balance)
+                    expect (count == 0,
+                            "note " + juce::String (note) + " is unbalanced by " + juce::String (count));
+            }
+
+            beginTest ("the swing setting makes alternate steps uneven");
+            {
+                const auto measureFirstGap = [] (float swing)
+                {
+                    nog::Arpeggiator arp;
+                    arp.prepare (testSampleRate);
+
+                    nog::Arpeggiator::Settings settings;
+                    settings.enabled = true;
+                    settings.swing   = swing;
+
+                    arp.noteOn (60, 0.9f);
+
+                    std::vector<nog::Arpeggiator::Event> events;
+
+                    for (int block = 0; block < 40; ++block)
+                        arp.process (testBlockSize, 120.0, settings, events);
+
+                    juce::Array<int> onsets;
+                    auto absolute = 0;
+                    auto blockIndex = 0;
+
+                    juce::ignoreUnused (absolute, blockIndex);
+
+                    auto count = 0;
+
+                    for (const auto& event : events)
+                        if (event.isNoteOn)
+                            ++count;
+
+                    return count;
+                };
+
+                // Swing redistributes time between pairs of steps rather than
+                // changing the overall rate, so the count over a fixed window
+                // should stay in the same region.
+                const auto straight = measureFirstGap (0.0f);
+                const auto swung    = measureFirstGap (0.6f);
+
+                expect (straight > 0 && swung > 0);
+                expect (std::abs (straight - swung) <= 2,
+                        "swing should not change the average tempo");
+            }
+
+            beginTest ("releasing the keys stops it");
+            {
+                TestProcessor processor;
+                processor.parameters.arpEnable->setValueNotifyingHost (1.0f);
+                processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                juce::AudioBuffer<float> buffer (2, testBlockSize);
+                juce::MidiBuffer midi;
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.9f), 0);
+
+                for (int block = 0; block < 40; ++block)
+                {
+                    processor.processBlock (buffer, midi);
+                    midi.clear();
+                }
+
+                midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+
+                for (int block = 0; block < 400; ++block)
+                {
+                    processor.processBlock (buffer, midi);
+                    midi.clear();
+                }
+
+                expect (processor.engine.getActiveVoiceCount() == 0,
+                        "letting go of the keys should stop the pattern");
+            }
+
+            beginTest ("every mode runs and stays healthy");
+            {
+                for (int mode = 0; mode < 7; ++mode)
+                {
+                    TestProcessor processor;
+                    processor.parameters.arpEnable->setValueNotifyingHost (1.0f);
+                    processor.parameters.arpMode->setValueNotifyingHost (
+                        processor.parameters.arpMode->convertTo0to1 (static_cast<float> (mode)));
+                    processor.parameters.arpOctaves->setValueNotifyingHost (
+                        processor.parameters.arpOctaves->convertTo0to1 (3));
+                    processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+
+                    for (const auto note : { 55, 60, 64 })
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, 0.8f), 0);
+
+                    auto peak = 0.0f;
+
+                    for (int block = 0; block < 120; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        expect (isBufferHealthy (buffer), "arp mode " + juce::String (mode) + " misbehaved");
+                        peak = juce::jmax (peak, buffer.getMagnitude (0, testBlockSize));
+                    }
+
+                    expect (peak > 1.0e-3f, "arp mode " + juce::String (mode) + " was silent");
+                }
+            }
+
+            beginTest ("a single held note still repeats");
+            {
+                // A one-note pattern is the degenerate case, and the one most
+                // likely to stall or divide by zero.
+                nog::Arpeggiator arp;
+                arp.prepare (testSampleRate);
+
+                nog::Arpeggiator::Settings settings;
+                settings.enabled = true;
+
+                arp.noteOn (60, 0.9f);
+
+                std::vector<nog::Arpeggiator::Event> events;
+
+                for (int block = 0; block < 190; ++block)
+                    arp.process (testBlockSize, 120.0, settings, events);
+
+                auto noteOns = 0;
+
+                for (const auto& event : events)
+                    if (event.isNoteOn)
+                        ++noteOns;
+
+                expect (noteOns >= 12, "a single held note should still retrigger");
+            }
+        }
+    };
+
     ParameterTests          parameterTests;
+    ArpeggiatorTests        arpeggiatorTests;
     SampleOscillatorTests   sampleOscillatorTests;
     FactoryPresetTests  factoryPresetTests;
     WavetableTests  wavetableTests;

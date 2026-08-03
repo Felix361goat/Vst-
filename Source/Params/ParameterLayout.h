@@ -17,6 +17,7 @@ namespace nog::params
     {
         juce::StringArray waveforms();
         juce::StringArray oscModes();
+        juce::StringArray arpModes();
         juce::StringArray sampleLoopModes();
         juce::StringArray subWaveforms();
         juce::StringArray warpModes();

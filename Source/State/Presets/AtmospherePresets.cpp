@@ -111,7 +111,7 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
-        list.push_back (Build ("Y2K Trance Pad", "Pad")
+        list.push_back (Build ("Classic Trance Pad", "Pad")
             .voices (16)
             .osc (0, wt::BasicShapes, wt::saw, 0.6f)
             .osc (1, wt::BasicShapes, wt::saw, 0.45f)
@@ -190,6 +190,7 @@ namespace nog::presets
         // rhythm comes from a tempo-synced LFO on amplitude, so the pattern
         // locks to the project without needing an arpeggiator.
         list.push_back (Build ("Afro Seq Pluck", "Sequence")
+            .arp (4, 7, 1, 0.45f, 0.18f)
             .voices (12)
             .osc (0, wt::BasicShapes, 0.42f, 0.75f)
             .osc (1, wt::BasicShapes, wt::sine, 0.25f)
@@ -206,6 +207,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Afro Piano Seq", "Sequence")
+            .arp (4, 6, 1, 0.55f, 0.16f)
             .voices (16)
             .osc (0, wt::BasicShapes, 0.28f, 0.78f)
             .oscOff (1)
@@ -221,6 +223,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Gated Sequence", "Sequence")
+            .arp (0, 8, 1, 0.35f, 0.00f)
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .oscOff (1)
@@ -236,6 +239,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Sixteenth Bass Seq", "Sequence")
+            .arp (0, 7, 1, 0.40f, 0.00f)
             .voices (8, 1)
             .glide (18.0f, 2)
             .osc (0, wt::BasicShapes, wt::square, 0.75f)
@@ -251,6 +255,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Random Blip Seq", "Sequence")
+            .arp (5, 8, 2, 0.35f, 0.00f)
             .voices (12)
             .osc (0, wt::Digital, 0.4f, 0.7f)
             .oscOff (1)
@@ -264,7 +269,8 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("Y2K Arp Stack", "Sequence")
+        list.push_back (Build ("Trance Arp Stack", "Sequence")
+            .arp (0, 7, 2, 0.50f, 0.00f)
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.6f)
             .osc (1, wt::BasicShapes, wt::square, 0.35f)
@@ -282,6 +288,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Marimba Seq", "Sequence")
+            .arp (2, 7, 2, 0.55f, 0.10f)
             .voices (12)
             .osc (0, wt::BasicShapes, 0.2f, 0.8f)
             .osc (1, wt::FmBell, 0.3f, 0.2f)
@@ -296,6 +303,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Bubble Seq", "Sequence")
+            .arp (5, 7, 2, 0.45f, 0.00f)
             .voices (12)
             .osc (0, wt::BasicShapes, wt::sine, 0.8f)
             .oscOff (1)
@@ -315,6 +323,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Pulse Width Seq", "Sequence")
+            .arp (0, 7, 1, 0.45f, 0.14f)
             .voices (12)
             .osc (0, wt::PulseWidth, 0.4f, 0.75f)
             .oscOff (1)
@@ -330,6 +339,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Deep Chord Stab", "Sequence")
+            .arp (4, 5, 1, 0.60f, 0.00f)
             .voices (16)
             .osc (0, wt::BasicShapes, wt::saw, 0.6f)
             .osc (1, wt::Organ, 0.5f, 0.35f)
@@ -350,7 +360,7 @@ namespace nog::presets
     {
         std::vector<Preset> list;
 
-        list.push_back (Build ("Y2K Supersaw", "Y2K")
+        list.push_back (Build ("Supersaw Rave", "Trance")
             .voices (10)
             .osc (0, wt::BasicShapes, wt::saw, 0.65f)
             .osc (1, wt::BasicShapes, wt::saw, 0.5f)
@@ -364,7 +374,7 @@ namespace nog::presets
             .master (-12.0f)
             .done());
 
-        list.push_back (Build ("Eurodance Stab", "Y2K")
+        list.push_back (Build ("Eurodance Stab", "Trance")
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .osc (1, wt::Organ, 0.6f, 0.35f)
@@ -378,7 +388,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Trance Gate Saw", "Y2K")
+        list.push_back (Build ("Trance Gate Saw", "Trance")
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .oscOff (1)
@@ -394,7 +404,7 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
-        list.push_back (Build ("Hoover Stab", "Y2K")
+        list.push_back (Build ("Hoover Stab", "Trance")
             .voices (8)
             .osc (0, wt::HardSync, 0.45f, 0.7f)
             .osc (1, wt::BasicShapes, wt::saw, 0.4f)
@@ -410,7 +420,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Digital Bell Y2K", "Y2K")
+        list.push_back (Build ("Digital Rave Bell", "Trance")
             .voices (12)
             .osc (0, wt::FmBell, 0.5f, 0.65f)
             .osc (1, wt::Digital, 0.3f, 0.28f)
@@ -423,7 +433,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Rave Organ", "Y2K")
+        list.push_back (Build ("Rave Organ", "Trance")
             .voices (12)
             .osc (0, wt::Organ, 0.75f, 0.8f)
             .oscOff (1)
@@ -436,7 +446,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Plastic Pluck Y2K", "Y2K")
+        list.push_back (Build ("Plastic Rave Pluck", "Trance")
             .voices (12)
             .osc (0, wt::PulseWidth, 0.5f, 0.75f)
             .osc (1, wt::FmBell, 0.3f, 0.25f)
@@ -452,7 +462,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("Wide Trance Lead", "Y2K")
+        list.push_back (Build ("Wide Trance Lead", "Trance")
             .voices (10)
             .osc (0, wt::BasicShapes, wt::saw, 0.62f)
             .osc (1, wt::HarmonicSweep, 0.8f, 0.35f)

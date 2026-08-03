@@ -9,6 +9,7 @@ namespace nog::presets
         // Built for fast note runs: very short envelopes, no unison smear, and
         // enough release to let the tail of one note reach the next.
         list.push_back (Build ("Arp Bright", "Arp")
+            .arp (0, 7, 2, 0.55f, 0.00f)
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.7f)
             .oscOff (1)
@@ -22,6 +23,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Arp Bell", "Arp")
+            .arp (2, 7, 2, 0.60f, 0.00f)
             .voices (12)
             .osc (0, wt::FmBell, 0.38f, 0.7f)
             .oscOff (1)
@@ -34,6 +36,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Arp Digital", "Arp")
+            .arp (0, 8, 1, 0.45f, 0.00f)
             .voices (12)
             .osc (0, wt::Digital, 0.35f, 0.7f)
             .oscOff (1)
@@ -47,6 +50,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Arp Pulse", "Arp")
+            .arp (3, 7, 2, 0.50f, 0.12f)
             .voices (12)
             .osc (0, wt::PulseWidth, 0.35f, 0.75f)
             .oscOff (1)
@@ -60,6 +64,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Arp Soft Sine", "Arp")
+            .arp (2, 6, 2, 0.70f, 0.00f)
             .voices (12)
             .osc (0, wt::BasicShapes, wt::sine, 0.85f)
             .oscOff (1)
@@ -71,6 +76,7 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Arp Hard Sync", "Arp")
+            .arp (0, 7, 1, 0.45f, 0.00f)
             .voices (12)
             .osc (0, wt::HardSync, 0.35f, 0.72f)
             .oscOff (1)

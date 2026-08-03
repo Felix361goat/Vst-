@@ -42,6 +42,13 @@ namespace nog
         velocitySens   = find<Float>  (apvts, ids::velocitySens);
         oversampling   = find<Choice> (apvts, ids::oversampling);
 
+        arpEnable  = find<Bool>   (apvts, ids::arpEnable);
+        arpMode    = find<Choice> (apvts, ids::arpMode);
+        arpRate    = find<Choice> (apvts, ids::arpRate);
+        arpOctaves = find<Int>    (apvts, ids::arpOctaves);
+        arpGate    = find<Float>  (apvts, ids::arpGate);
+        arpSwing   = find<Float>  (apvts, ids::arpSwing);
+
         // -- oscillators ----------------------------------------------------
         for (int i = 0; i < ids::numOscillators; ++i)
         {

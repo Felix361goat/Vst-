@@ -53,6 +53,14 @@ namespace nog::ids
     inline constexpr const char* velocitySens   = "velocity_sens";
     inline constexpr const char* oversampling   = "oversampling";
 
+    // -- arpeggiator --------------------------------------------------------
+    inline constexpr const char* arpEnable      = "arp_on";
+    inline constexpr const char* arpMode        = "arp_mode";
+    inline constexpr const char* arpRate        = "arp_rate";
+    inline constexpr const char* arpOctaves     = "arp_octaves";
+    inline constexpr const char* arpGate        = "arp_gate";
+    inline constexpr const char* arpSwing       = "arp_swing";
+
     // -- oscillator (per index) --------------------------------------------
     inline constexpr const char* oscEnable      = "enable";
     inline constexpr const char* oscLevel       = "level";

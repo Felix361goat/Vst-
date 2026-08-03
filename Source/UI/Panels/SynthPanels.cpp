@@ -364,4 +364,43 @@ namespace nog::ui
 
         help.setBounds (bounds.removeFromTop (34).reduced (4, 0));
     }
+
+    ArpPanel::ArpPanel (juce::AudioProcessorValueTreeState& state)
+        : enable  (state, ids::arpEnable, "Arp On"),
+          mode    (state, ids::arpMode, "Mode"),
+          rate    (state, ids::arpRate, "Rate"),
+          octaves (state, ids::arpOctaves, "Octaves"),
+          gate    (state, ids::arpGate, "Gate"),
+          swing   (state, ids::arpSwing, "Swing")
+    {
+        addAllChildren (*this, { &enable, &mode, &rate, &octaves, &gate, &swing });
+
+        for (auto* knob : { &octaves, &gate, &swing })
+            knob->setAccentColour (colours::candyPurple);
+
+        help.setText ("Holds the keys you press and plays them back one at a time, locked to "
+                      "the host tempo. Gate sets how long each step rings; swing pushes every "
+                      "second step late.",
+                      juce::dontSendNotification);
+        help.setFont (juce::Font (juce::FontOptions (11.0f)));
+        help.setColour (juce::Label::textColourId, colours::dimText);
+        help.setJustificationType (juce::Justification::topLeft);
+        addAndMakeVisible (help);
+    }
+
+    void ArpPanel::resized()
+    {
+        auto bounds = getLocalBounds();
+
+        auto top = bounds.removeFromTop (44);
+        enable.setBounds (top.removeFromLeft (90));
+        top.removeFromLeft (6);
+        layoutRow (top, { &mode, &rate }, 6);
+
+        bounds.removeFromTop (8);
+        layoutRow (bounds.removeFromTop (knobRowHeight), { &octaves, &gate, &swing });
+        bounds.removeFromTop (10);
+
+        help.setBounds (bounds.removeFromTop (34).reduced (4, 0));
+    }
 }
