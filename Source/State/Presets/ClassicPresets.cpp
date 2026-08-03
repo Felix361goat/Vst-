@@ -241,7 +241,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Brass Section", "Brass")
+        list.push_back (Build ("Synth Brass Section", "Brass")
             .voices (12)
             .osc (0, wt::BasicShapes, wt::saw, 0.68f)
             .osc (1, wt::Formant, 0.2f, 0.3f)

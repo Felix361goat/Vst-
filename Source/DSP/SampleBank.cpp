@@ -1,6 +1,7 @@
 #include "DSP/SampleBank.h"
 
 #include <cmath>
+#include <functional>
 
 namespace nog::dsp
 {
@@ -713,6 +714,480 @@ namespace nog::dsp
                               3.0f, 4809, 0.45f);
         }
 
+        // -- sustained instruments ------------------------------------------
+        //
+        // Everything above is struck or plucked, so it decays and is played as
+        // a one-shot. These do not: a bowed string or a blown pipe goes on for
+        // as long as the player wants, so they are looped instead.
+        //
+        // A looped sample restarts at its start offset, so the loop point is
+        // the whole problem: unless the file holds a whole number of cycles,
+        // every wrap is a discontinuity and the note clicks at the loop rate.
+        // sustainedLoop() rounds the length to an exact number of periods.
+
+        /** Builds a seamlessly loopable tone.
+
+            @param harmonics  amplitude of each harmonic, 1st upwards
+            @param breath     filtered noise mixed in, for the wind instruments
+            @param drift      slow pitch wander in cents, so it is not sterile
+        */
+        juce::AudioBuffer<float> sustainedLoop (float frequency, double approximateSeconds,
+                                                const std::vector<float>& harmonics,
+                                                float breath, float drift, int seed)
+        {
+            const auto period = rate / static_cast<double> (frequency);
+            const auto cycles = juce::jmax (1, juce::roundToInt (rate * approximateSeconds / period));
+            const auto length = static_cast<int> (std::round (period * cycles));
+
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+
+            // Vibrato as phase modulation rather than as resampling. The
+            // modulating term is a whole number of cycles of the loop, so it
+            // returns to zero at the seam and its average is zero - which keeps
+            // the note at exactly the pitch it claims. Stretching time to get
+            // the same wobble would drag the mean pitch flat instead.
+            constexpr double driftCycles = 3.0;
+
+            const auto driftRatio = std::pow (2.0, static_cast<double> (drift) / 1200.0) - 1.0;
+            const auto driftDepth = driftRatio * static_cast<double> (frequency) * length
+                                  / (rate * juce::MathConstants<double>::twoPi * driftCycles);
+
+            for (size_t h = 0; h < harmonics.size(); ++h)
+            {
+                const auto harmonic = static_cast<double> (h + 1);
+
+                if (frequency * harmonic > 18000.0f || harmonics[h] <= 0.0f)
+                    continue;
+
+                // Phase is derived from the position in the loop rather than
+                // accumulated, so the last sample joins the first exactly.
+                for (int i = 0; i < length; ++i)
+                {
+                    const auto position = static_cast<double> (i) / length;
+                    const auto wobble = driftDepth
+                                      * std::sin (position * juce::MathConstants<double>::twoPi * driftCycles);
+
+                    const auto phase = (static_cast<double> (i) / period + wobble) * harmonic;
+
+                    out[i] += static_cast<float> (std::sin (phase * juce::MathConstants<double>::twoPi))
+                            * harmonics[h];
+                }
+            }
+
+            if (breath > 0.0f)
+            {
+                Noise noise (seed);
+                auto lowPass = 0.0f;
+
+                for (int i = 0; i < length; ++i)
+                {
+                    lowPass += 0.25f * (noise.next() - lowPass);
+                    out[i] += lowPass * breath;
+                }
+
+                // Cross-fade the noise across the seam so the loop stays clean.
+                const auto blend = juce::jmin (length / 4, lengthFor (0.01));
+
+                for (int i = 0; i < blend; ++i)
+                {
+                    const auto mix = static_cast<float> (i) / static_cast<float> (blend);
+                    out[i] = out[i] * mix + out[length - blend + i] * (1.0f - mix);
+                }
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeBowedString()
+        {
+            // A bowed string is very nearly a sawtooth - the bow grabs and
+            // releases once per cycle - with a little bow noise on top.
+            return sustainedLoop (noteHz (48), 1.2,
+                                  { 1.0f, 0.5f, 0.33f, 0.25f, 0.2f, 0.17f, 0.14f, 0.12f,
+                                    0.11f, 0.10f, 0.09f, 0.08f, 0.07f, 0.06f, 0.05f, 0.04f },
+                                  0.04f, 4.0f, 4810);
+        }
+
+        juce::AudioBuffer<float> makeBrassSection()
+        {
+            // Brass puts its energy in the middle harmonics rather than the
+            // fundamental, which is what makes it cut through everything.
+            return sustainedLoop (noteHz (48), 1.2,
+                                  { 0.55f, 0.75f, 0.85f, 0.8f, 0.6f, 0.45f, 0.32f, 0.24f,
+                                    0.18f, 0.14f, 0.10f, 0.07f, 0.05f, 0.03f },
+                                  0.02f, 3.0f, 4811);
+        }
+
+        juce::AudioBuffer<float> makePanFlute()
+        {
+            // Nearly a sine with a strong second harmonic, and enough breath
+            // that it reads as blown rather than synthesised.
+            return sustainedLoop (noteHz (60), 1.0,
+                                  { 1.0f, 0.34f, 0.10f, 0.04f, 0.02f },
+                                  0.09f, 6.0f, 4812);
+        }
+
+        juce::AudioBuffer<float> makeChoirOo()
+        {
+            // An "oo" is a vowel with its formants low and close together, so
+            // the low harmonics dominate and the top is almost empty.
+            return sustainedLoop (noteHz (48), 1.4,
+                                  { 1.0f, 0.62f, 0.22f, 0.30f, 0.12f, 0.05f, 0.03f, 0.02f },
+                                  0.02f, 7.0f, 4813);
+        }
+
+        // -- more struck and plucked ----------------------------------------
+
+        juce::AudioBuffer<float> makeHarp()
+        {
+            // Plucked close to the end of a long string: bright, and it rings
+            // for a very long time because nothing is damping it.
+            return pluckedString (noteHz (48), 3.4, 0.55f, 0.80f, 0.9992f, 0.09f, 4814);
+        }
+
+        juce::AudioBuffer<float> makeClavinet()
+        {
+            // A hammer striking a short, tightly damped string against a
+            // pickup. Almost no sustain at all, which is the funk of it.
+            return pluckedString (noteHz (48), 1.2, 0.85f, 0.62f, 0.991f, 0.07f, 4815, 0.35f);
+        }
+
+        /** A plucked string with a buzzing bridge: the sitar's jawari.
+
+            The string rests on a curved bridge and rattles against it on every
+            swing, which folds the loudest part of each cycle back on itself and
+            throws energy up into the high harmonics. Modelled here as a soft
+            clip inside the feedback loop, so the buzz decays with the note
+            instead of sitting on top of it. */
+        juce::AudioBuffer<float> makeSitar()
+        {
+            auto buffer = pluckedString (noteHz (48), 3.0, 0.65f, 0.85f, 0.9988f, 0.12f, 4816);
+
+            const auto length = buffer.getNumSamples();
+            auto* out = buffer.getWritePointer (0);
+
+            auto previous = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto value = out[i];
+
+                // Rattle only on the part of the swing that reaches the bridge.
+                const auto buzzing = std::abs (value) > 0.25f;
+                const auto rattle  = buzzing ? (value - previous) * 3.0f : 0.0f;
+
+                previous = value;
+                out[i] = std::tanh (value * 1.4f + rattle * 0.35f);
+            }
+
+            fadeTail (buffer);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeMusicBox()
+        {
+            // A music box comb tooth is a free bar, so its second mode is way
+            // up at 2.76 times the fundamental rather than at the octave.
+            return struckBar (noteHz (72), 1.6,
+                              { 1.0f, 2.76f, 5.40f, 8.93f },
+                              { 0.85f, 0.30f, 0.12f, 0.05f },
+                              2.0f, 4817, 0.5f);
+        }
+
+        juce::AudioBuffer<float> makeGlockenspiel()
+        {
+            // Same mode ratios as the music box - it is the same physics - but
+            // a heavier bar, so it rings far longer and starts brighter.
+            return struckBar (noteHz (72), 2.4,
+                              { 1.0f, 2.76f, 5.40f, 8.93f, 13.3f },
+                              { 0.8f, 0.42f, 0.22f, 0.10f, 0.04f },
+                              1.1f, 4818, 0.35f);
+        }
+
+        juce::AudioBuffer<float> makeHangDrum()
+        {
+            // A hang is tuned so the first three modes are the fundamental, the
+            // octave and the twelfth, which is why it sounds so consonant.
+            return struckBar (noteHz (60), 2.6,
+                              { 1.0f, 2.0f, 3.0f, 4.2f, 5.1f },
+                              { 0.85f, 0.35f, 0.18f, 0.07f, 0.03f },
+                              1.3f, 4819, 0.3f);
+        }
+
+        // -- sound chips ----------------------------------------------------
+        //
+        // What makes an old console sound like an old console is not the
+        // waveform - a square wave is a square wave - but everything the
+        // hardware could not do. The output was quantised to a handful of bits,
+        // clocked at a rate far below the modern one, and the pitch was set by
+        // a divider that could only land on certain values. Modelling those
+        // limits is the whole job; modelling the waveform is trivial.
+
+        /** Whole cycles of a waveform, quantised and clocked the way an eight-
+            bit sound chip would be. Whole cycles so it loops without a click.
+
+            @param bits      DAC resolution; the NES triangle had four
+            @param holdRate  sample-and-hold rate, for the aliasing that comes
+                             from a low output clock. Zero leaves it clean. */
+        juce::AudioBuffer<float> chipLoop (float frequency, double approximateSeconds,
+                                           const std::function<float (float)>& shape,
+                                           float bits, double holdRate)
+        {
+            const auto period = rate / static_cast<double> (frequency);
+            const auto cycles = juce::jmax (1, juce::roundToInt (rate * approximateSeconds / period));
+            const auto length = static_cast<int> (std::round (period * cycles));
+
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            const auto levels = std::pow (2.0f, bits) * 0.5f;
+            const auto holdEvery = holdRate > 0.0 ? juce::jmax (1, juce::roundToInt (rate / holdRate)) : 1;
+
+            auto held = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                if (i % holdEvery == 0)
+                {
+                    const auto phase = static_cast<float> (std::fmod (static_cast<double> (i) / period, 1.0));
+                    held = bits > 0.0f ? crush (shape (phase), levels) : shape (phase);
+                }
+
+                out[i] = held;
+            }
+
+            return buffer;
+        }
+
+        float pulseAt (float phase, float duty) { return phase < duty ? 1.0f : -1.0f; }
+
+        juce::AudioBuffer<float> makeNesTriangle()
+        {
+            // The NES triangle channel had sixteen steps up and sixteen down,
+            // and no volume control at all. Those stair steps are the sound of
+            // every bass line on the console.
+            return chipLoop (noteHz (36), 0.5,
+                             [] (float phase)
+                             {
+                                 return 1.0f - 4.0f * std::abs (phase - 0.5f);
+                             },
+                             4.0f, 0.0);
+        }
+
+        juce::AudioBuffer<float> makeNesPulse()
+        {
+            // The narrow duty setting: thin and nasal, which is how it stayed
+            // audible over everything else on three other channels.
+            return chipLoop (noteHz (60), 0.4,
+                             [] (float phase) { return pulseAt (phase, 0.125f); },
+                             4.0f, 0.0);
+        }
+
+        juce::AudioBuffer<float> makeGameBoyWave()
+        {
+            // The Game Boy's fourth channel played a 32-step, 4-bit waveform
+            // the programmer wrote by hand. This is a hollow, reedy one.
+            return chipLoop (noteHz (48), 0.5,
+                             [] (float phase)
+                             {
+                                 return 0.7f * std::sin (phase * twoPi)
+                                      + 0.4f * std::sin (phase * twoPi * 2.0f)
+                                      - 0.2f * std::sin (phase * twoPi * 3.0f)
+                                      + 0.1f * std::sin (phase * twoPi * 5.0f);
+                             },
+                             4.0f, 0.0);
+        }
+
+        juce::AudioBuffer<float> makeSidPulse()
+        {
+            // The SID's pulse plus its sawtooth, which is the combination every
+            // C64 lead used because either one alone was too plain.
+            return chipLoop (noteHz (48), 0.5,
+                             [] (float phase)
+                             {
+                                 return 0.6f * pulseAt (phase, 0.25f) + 0.4f * (2.0f * phase - 1.0f);
+                             },
+                             8.0f, 0.0);
+        }
+
+        juce::AudioBuffer<float> makeAmigaSaw()
+        {
+            // A tracker sample: eight bits, played back off a chip that could
+            // not clock much above 28 kHz, so the top octave aliases audibly.
+            // That grit is the sound of the era, not a defect to design out.
+            return chipLoop (noteHz (48), 0.5,
+                             [] (float phase) { return 2.0f * phase - 1.0f; },
+                             8.0f, 22050.0);
+        }
+
+        juce::AudioBuffer<float> makePcSpeaker()
+        {
+            // One bit, on or off, straight off the motherboard.
+            return chipLoop (noteHz (72), 0.3,
+                             [] (float phase) { return pulseAt (phase, 0.5f); },
+                             1.0f, 0.0);
+        }
+
+        /** Two-operator FM with feedback: the sixteen-bit console sound.
+
+            The generation after the square-wave chips could do FM, which is why
+            everything from that era has the same glassy, slightly metallic edge
+            regardless of what instrument it was meant to be. */
+        juce::AudioBuffer<float> makeFmConsole()
+        {
+            const auto frequency = noteHz (48);
+            const auto period = rate / static_cast<double> (frequency);
+            const auto cycles = juce::jmax (1, juce::roundToInt (rate * 0.5 / period));
+            const auto length = static_cast<int> (std::round (period * cycles));
+
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            auto feedback = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto phase = static_cast<double> (i) / period;
+
+                // The modulator runs at three times the carrier and feeds back
+                // into itself, which is what turns a clean bell into a growl.
+                const auto modulator = std::sin ((phase * 3.0 + feedback * 0.4) * juce::MathConstants<double>::twoPi);
+                feedback = static_cast<float> (modulator);
+
+                out[i] = static_cast<float> (std::sin ((phase + modulator * 0.6)
+                                                       * juce::MathConstants<double>::twoPi));
+            }
+
+            return buffer;
+        }
+
+        // -- nostalgia ------------------------------------------------------
+
+        /** The dial-up handshake: two carriers, a warble and a burst of noise,
+            in the order a modem actually sent them. */
+        juce::AudioBuffer<float> makeDialUp()
+        {
+            const auto length = lengthFor (2.6);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0xD1A1);
+            auto lowPass = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+                auto value = 0.0f;
+
+                if (t < 0.5f)
+                {
+                    // The answer tone.
+                    value = std::sin (twoPi * 2100.0f * t) * 0.6f;
+                }
+                else if (t < 1.4f)
+                {
+                    // Two tones beating, then the warble as they negotiate.
+                    const auto warble = 1.0f + 0.03f * std::sin (twoPi * 9.0f * t);
+                    value = (std::sin (twoPi * 1080.0f * t * warble)
+                             + std::sin (twoPi * 1750.0f * t)) * 0.35f;
+                }
+                else
+                {
+                    // Handshake: broadband noise with a tone still under it.
+                    lowPass += 0.35f * (noise.next() - lowPass);
+                    value = lowPass * 0.7f + std::sin (twoPi * 1800.0f * t) * 0.2f;
+                }
+
+                out[i] = value;
+            }
+
+            fadeTail (buffer, 0.15);
+            return buffer;
+        }
+
+        /** A tape deck losing speed: pitch and brightness both fall away. */
+        juce::AudioBuffer<float> makeTapeStop()
+        {
+            const auto length = lengthFor (1.6);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x7A9F);
+            auto lowPass = 0.0f;
+            auto phase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (length);
+
+                // Speed falls away as a curve, not a line: the capstan has
+                // inertia, so it dies slowly and then all at once.
+                const auto speed = std::pow (1.0f - t, 1.6f);
+
+                phase += 220.0f * speed / static_cast<float> (rate);
+
+                lowPass += (0.05f + 0.4f * speed) * (noise.next() - lowPass);
+
+                out[i] = (std::sin (phase * twoPi) * 0.7f + lowPass * 0.25f) * speed;
+            }
+
+            fadeTail (buffer, 0.05);
+            return buffer;
+        }
+
+        /** A bell telephone: two tones struck twice a second, plus the clapper. */
+        juce::AudioBuffer<float> makeTelephoneBell()
+        {
+            const auto length = lengthFor (2.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                // The hammer swings between the two gongs twenty times a second.
+                const auto strike = std::fmod (t, 0.05f) / 0.05f;
+                const auto envelope = std::exp (-14.0f * strike) * std::exp (-0.9f * t);
+                const auto onFirst = std::fmod (t, 0.1f) < 0.05f;
+
+                out[i] = std::sin (twoPi * (onFirst ? 1050.0f : 1320.0f) * t) * envelope * 0.8f;
+            }
+
+            fadeTail (buffer, 0.08);
+            return buffer;
+        }
+
+        /** A CRT television left on: mains hum and the flyback whistle. */
+        juce::AudioBuffer<float> makeCrtHum()
+        {
+            const auto length = lengthFor (2.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0xC27);
+            auto lowPass = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                lowPass += 0.08f * (noise.next() - lowPass);
+
+                out[i] = std::sin (twoPi * 50.0f * t) * 0.30f
+                       + std::sin (twoPi * 100.0f * t) * 0.15f
+                       // 15.625 kHz: the line frequency, and the reason a room
+                       // with a television in it was never actually quiet.
+                       + std::sin (twoPi * 15625.0f * t) * 0.10f
+                       + lowPass * 0.25f;
+            }
+
+            return buffer;
+        }
+
         struct Definition
         {
             const char* name;
@@ -747,7 +1222,34 @@ namespace nog::dsp
                 { "Vinyl Crackle", makeVinylCrackle, true,  60, false },
                 { "Radio Static",  makeRadioStatic,  true,  60, false },
                 { "Voice Ah",      makeVoiceAh,      true,  60, false },
-                { "Retro Engine",  makeRetroEngine,  true,  60, false }
+                { "Retro Engine",  makeRetroEngine,  true,  60, false },
+
+                // Appended rather than slotted in beside the other instruments:
+                // presets refer to these by index, so the existing ones cannot
+                // move without changing what every patch plays.
+                { "Harp",          makeHarp,         false, 48, true },
+                { "Clavinet",      makeClavinet,     false, 48, true },
+                { "Sitar",         makeSitar,        false, 48, true },
+                { "Music Box",     makeMusicBox,     false, 72, true },
+                { "Glockenspiel",  makeGlockenspiel, false, 72, true },
+                { "Hang Drum",     makeHangDrum,     false, 60, true },
+                { "Bowed String",  makeBowedString,  true,  48, true },
+                { "Brass Section", makeBrassSection, true,  48, true },
+                { "Pan Flute",     makePanFlute,     true,  60, true },
+                { "Choir Oo",      makeChoirOo,      true,  48, true },
+
+                { "NES Triangle",  makeNesTriangle,  true,  36, true },
+                { "NES Pulse",     makeNesPulse,     true,  60, true },
+                { "Game Boy Wave", makeGameBoyWave,  true,  48, true },
+                { "SID Pulse",     makeSidPulse,     true,  48, true },
+                { "Amiga Saw",     makeAmigaSaw,     true,  48, true },
+                { "PC Speaker",    makePcSpeaker,    true,  72, true },
+                { "FM Console",    makeFmConsole,    true,  48, true },
+
+                { "Dial Up",       makeDialUp,       false, 60, false },
+                { "Tape Stop",     makeTapeStop,     false, 60, false },
+                { "Telephone Bell", makeTelephoneBell, false, 60, false },
+                { "CRT Hum",       makeCrtHum,       true,  60, false }
             };
 
             return list;

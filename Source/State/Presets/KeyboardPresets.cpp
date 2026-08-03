@@ -283,7 +283,7 @@ namespace nog::presets
     {
         std::vector<Preset> list;
 
-        list.push_back (Build ("Music Box", "Bell")
+        list.push_back (Build ("Synth Music Box", "Bell")
             .voices (12)
             .osc (0, wt::FmBell, 0.48f, 0.75f)
             .oscOff (1)

@@ -24,7 +24,7 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
-        list.push_back (Build ("String Pad", "Pad")
+        list.push_back (Build ("Synth String Pad", "Pad")
             .voices (16)
             .osc (0, wt::BasicShapes, wt::saw, 0.6f)
             .osc (1, wt::OddEven, 0.7f, 0.35f)

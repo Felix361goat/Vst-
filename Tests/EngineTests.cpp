@@ -1309,79 +1309,72 @@ namespace
         }
 
     private:
-        /** Autocorrelation pitch estimate over a window just after the attack.
+        /** Frequency of the lowest partial that is clearly present.
 
-            Autocorrelation rather than an FFT because these are inharmonic by
-            design: a piano's partials are stretched sharp and a kalimba's
-            second mode is nowhere near an octave, so the loudest bin is not
-            reliably the fundamental. The period is. */
+            Not autocorrelation: half of these instruments are struck bars,
+            whose modes sit at ratios like 2.76 and 5.40 rather than at whole
+            multiples. Such a tone has no period at all, so a periodicity
+            estimate lands on whatever pseudo-period the beating produces. The
+            lowest prominent partial is well defined for both kinds of source,
+            and it is what "the note it plays" means for a bar.
+        */
         static double estimateFundamental (const nog::dsp::Sample& sample)
         {
-            constexpr int window = 16384;
+            constexpr int order = 15;
+            constexpr int size  = 1 << order;
 
             const auto length = sample.getLength();
             const auto rate   = sample.getSourceSampleRate();
 
-            // Skip the attack: the hammer thump and pick noise are broadband
-            // and would drag the correlation towards very short lags.
-            const auto start = static_cast<int> (rate * 0.08);
+            // Skip the attack: the pick or hammer noise is broadband and would
+            // put energy in every bin.
+            const auto start = static_cast<int> (rate * 0.05);
 
-            if (length < start + 2 * window)
-                return 0.0;
 
-            std::vector<float> data (static_cast<size_t> (2 * window));
+            juce::dsp::FFT fft (order);
+            std::vector<float> data (static_cast<size_t> (size) * 2, 0.0f);
 
-            for (size_t n = 0; n < data.size(); ++n)
-                data[n] = sample.read (0, (start + static_cast<int> (n)) / static_cast<double> (length));
-
-            // Search the lag range that covers every root note in the bank,
-            // roughly 40 Hz to 1200 Hz.
-            const auto minLag = juce::jmax (2, static_cast<int> (rate / 1200.0));
-            const auto maxLag = juce::jmin (window - 1, static_cast<int> (rate / 40.0));
-
-            auto reference = 0.0;
-
-            for (int n = 0; n < window; ++n)
-                reference += static_cast<double> (data[static_cast<size_t> (n)]) * data[static_cast<size_t> (n)];
-
-            std::vector<double> scores (static_cast<size_t> (maxLag + 1), 0.0);
-
-            for (int lag = minLag; lag <= maxLag; ++lag)
+            for (int n = 0; n < size; ++n)
             {
-                auto correlation = 0.0;
-                auto energy = 0.0;
+                const auto window = 0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi
+                                                            * static_cast<float> (n)
+                                                            / static_cast<float> (size - 1));
 
-                for (int n = 0; n < window; ++n)
-                {
-                    correlation += static_cast<double> (data[static_cast<size_t> (n)])
-                                 * data[static_cast<size_t> (n + lag)];
-                    energy += static_cast<double> (data[static_cast<size_t> (n + lag)])
-                            * data[static_cast<size_t> (n + lag)];
-                }
+                // Wraps round for the short ones. Every sample shorter than the
+                // window is a seamless loop, so reading past the end is exactly
+                // what playback does rather than a distortion of it.
+                const auto position = (start + n) % length;
 
-                // Normalising by both windows keeps the score in -1..1, so a
-                // decaying tone does not make short lags win by default.
-                const auto denominator = std::sqrt (reference * energy);
-                scores[static_cast<size_t> (lag)] = denominator > 0.0 ? correlation / denominator : 0.0;
+                data[static_cast<size_t> (n)] =
+                    sample.read (0, position / static_cast<double> (length)) * window;
             }
 
-            const auto best = *std::max_element (scores.begin() + minLag, scores.end());
+            fft.performFrequencyOnlyForwardTransform (data.data());
 
-            // Take the first *peak* that comes close to the best rather than
-            // the best itself. A signal that repeats every N samples also
-            // repeats every 2N and 3N, so the global maximum lands on a
-            // sub-multiple as often as not. Requiring a local maximum matters
-            // as much as the threshold: on an inharmonic tone the correlation
-            // curve is broad, and a plain threshold trips on the rising flank
-            // and reports a pitch several percent sharp.
-            for (int lag = minLag + 1; lag < maxLag; ++lag)
+            const auto binToHz = rate / size;
+            const auto lowest  = juce::jmax (1, static_cast<int> (35.0 / binToHz));
+            const auto highest = juce::jmin (size / 2 - 2, static_cast<int> (2500.0 / binToHz));
+
+            auto strongest = 0.0f;
+
+            for (int bin = lowest; bin <= highest; ++bin)
+                strongest = juce::jmax (strongest, data[static_cast<size_t> (bin)]);
+
+            for (int bin = lowest + 1; bin < highest; ++bin)
             {
-                const auto score = scores[static_cast<size_t> (lag)];
+                const auto here  = data[static_cast<size_t> (bin)];
+                const auto below = data[static_cast<size_t> (bin - 1)];
+                const auto above = data[static_cast<size_t> (bin + 1)];
 
-                if (score > best * 0.9
-                    && score >= scores[static_cast<size_t> (lag - 1)]
-                    && score > scores[static_cast<size_t> (lag + 1)])
-                    return rate / lag;
+                if (here < strongest * 0.1f || here < below || here < above)
+                    continue;
+
+                // Parabolic interpolation across the peak, so the estimate is
+                // not limited to the bin spacing.
+                const auto denominator = below - 2.0 * here + above;
+                const auto offset = denominator != 0.0 ? 0.5 * (below - above) / denominator : 0.0;
+
+                return (bin + offset) * binToHz;
             }
 
             return 0.0;
