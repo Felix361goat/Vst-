@@ -182,21 +182,28 @@ namespace nog::presets
             .done());
 
         list.push_back (Build ("Trap Flute", "Trap")
-            .voices (8, 1)
+            .voices (1, 1)
             .glide (38.0f, 2)
-            .osc (0, wt::BasicShapes, 0.12f, 0.8f)
-            .oscOff (1)
-            // Breath is a filtered noise layer that does not track the note.
-            .noise (1, 0.16f)
-            .filter (flt::LP24, 2600.0f, 0.08f, 0.0f, 1.0f, 0.5f)
-            .env (0, 45.0f, 700.0f, 0.8f, 260.0f)
-            .env (1, 12.0f, 200.0f, 0.25f, 150.0f)
-            .route (Src::Env2, Dst::NoiseLevel, 0.3f)
-            .lfoFree (0, 0, 5.2f)
-            .lfoShape (0, 700.0f, 0.15f)
-            .route (Src::Lfo1, Dst::Osc1Pitch, 0.010f, true)
-            .fx (FX::Delay, 0.22f, 0.26f, 0.3f, 0.85f)
-            .fx (FX::Reverb, 0.34f, 0.78f, 0.3f, 1.0f)
+            // A flute is very close to a sine with a quiet octave above it.
+            // Anything more than that stops sounding like a flute.
+            .osc (0, wt::BasicShapes, 0.06f, 0.8f)
+            .osc (1, wt::BasicShapes, wt::sine, 0.16f)
+            .tune (1, 1)
+            // Breath is a chiff on the attack, not a layer. It used to sustain
+            // underneath the note, which read as hiss rather than as playing.
+            .noise (1, 0.05f)
+            .filter (flt::LP24, 3000.0f, 0.06f, 0.0f, 1.0f, 0.55f)
+            .env (0, 55.0f, 700.0f, 0.85f, 220.0f)
+            .env (1, 8.0f, 130.0f, 0.0f, 80.0f)
+            .route (Src::Env2, Dst::NoiseLevel, 0.35f)
+            .route (Src::Env2, Dst::FilterCutoff, 0.12f)
+            // The rise time delays the vibrato, so a short note has none and a
+            // held one swells - which is how it is actually played.
+            .lfoFree (0, 0, 5.0f)
+            .lfoShape (0, 900.0f, 0.2f)
+            .route (Src::Lfo1, Dst::Osc1Pitch, 0.006f, true)
+            .fx (FX::Delay, 0.20f, 0.26f, 0.28f, 0.8f)
+            .fx (FX::Reverb, 0.30f, 0.72f, 0.3f, 1.0f)
             .master (-8.0f)
             .done());
 
