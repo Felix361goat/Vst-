@@ -245,6 +245,46 @@ namespace
                 expectWithinAbsoluteError (frame.getOffset (nog::mod::Dest::FilterReso), 0.0f, 1.0e-6f);
             }
 
+            beginTest ("a via source scales the slot rather than adding to it");
+            {
+                // Via is what puts a modulator under the player's control: an
+                // LFO to pitch via the mod wheel is vibrato that arrives when
+                // it is asked for. It has to scale, not sum, or a closed mod
+                // wheel would still let the LFO through.
+                TestProcessor processor;
+                auto& slot = processor.parameters.matrix[0];
+
+                slot.enabled->setValueNotifyingHost (1.0f);
+                slot.source->setValueNotifyingHost (
+                    slot.source->convertTo0to1 (static_cast<float> (nog::mod::Source::Macro1)));
+                slot.via->setValueNotifyingHost (
+                    slot.via->convertTo0to1 (static_cast<float> (nog::mod::Source::Macro2)));
+                slot.dest->setValueNotifyingHost (
+                    slot.dest->convertTo0to1 (static_cast<float> (nog::mod::Dest::FilterCutoff)));
+                slot.amount->setValueNotifyingHost (slot.amount->convertTo0to1 (1.0f));
+
+                processor.parameters.macro[0]->setValueNotifyingHost (1.0f);
+
+                const auto offsetFor = [&processor] (float viaAmount)
+                {
+                    processor.parameters.macro[1]->setValueNotifyingHost (viaAmount);
+
+                    nog::ModMatrix matrix;
+                    matrix.refresh (processor.parameters);
+
+                    nog::ModulationFrame frame;
+                    matrix.applyGlobalSources (frame);
+                    frame.clearOffsets();
+                    matrix.apply (frame);
+
+                    return frame.getOffset (nog::mod::Dest::FilterCutoff);
+                };
+
+                expectWithinAbsoluteError (offsetFor (0.0f), 0.0f, 1.0e-4f);
+                expectWithinAbsoluteError (offsetFor (0.5f), 0.5f, 1.0e-3f);
+                expectWithinAbsoluteError (offsetFor (1.0f), 1.0f, 1.0e-4f);
+            }
+
             beginTest ("a disabled or zero-amount slot contributes nothing");
             {
                 TestProcessor processor;

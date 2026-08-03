@@ -57,6 +57,9 @@ namespace nog
             mod::Dest   dest    = mod::Dest::None;
             float       amount  = 0.0f;
             bool        bipolar = false;
+
+            /** Scales the slot by a second source. None means full depth. */
+            mod::Source via     = mod::Source::None;
         };
 
         ModMatrix();

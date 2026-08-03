@@ -109,6 +109,9 @@ namespace nog
             juce::AudioParameterChoice* dest    = nullptr;
             juce::AudioParameterFloat*  amount  = nullptr;
             juce::AudioParameterBool*   bipolar = nullptr;
+
+            /** A second source that scales this slot, or None. */
+            juce::AudioParameterChoice* via     = nullptr;
         };
 
         struct Effect

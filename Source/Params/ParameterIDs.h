@@ -134,6 +134,7 @@ namespace nog::ids
     inline constexpr const char* modDest        = "dst";
     inline constexpr const char* modAmount      = "amt";
     inline constexpr const char* modBipolar     = "bip";
+    inline constexpr const char* modVia         = "via";
 
     // -- effect slot (per index) -------------------------------------------
     inline constexpr const char* fxEnable       = "enable";

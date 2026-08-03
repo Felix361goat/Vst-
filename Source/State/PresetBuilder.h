@@ -218,6 +218,24 @@ namespace nog::presets
             return set (ids::matrix (slot, ids::modBipolar), bipolar ? 1.0f : 0.0f);
         }
 
+        /** As route(), but scaled by a second source rather than at full depth.
+
+            This is how a modulator gets put under the player's control: an LFO
+            routed to pitch via the mod wheel is vibrato that arrives when it is
+            asked for, rather than a wobble that is always on. */
+        Build& routeVia (mod::Source source, mod::Source via, mod::Dest destination,
+                         float amount, bool bipolar = false)
+        {
+            const auto slot = nextModSlot;
+
+            route (source, destination, amount, bipolar);
+
+            if (slot < ids::numMatrixSlots)
+                set (ids::matrix (slot, ids::modVia), static_cast<float> (via));
+
+            return *this;
+        }
+
         /** Fills the next free effect slot. The three controls mean different
             things per effect; see FXChain.cpp. */
         Build& fx (fx::FXChain::Type type, float mix, float a, float b, float c)

@@ -446,6 +446,9 @@ namespace nog::presets
             .fx (FX::Delay, 0.24f, 0.26f, 0.32f, 0.85f)
             .fx (FX::Reverb, 0.36f, 0.78f, 0.28f, 1.0f)
             .master (-9.0f)
+            // Vibrato the player can reach for: the LFO is already
+            // running, and the wheel decides how much of it is heard.
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::Osc1Pitch, 0.018f, true)
             .done());
 
         // -- tuned percussion, second wave ----------------------------------
@@ -559,6 +562,9 @@ namespace nog::presets
             .route (Src::Lfo1, Dst::Osc1Pitch, 0.008f, true)
             .fx (FX::Reverb, 0.36f, 0.78f, 0.26f, 1.0f)
             .master (-7.0f)
+            // Vibrato the player can reach for: the LFO is already
+            // running, and the wheel decides how much of it is heard.
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::Osc1Pitch, 0.022f, true)
             .done());
 
         list.push_back (Build ("String Pad", "Pad")
@@ -619,6 +625,9 @@ namespace nog::presets
             .fx (FX::Delay, 0.20f, 0.26f, 0.28f, 0.8f)
             .fx (FX::Reverb, 0.34f, 0.76f, 0.28f, 1.0f)
             .master (-7.0f)
+            // Vibrato the player can reach for: the LFO is already
+            // running, and the wheel decides how much of it is heard.
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::Osc1Pitch, 0.02f, true)
             .done());
 
         list.push_back (Build ("Flute Sparkle Lead", "Lead")

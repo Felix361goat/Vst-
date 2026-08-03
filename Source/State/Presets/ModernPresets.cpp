@@ -205,6 +205,9 @@ namespace nog::presets
             .fx (FX::Delay, 0.20f, 0.26f, 0.28f, 0.8f)
             .fx (FX::Reverb, 0.30f, 0.72f, 0.3f, 1.0f)
             .master (-8.0f)
+            // Vibrato the player can reach for: the LFO is already
+            // running, and the wheel decides how much of it is heard.
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::Osc1Pitch, 0.02f, true)
             .done());
 
         list.push_back (Build ("Trap Pluck Dark", "Trap")

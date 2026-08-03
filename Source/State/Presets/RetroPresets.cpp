@@ -75,6 +75,9 @@ namespace nog::presets
             .lfoShape (0, 240.0f, 0.0f)
             .route (Src::Lfo1, Dst::Osc1Pitch, 0.012f, true)
             .master (-10.0f)
+            // Vibrato the player can reach for: the LFO is already
+            // running, and the wheel decides how much of it is heard.
+            .routeVia (Src::Lfo1, Src::ModWheel, Dst::Osc1Pitch, 0.022f, true)
             .done());
 
         // Two chip channels a fifth apart, which is the only chord an NES

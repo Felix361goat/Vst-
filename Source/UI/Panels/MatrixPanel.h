@@ -30,6 +30,7 @@ namespace nog::ui
             ToggleBox enabled;
             ChoiceBox source;
             ChoiceBox destination;
+            ChoiceBox via;
             ToggleBox bipolar;
             juce::Slider amount;
             juce::Label  number;
@@ -43,13 +44,13 @@ namespace nog::ui
             up with the controls they describe at any window width. */
         struct Columns
         {
-            juce::Rectangle<int> number, enabled, source, destination, amount, bipolar;
+            juce::Rectangle<int> number, enabled, source, via, destination, amount, bipolar;
         };
 
         static Columns splitIntoColumns (juce::Rectangle<int> area);
 
         std::array<std::unique_ptr<Row>, ids::numMatrixSlots> rows;
 
-        juce::Label sourceHeader, destinationHeader, amountHeader;
+        juce::Label sourceHeader, viaHeader, destinationHeader, amountHeader;
     };
 }

@@ -372,7 +372,12 @@ namespace nog::params
                                           mod::destChoices(), 0),
                              floatParam  (ids::matrix (i, ids::modAmount), "Mod " + number + " Amount",
                                           linear (-1.0f, 1.0f), 0.0f, fmtPercent),
-                             boolParam   (ids::matrix (i, ids::modBipolar), "Mod " + number + " Bipolar", false));
+                             boolParam   (ids::matrix (i, ids::modBipolar), "Mod " + number + " Bipolar", false),
+                             // Scales the slot by a second source. Defaults to
+                             // None, so a patch saved before this existed loads
+                             // with the routing it had.
+                             choiceParam (ids::matrix (i, ids::modVia), "Mod " + number + " Via",
+                                          mod::sourceChoices(), 0));
             }
 
             return g;

@@ -31,7 +31,10 @@ namespace nog
             if (source == mod::Source::None || dest == mod::Dest::None)
                 continue;
 
-            routings.push_back ({ source, dest, amount, slot.bipolar->get() });
+            const auto via = slot.via != nullptr ? static_cast<mod::Source> (slot.via->getIndex())
+                                                : mod::Source::None;
+
+            routings.push_back ({ source, dest, amount, slot.bipolar->get(), via });
         }
 
         for (int i = 0; i < ids::numMacros; ++i)
@@ -62,7 +65,16 @@ namespace nog
             if (routing.bipolar)
                 value = value * 2.0f - 1.0f;
 
-            frame.offsets[static_cast<size_t> (routing.dest)] += value * routing.amount;
+            // The via source scales the slot rather than adding to it, which is
+            // what lets one modulator control how much another one does: a mod
+            // wheel over an LFO is vibrato you can play into, and an envelope
+            // over an LFO is a wobble that arrives with the note.
+            auto depth = routing.amount;
+
+            if (routing.via != mod::Source::None)
+                depth *= juce::jlimit (0.0f, 1.0f, frame.getSource (routing.via));
+
+            frame.offsets[static_cast<size_t> (routing.dest)] += value * depth;
         }
     }
 

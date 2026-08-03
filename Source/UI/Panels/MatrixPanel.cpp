@@ -18,6 +18,7 @@ namespace nog::ui
         : enabled     (state, ids::matrix (index, ids::modEnable), "ON"),
           source      (state, ids::matrix (index, ids::modSource), {}),
           destination (state, ids::matrix (index, ids::modDest), {}),
+          via         (state, ids::matrix (index, ids::modVia), {}),
           bipolar     (state, ids::matrix (index, ids::modBipolar), "BIPOLAR")
     {
         number.setText (juce::String (index + 1), juce::dontSendNotification);
@@ -35,8 +36,8 @@ namespace nog::ui
 
     MatrixPanel::MatrixPanel (juce::AudioProcessorValueTreeState& state)
     {
-        const auto headerNames = std::array { "SOURCE", "DESTINATION", "AMOUNT" };
-        const auto headerLabels = std::array { &sourceHeader, &destinationHeader, &amountHeader };
+        const auto headerNames = std::array { "SOURCE", "VIA", "DESTINATION", "AMOUNT" };
+        const auto headerLabels = std::array { &sourceHeader, &viaHeader, &destinationHeader, &amountHeader };
 
         for (size_t i = 0; i < headerLabels.size(); ++i)
         {
@@ -62,6 +63,7 @@ namespace nog::ui
         addAndMakeVisible (row.number);
         addAndMakeVisible (row.enabled);
         addAndMakeVisible (row.source);
+        addAndMakeVisible (row.via);
         addAndMakeVisible (row.destination);
         addAndMakeVisible (row.amount);
         addAndMakeVisible (row.bipolar);
@@ -95,12 +97,14 @@ namespace nog::ui
         columns.enabled = area.removeFromLeft (toggleWidth);
         columns.bipolar = area.removeFromRight (bipolarWidth);
 
-        // Source, destination and amount share what is left, so the table stays
-        // proportional when the window is resized.
-        const auto cell = area.getWidth() / 3;
+        // Source, via, destination and amount share what is left, so the table
+        // stays proportional when the window is resized. Via is narrower than
+        // the rest: most slots leave it empty.
+        const auto cell = area.getWidth() / 7;
 
-        columns.source      = area.removeFromLeft (cell);
-        columns.destination = area.removeFromLeft (cell);
+        columns.source      = area.removeFromLeft (cell * 2);
+        columns.via         = area.removeFromLeft (cell);
+        columns.destination = area.removeFromLeft (cell * 2);
         columns.amount      = area;
 
         return columns;
@@ -113,6 +117,7 @@ namespace nog::ui
         const auto headerColumns = splitIntoColumns (bounds.removeFromTop (headerHeight));
 
         sourceHeader.setBounds (headerColumns.source.withTrimmedLeft (4));
+        viaHeader.setBounds (headerColumns.via.withTrimmedLeft (4));
         destinationHeader.setBounds (headerColumns.destination.withTrimmedLeft (4));
         amountHeader.setBounds (headerColumns.amount.withTrimmedLeft (4));
 
@@ -126,6 +131,7 @@ namespace nog::ui
             row->number.setBounds (columns.number);
             row->enabled.setBounds (columns.enabled.reduced (2, 1));
             row->source.setBounds (columns.source.reduced (2, 1));
+            row->via.setBounds (columns.via.reduced (2, 1));
             row->destination.setBounds (columns.destination.reduced (2, 1));
             row->amount.setBounds (columns.amount.reduced (2, 1));
             row->bipolar.setBounds (columns.bipolar.reduced (2, 1));
