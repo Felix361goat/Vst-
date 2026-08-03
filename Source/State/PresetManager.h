@@ -43,8 +43,21 @@ namespace nog
 
         void deletePreset (const juce::String& name);
 
-        /** Preset names, sorted, without extensions. Rescans the folder. */
+        /** User preset names, sorted, without extensions. Rescans the folder. */
         juce::StringArray getPresetNames() const;
+
+        /** Factory preset names in the order they should be presented. */
+        static juce::StringArray getFactoryNames();
+
+        /** Factory names belonging to @p category. */
+        static juce::StringArray getFactoryNamesInCategory (const juce::String& category);
+
+        /** True if @p name is one of the built-in patches. A user preset with
+            the same name shadows it, since that is what saving over one means. */
+        bool isFactoryPreset (const juce::String& name) const;
+
+        /** Every name the browser can offer: factory first, then user. */
+        juce::StringArray getAllPresetNames() const;
 
         juce::String getCurrentPresetName() const;
 
@@ -53,6 +66,9 @@ namespace nog
 
         /** Steps through the preset list by @p delta, wrapping at both ends. */
         void step (int delta);
+
+        /** Applies a factory patch: init defaults first, then its overrides. */
+        void loadFactory (const juce::String& name);
 
         juce::AudioProcessorValueTreeState& state;
     };

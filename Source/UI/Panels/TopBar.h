@@ -47,6 +47,10 @@ namespace nog::ui
         juce::TextButton backgroundButton { "BG" };
         juce::ComboBox   presetList;
 
+        /** Preset name for each combo item ID, since section headings take up
+            rows without consuming IDs. */
+        juce::StringArray presetIds;
+
         // Held as a member because the chooser has to outlive the call that
         // launches it.
         std::unique_ptr<juce::FileChooser> fileChooser;

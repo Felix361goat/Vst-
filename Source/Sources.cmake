@@ -21,6 +21,12 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/Engine/Voice.cpp
     ${NOG_SOURCE_DIR}/Engine/SynthEngine.cpp
     ${NOG_SOURCE_DIR}/FX/FXChain.cpp
+    ${NOG_SOURCE_DIR}/State/FactoryPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/BassPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/LeadPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/PluckPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/KeyboardPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/AtmospherePresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES

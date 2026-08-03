@@ -1,5 +1,7 @@
 #include "State/PresetManager.h"
 
+#include "State/FactoryPresets.h"
+
 namespace nog
 {
     PresetManager::PresetManager (juce::AudioProcessorValueTreeState& stateToUse)
@@ -39,6 +41,77 @@ namespace nog
         return names;
     }
 
+    juce::StringArray PresetManager::getFactoryNames()
+    {
+        juce::StringArray names;
+
+        for (const auto& preset : presets::all())
+            names.add (preset.name);
+
+        return names;
+    }
+
+    juce::StringArray PresetManager::getFactoryNamesInCategory (const juce::String& category)
+    {
+        juce::StringArray names;
+
+        for (const auto& preset : presets::all())
+            if (preset.category == category)
+                names.add (preset.name);
+
+        return names;
+    }
+
+    bool PresetManager::isFactoryPreset (const juce::String& name) const
+    {
+        // A saved user preset of the same name wins, so that "save over" does
+        // what the user expects rather than being silently ignored.
+        if (getPresetNames().contains (name))
+            return false;
+
+        return presets::find (name) != nullptr;
+    }
+
+    juce::StringArray PresetManager::getAllPresetNames() const
+    {
+        auto names = getFactoryNames();
+
+        for (const auto& name : getPresetNames())
+            if (! names.contains (name))
+                names.add (name);
+
+        return names;
+    }
+
+    void PresetManager::loadFactory (const juce::String& name)
+    {
+        const auto* preset = presets::find (name);
+
+        if (preset == nullptr)
+            return;
+
+        // Reset first: a preset only stores what differs from the defaults, so
+        // without this it would inherit whatever the previous patch left behind.
+        loadDefault();
+
+        for (const auto& [id, value] : preset->values)
+        {
+            if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (state.getParameter (id)))
+            {
+                // Values are written in real units - hertz, milliseconds,
+                // semitones - and converted here.
+                const auto normalised = parameter->convertTo0to1 (value);
+                parameter->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, normalised));
+            }
+            else
+            {
+                jassertfalse;   // preset names a parameter that does not exist
+            }
+        }
+
+        setCurrentPresetName (name);
+    }
+
     juce::String PresetManager::getCurrentPresetName() const
     {
         return state.state.getProperty (presetNameProperty, "Init").toString();
@@ -74,6 +147,12 @@ namespace nog
 
     void PresetManager::load (const juce::String& name)
     {
+        if (isFactoryPreset (name))
+        {
+            loadFactory (name);
+            return;
+        }
+
         const auto file = getUserPresetDirectory()
                               .getChildFile (juce::File::createLegalFileName (name) + presetFileExtension);
 
@@ -99,7 +178,7 @@ namespace nog
 
     void PresetManager::step (int delta)
     {
-        const auto names = getPresetNames();
+        const auto names = getAllPresetNames();
 
         if (names.isEmpty())
             return;

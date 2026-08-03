@@ -2,6 +2,7 @@
 
 #include "Params/ParameterIDs.h"
 #include "PluginProcessor.h"
+#include "State/FactoryPresets.h"
 
 namespace nog::ui
 {
@@ -72,15 +73,44 @@ namespace nog::ui
 
     void TopBar::refreshPresetList()
     {
-        const auto names   = processor.getPresetManager().getPresetNames();
-        const auto current = processor.getPresetManager().getCurrentPresetName();
+        auto& manager = processor.getPresetManager();
+        const auto current = manager.getCurrentPresetName();
 
         presetList.clear (juce::dontSendNotification);
+        presetIds.clear();
 
-        for (int i = 0; i < names.size(); ++i)
-            presetList.addItem (names[i], i + 1);
+        // Item IDs are assigned as the list is built rather than derived from a
+        // position, because the section headings occupy rows but not IDs.
+        const auto addEntry = [this] (const juce::String& name)
+        {
+            presetIds.add (name);
+            presetList.addItem (name, presetIds.size());
+        };
 
-        const auto index = names.indexOf (current);
+        for (const auto& category : presets::categories())
+        {
+            const auto names = PresetManager::getFactoryNamesInCategory (category);
+
+            if (names.isEmpty())
+                continue;
+
+            presetList.addSectionHeading (category.toUpperCase());
+
+            for (const auto& name : names)
+                addEntry (name);
+        }
+
+        const auto userNames = manager.getPresetNames();
+
+        if (! userNames.isEmpty())
+        {
+            presetList.addSectionHeading ("USER");
+
+            for (const auto& name : userNames)
+                addEntry (name);
+        }
+
+        const auto index = presetIds.indexOf (current);
 
         if (index >= 0)
             presetList.setSelectedId (index + 1, juce::dontSendNotification);

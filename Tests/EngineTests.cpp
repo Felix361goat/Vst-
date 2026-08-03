@@ -19,6 +19,7 @@
 #include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 #include "Params/ParameterStore.h"
+#include "State/FactoryPresets.h"
 
 namespace
 {
@@ -736,7 +737,151 @@ namespace
         }
     };
 
-    ParameterTests  parameterTests;
+    // -----------------------------------------------------------------------
+    class FactoryPresetTests final : public juce::UnitTest
+    {
+    public:
+        FactoryPresetTests() : UnitTest ("Factory presets", "nog") {}
+
+        void runTest() override
+        {
+            const auto& presets = nog::presets::all();
+
+            beginTest ("the library is populated and every name is unique");
+            {
+                logMessage ("preset count: " + juce::String (presets.size()));
+                expect (presets.size() >= 50, "expected a substantial preset library");
+
+                juce::StringArray seen;
+
+                for (const auto& preset : presets)
+                {
+                    expect (! seen.contains (preset.name), "duplicate preset name: " + preset.name);
+                    expect (preset.name.isNotEmpty());
+                    expect (preset.category.isNotEmpty(), preset.name + " has no category");
+                    seen.add (preset.name);
+                }
+            }
+
+            beginTest ("every category listed by the browser has presets in it");
+            {
+                for (const auto& listed : nog::presets::categories())
+                {
+                    auto count = 0;
+
+                    for (const auto& preset : presets)
+                        if (preset.category == listed)
+                            ++count;
+
+                    expect (count > 0, "empty category: " + listed);
+                }
+            }
+
+            beginTest ("every preset names real parameters and stays in range");
+            {
+                // A typo in a preset's parameter ID would otherwise be silent:
+                // the value is simply dropped and the patch quietly sounds wrong.
+                TestProcessor processor;
+
+                for (const auto& preset : presets)
+                {
+                    for (const auto& [id, value] : preset.values)
+                    {
+                        auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (
+                            processor.apvts.getParameter (id));
+
+                        if (parameter == nullptr)
+                        {
+                            expect (false, preset.name + " sets unknown parameter " + id);
+                            continue;
+                        }
+
+                        const auto range = parameter->getNormalisableRange();
+
+                        expect (value >= range.start - 1.0e-3f && value <= range.end + 1.0e-3f,
+                                preset.name + ": " + id + " = " + juce::String (value)
+                                    + " is outside " + juce::String (range.start)
+                                    + " to " + juce::String (range.end));
+                    }
+                }
+            }
+
+            beginTest ("every preset makes a healthy, audible sound");
+            {
+                // The real proof. Each patch is loaded, played, and checked for
+                // finite output that is neither silent nor clipping hard.
+                for (const auto& preset : presets)
+                {
+                    TestProcessor processor;
+                    apply (processor, preset);
+                    processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.9f), 0);
+
+                    auto peak = 0.0f;
+
+                    // Long enough for slow pads to open up.
+                    for (int block = 0; block < 120; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        expect (isBufferHealthy (buffer), preset.name + " produced bad samples");
+                        peak = juce::jmax (peak, buffer.getMagnitude (0, testBlockSize));
+                    }
+
+                    expect (peak > 1.0e-3f, preset.name + " is silent");
+                    expect (peak < 4.0f,
+                            preset.name + " is far too loud (peak " + juce::String (peak) + ")");
+                }
+            }
+
+            beginTest ("every preset releases to silence");
+            {
+                for (const auto& preset : presets)
+                {
+                    TestProcessor processor;
+                    apply (processor, preset);
+                    processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.9f), 0);
+                    processor.processBlock (buffer, midi);
+
+                    midi.clear();
+                    midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+                    processor.processBlock (buffer, midi);
+
+                    // Generous: the longest release in the library is several
+                    // seconds, and the effects add a tail on top of that.
+                    for (int block = 0; block < 1200; ++block)
+                    {
+                        midi.clear();
+                        processor.processBlock (buffer, midi);
+                    }
+
+                    expect (processor.engine.getActiveVoiceCount() == 0,
+                            preset.name + " left a voice running");
+                }
+            }
+        }
+
+    private:
+        static void apply (TestProcessor& processor, const nog::presets::Preset& preset)
+        {
+            for (const auto& [id, value] : preset.values)
+                if (auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (
+                        processor.apvts.getParameter (id)))
+                    parameter->setValueNotifyingHost (
+                        juce::jlimit (0.0f, 1.0f, parameter->convertTo0to1 (value)));
+        }
+    };
+
+    ParameterTests      parameterTests;
+    FactoryPresetTests  factoryPresetTests;
     WavetableTests  wavetableTests;
     ModMatrixTests  modMatrixTests;
     EnvelopeTests   envelopeTests;
