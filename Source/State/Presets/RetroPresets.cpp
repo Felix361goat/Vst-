@@ -42,7 +42,7 @@ namespace nog::presets
 
         // The NES had one triangle channel, no volume control on it, and it
         // played every bass line on the console. Mono for the same reason.
-        list.push_back (Build ("NES Bass", "Bass")
+        list.push_back (Build ("NES Bass", "Chiptune")
             .voices (1, 1)
             .sampleOsc (0, smp::nesTriangle, 0.9f, true)
             .oscOff (1)
@@ -51,7 +51,7 @@ namespace nog::presets
             .master (-7.0f)
             .done());
 
-        list.push_back (Build ("NES Sub Bass", "Bass")
+        list.push_back (Build ("NES Sub Bass", "Chiptune")
             .voices (1, 1)
             .glide (30.0f, 2)
             .sampleOsc (0, smp::nesTriangle, 0.85f, true)
@@ -63,7 +63,7 @@ namespace nog::presets
             .master (-7.0f)
             .done());
 
-        list.push_back (Build ("NES Lead", "Lead")
+        list.push_back (Build ("NES Lead", "Chiptune")
             .voices (1, 1)
             .sampleOsc (0, smp::nesPulse, 0.8f, true)
             .oscOff (1)
@@ -79,7 +79,7 @@ namespace nog::presets
 
         // Two chip channels a fifth apart, which is the only chord an NES
         // could afford once the bass and the drums had theirs.
-        list.push_back (Build ("Chip Duet Lead", "Lead")
+        list.push_back (Build ("Chip Duet Lead", "Chiptune")
             .voices (4)
             .sampleOsc (0, smp::nesPulse, 0.55f, true)
             .osc (1, wt::PulseWidth, 0.15f, 0.35f)
@@ -90,7 +90,7 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
-        list.push_back (Build ("Chip Arp", "Arp")
+        list.push_back (Build ("Chip Arp", "Chiptune")
             .voices (8)
             .arp (0, 8, 2, 0.4f, 0.0f)
             .sampleOsc (0, smp::nesPulse, 0.8f, true)
@@ -103,7 +103,7 @@ namespace nog::presets
 
         // The trick every chiptune used to fake a chord: cycle through its
         // notes faster than the ear can separate them.
-        list.push_back (Build ("Chip Chord Arp", "Arp")
+        list.push_back (Build ("Chip Chord Arp", "Chiptune")
             .voices (8)
             .arp (0, 9, 1, 0.9f, 0.0f)
             .sampleOsc (0, smp::nesPulse, 0.8f, true)
@@ -114,7 +114,7 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
-        list.push_back (Build ("Game Boy Keys", "Keys")
+        list.push_back (Build ("Game Boy Keys", "Chiptune")
             .voices (8)
             .sampleOsc (0, smp::gameBoyWave, 0.85f, true)
             .oscOff (1)
@@ -126,7 +126,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Game Boy Pluck", "Pluck")
+        list.push_back (Build ("Game Boy Pluck", "Chiptune")
             .voices (8)
             .sampleOsc (0, smp::gameBoyWave, 0.9f, true)
             .oscOff (1)
@@ -139,7 +139,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("SID Lead", "Lead")
+        list.push_back (Build ("SID Lead", "Chiptune")
             .voices (1, 1)
             .glide (25.0f, 2)
             .sampleOsc (0, smp::sidPulse, 0.85f, true)
@@ -154,7 +154,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("SID Bass", "Bass")
+        list.push_back (Build ("SID Bass", "Chiptune")
             .voices (1, 1)
             .sampleOsc (0, smp::sidPulse, 0.85f, true)
             .oscOff (1)
@@ -168,7 +168,7 @@ namespace nog::presets
 
         // -- sixteen-bit ----------------------------------------------------
 
-        list.push_back (Build ("Amiga Tracker Saw", "Lead")
+        list.push_back (Build ("Amiga Tracker Saw", "Chiptune")
             .voices (6)
             .sampleOsc (0, smp::amigaSaw, 0.8f, true)
             .oscOff (1)
@@ -181,7 +181,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("Tracker Stab", "Chords")
+        list.push_back (Build ("Tracker Stab", "Chiptune")
             .voices (10)
             .sampleOsc (0, smp::amigaSaw, 0.7f, true)
             .oscOff (1)
@@ -194,7 +194,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("FM Console Bass", "Bass")
+        list.push_back (Build ("FM Console Bass", "Chiptune")
             .voices (1, 1)
             .sampleOsc (0, smp::fmConsole, 0.85f, true)
             .oscOff (1)
@@ -206,7 +206,7 @@ namespace nog::presets
             .master (-9.0f)
             .done());
 
-        list.push_back (Build ("FM Console Lead", "Lead")
+        list.push_back (Build ("FM Console Lead", "Chiptune")
             .voices (6)
             .sampleOsc (0, smp::fmConsole, 0.8f, true)
             .oscOff (1)
@@ -219,7 +219,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("FM Console Bell", "Bell")
+        list.push_back (Build ("FM Console Bell", "Chiptune")
             .voices (10)
             .sampleOsc (0, smp::fmConsole, 0.6f, true)
             .osc (1, wt::FmBell, 0.38f, 0.3f)
@@ -232,7 +232,7 @@ namespace nog::presets
             .master (-10.0f)
             .done());
 
-        list.push_back (Build ("PC Speaker Beep", "Lead")
+        list.push_back (Build ("PC Speaker Beep", "Chiptune")
             .voices (1, 1)
             .sampleOsc (0, smp::pcSpeaker, 0.7f, true)
             .oscOff (1)
@@ -335,7 +335,7 @@ namespace nog::presets
             .master (-8.0f)
             .done());
 
-        list.push_back (Build ("Chip Sparkle Lead", "Lead")
+        list.push_back (Build ("Chip Sparkle Lead", "Chiptune")
             .voices (8)
             .sampleOsc (0, smp::nesPulse, 0.30f, true)
             .osc (1, wt::BasicShapes, wt::saw, 0.45f)

@@ -34,7 +34,7 @@ namespace nog::presets
         return { "Bass", "Lead", "Pluck", "Chords", "Keys", "Plucked",
                  "Bell", "Pad", "Arp", "Sequence",
                  "Future Bass", "Trap", "Drill", "House", "Trance", "Synthwave",
-                 "Strings", "Brass", "Ambient", "FX" };
+                 "Strings", "Brass", "Chiptune", "Ambient", "FX" };
     }
 
     const std::vector<Preset>& all()
