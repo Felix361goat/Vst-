@@ -1477,6 +1477,284 @@ namespace nog::dsp
             return buffer;
         }
 
+        // -- tuned metal and mallets, second wave ------------------------------
+        //
+        // The bars and plates a sequenced part is usually built from. What
+        // separates them from each other is entirely where their modes sit: a
+        // marimba is undercut so its second mode lands two octaves up, a
+        // vibraphone slightly differently, and a xylophone barely at all. Those
+        // three numbers are the instruments.
+
+        juce::AudioBuffer<float> makeVibraphone()
+        {
+            auto buffer = struckBar (noteHz (60), 3.0,
+                                     { 1.0f, 4.0f, 10.8f, 18.0f },
+                                     { 0.88f, 0.20f, 0.06f, 0.02f },
+                                     0.75f, 4840, 0.2f);
+
+            // The motor. A vibraphone's tremolo comes from discs spinning in
+            // the resonator tubes, opening and closing them - which is an
+            // amplitude effect, not a pitch one, and it is the whole reason
+            // anyone can tell a vibraphone from a marimba with a long decay.
+            const auto length = buffer.getNumSamples();
+            auto* out = buffer.getWritePointer (0);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+                out[i] *= 0.72f + 0.28f * std::sin (twoPi * 4.6f * t);
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeXylophone()
+        {
+            // Barely undercut, so the second mode sits at three times rather
+            // than four: harder and drier than a marimba, and much shorter.
+            return struckBar (noteHz (72), 0.9,
+                              { 1.0f, 3.0f, 6.0f, 9.8f },
+                              { 0.9f, 0.35f, 0.14f, 0.05f },
+                              3.6f, 4841, 0.55f);
+        }
+
+        juce::AudioBuffer<float> makeTubularBell()
+        {
+            // A long tube rings for a very long time, and its modes are the
+            // free-bar set - which is why a tubular bell has no clear
+            // fundamental and the ear invents one an octave below the strike.
+            return struckBar (noteHz (48), 4.0,
+                              { 1.0f, 2.76f, 5.40f, 8.93f, 13.34f },
+                              { 0.55f, 0.80f, 0.55f, 0.28f, 0.12f },
+                              0.45f, 4842, 0.25f);
+        }
+
+        juce::AudioBuffer<float> makeCrotale()
+        {
+            // A very small cymbal, tuned. High, bright and it hangs.
+            return struckBar (noteHz (84), 2.2,
+                              { 1.0f, 2.76f, 5.40f, 8.93f },
+                              { 0.75f, 0.45f, 0.25f, 0.12f },
+                              0.9f, 4843, 0.3f);
+        }
+
+        juce::AudioBuffer<float> makeGamelanGong()
+        {
+            // Pairs of partials a couple of hertz apart, which is deliberate on
+            // a gamelan: the instruments are tuned in beating pairs and that
+            // shimmer is the ensemble's sound, not an error.
+            return struckBar (noteHz (48), 3.6,
+                              { 1.0f, 1.008f, 2.34f, 2.36f, 4.12f, 6.75f },
+                              { 0.6f, 0.6f, 0.32f, 0.30f, 0.14f, 0.06f },
+                              0.7f, 4844, 0.35f);
+        }
+
+        juce::AudioBuffer<float> makeSingingBowl()
+        {
+            // Two close partials and a long decay: the beat between them is
+            // the sound, and it takes several seconds to become audible.
+            return struckBar (noteHz (48), 4.0,
+                              { 1.0f, 1.004f, 2.68f, 2.69f, 5.11f },
+                              { 0.7f, 0.7f, 0.22f, 0.20f, 0.06f },
+                              0.35f, 4845, 0.12f);
+        }
+
+        juce::AudioBuffer<float> makeSteelTongue()
+        {
+            // A tongue drum is cut so its modes are nearly harmonic, which is
+            // why it sounds consonant where a gong does not.
+            return struckBar (noteHz (60), 2.8,
+                              { 1.0f, 2.0f, 3.0f, 4.0f },
+                              { 0.9f, 0.28f, 0.10f, 0.03f },
+                              0.9f, 4846, 0.22f);
+        }
+
+        juce::AudioBuffer<float> makeWoodBlock()
+        {
+            // Almost no sustain and no clear pitch: a block is a click with a
+            // hint of a note in it.
+            return struckBar (noteHz (72), 0.35,
+                              { 1.0f, 2.6f, 5.4f },
+                              { 0.8f, 0.4f, 0.2f },
+                              6.0f, 4847, 0.7f);
+        }
+
+        // -- more strings -----------------------------------------------------
+
+        /** Two strings a few cents apart, which is what a double course is.
+            The beating between them is the instrument, not a detune effect. */
+        juce::AudioBuffer<float> doubleCourse (float frequency, double seconds, float cents,
+                                               float brightness, float damping, float feedback,
+                                               float pick, int seed, float drive = 0.0f)
+        {
+            auto a = pluckedString (frequency * std::pow (2.0f, -cents / 1200.0f), seconds,
+                                    brightness, damping, feedback, pick, seed, drive);
+            auto b = pluckedString (frequency * std::pow (2.0f, cents / 1200.0f), seconds,
+                                    brightness, damping, feedback, pick * 0.92f, seed + 1, drive);
+
+            const auto length = juce::jmin (a.getNumSamples(), b.getNumSamples());
+            auto* out = a.getWritePointer (0);
+            const auto* other = b.getReadPointer (0);
+
+            for (int i = 0; i < length; ++i)
+                out[i] = (out[i] + other[i]) * 0.5f;
+
+            return a;
+        }
+
+        juce::AudioBuffer<float> makeMandolin()
+        {
+            // Bright, short, plucked hard by the bridge with a plectrum.
+            return doubleCourse (noteHz (60), 1.8, 7.0f, 0.85f, 0.80f, 0.9968f, 0.08f, 4848, 0.15f);
+        }
+
+        juce::AudioBuffer<float> makeOud()
+        {
+            // Gut over a deep bowl: dark, and plucked far from the bridge.
+            return pluckedString (noteHz (48), 2.6, 0.22f, 0.44f, 0.9980f, 0.38f, 4850);
+        }
+
+        juce::AudioBuffer<float> makeGuzheng()
+        {
+            // Steel over a long soundboard, plucked with a nail: very bright at
+            // the start, and it rings a long way.
+            return pluckedString (noteHz (48), 3.2, 0.78f, 0.76f, 0.9989f, 0.13f, 4851, 0.12f);
+        }
+
+        // -- voices and air ----------------------------------------------------
+
+        juce::AudioBuffer<float> makeChoirEe()
+        {
+            // An "ee" puts its second formant far higher than an "oo", which is
+            // the whole difference between the two vowels.
+            return sustainedLoop (noteHz (48), 1.4,
+                                  { 1.0f, 0.30f, 0.14f, 0.22f, 0.40f, 0.55f, 0.35f, 0.18f,
+                                    0.10f, 0.06f, 0.03f },
+                                  0.02f, 7.0f, 4852);
+        }
+
+        juce::AudioBuffer<float> makeWhistle()
+        {
+            // Nearly a pure tone with a lot of air around it.
+            return sustainedLoop (noteHz (72), 0.8,
+                                  { 1.0f, 0.10f, 0.03f },
+                                  0.11f, 9.0f, 4853);
+        }
+
+        juce::AudioBuffer<float> makeBottleBlow()
+        {
+            // A Helmholtz resonator: one strong mode, very little above it, and
+            // a great deal of the noise that drives it.
+            return sustainedLoop (noteHz (48), 1.0,
+                                  { 1.0f, 0.06f, 0.12f, 0.03f },
+                                  0.20f, 10.0f, 4854);
+        }
+
+        // -- small individual sounds -------------------------------------------
+
+        juce::AudioBuffer<float> makeWaterDrop()
+        {
+            const auto length = lengthFor (0.5);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            auto phase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (length);
+
+                // The pitch *rises*, which is what makes a drop sound like a
+                // drop: the cavity it leaves behind is shrinking.
+                const auto frequency = juce::jmap (t * t, 700.0f, 2600.0f);
+
+                phase += frequency / static_cast<float> (rate);
+                out[i] = std::sin (phase * twoPi) * decay (i, length, 7.0f);
+            }
+
+            fadeTail (buffer, 0.02);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeIceCrackle()
+        {
+            const auto length = lengthFor (3.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+            juce::Random cracks (0x1CE0);
+
+            // Sparse, very short, very high: ice is almost all transient.
+            constexpr int numCracks = 340;
+
+            for (int c = 0; c < numCracks; ++c)
+            {
+                const auto start = cracks.nextInt (length - 900);
+                const auto frequency = juce::jmap (cracks.nextFloat(), 2600.0f, 11000.0f);
+                const auto amplitude = juce::jmap (cracks.nextFloat(), 0.10f, 0.85f);
+                const auto decayRate = juce::jmap (cracks.nextFloat(), 120.0f, 700.0f);
+
+                for (int n = 0; n < 900; ++n)
+                {
+                    const auto t = static_cast<float> (n) / static_cast<float> (rate);
+                    out[start + n] += std::sin (twoPi * frequency * t) * amplitude * std::exp (-decayRate * t);
+                }
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeReverseSwell()
+        {
+            const auto length = lengthFor (2.4);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x5E11);
+            auto lowPass = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (length);
+
+                // Backwards: it grows into its own end, which is the gesture a
+                // reversed cymbal makes and no envelope can fake, because the
+                // brightness has to grow with the level.
+                lowPass += juce::jmap (t, 0.03f, 0.55f) * (noise.next() - lowPass);
+
+                out[i] = lowPass * t * t;
+            }
+
+            fadeTail (buffer, 0.01);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeSubDrop()
+        {
+            const auto length = lengthFor (2.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            auto phase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (length);
+
+                // Two octaves down over two seconds, on a curve rather than a
+                // line, because a linear fall in hertz is not a linear fall in
+                // pitch and only the second one sounds intentional.
+                const auto frequency = 220.0f * std::pow (2.0f, -4.0f * t);
+
+                phase += frequency / static_cast<float> (rate);
+                out[i] = std::sin (phase * twoPi) * (1.0f - t * 0.35f);
+            }
+
+            fadeTail (buffer, 0.08);
+            return buffer;
+        }
+
         struct Definition
         {
             const char* name;
@@ -1557,7 +1835,26 @@ namespace nog::dsp
                 // nothing stops an oscillator loading one.
                 { "Wind",          makeWind,         true,  60, false },
                 { "Rain",          makeRain,         true,  60, false },
-                { "Breath",        makeBreath,       true,  60, false }
+                { "Breath",        makeBreath,       true,  60, false },
+
+                { "Vibraphone",    makeVibraphone,   false, 60, true },
+                { "Xylophone",     makeXylophone,    false, 72, true },
+                { "Tubular Bell",  makeTubularBell,  false, 48, true },
+                { "Crotale",       makeCrotale,      false, 84, true },
+                { "Gamelan Gong",  makeGamelanGong,  false, 48, true },
+                { "Singing Bowl",  makeSingingBowl,  false, 48, true },
+                { "Steel Tongue",  makeSteelTongue,  false, 60, true },
+                { "Wood Block",    makeWoodBlock,    false, 72, false },
+                { "Mandolin",      makeMandolin,     false, 60, true },
+                { "Oud",           makeOud,          false, 48, true },
+                { "Guzheng",       makeGuzheng,      false, 48, true },
+                { "Choir Ee",      makeChoirEe,      true,  48, true },
+                { "Whistle",       makeWhistle,      true,  72, true },
+                { "Bottle Blow",   makeBottleBlow,   true,  48, true },
+                { "Water Drop",    makeWaterDrop,    false, 60, false },
+                { "Ice Crackle",   makeIceCrackle,   true,  60, false },
+                { "Reverse Swell", makeReverseSwell, false, 60, false },
+                { "Sub Drop",      makeSubDrop,      false, 60, false }
             };
 
             return list;

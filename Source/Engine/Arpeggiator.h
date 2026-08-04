@@ -60,8 +60,8 @@ namespace nog
             their rendering there. Returns a large number when idle. */
         int samplesUntilNextStep (double bpm, const Settings& settings) const noexcept;
 
-        /** The note currently sounding, or -1. Released when the arp stops. */
-        int getSoundingNote() const noexcept { return soundingNote; }
+        /** True while the arp has notes it still has to release. */
+        bool hasSoundingNotes() const noexcept { return ! sounding.empty(); }
 
     private:
         struct HeldNote
@@ -81,8 +81,12 @@ namespace nog
         std::vector<HeldNote> pattern;    // held notes expanded by mode and octaves
 
         double stepPhase   = 0.0;   // samples into the current step
+        double currentStepLength = 0.0;   // its length, with swing already applied
         int    stepIndex   = 0;
-        int    soundingNote = -1;
+        /** Every note the arp has started and not yet released. A vector
+            rather than a single note because chord mode starts the whole
+            pattern at once, and something has to release all of it. */
+        std::vector<int> sounding;
         double gateRemaining = 0.0;
         bool   descending  = false; // for the up-down modes
 

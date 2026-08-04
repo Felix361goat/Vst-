@@ -16,7 +16,7 @@ namespace nog
         pattern.clear();
         stepPhase = 0.0;
         stepIndex = 0;
-        soundingNote = -1;
+        sounding.clear();
         gateRemaining = 0.0;
         descending = false;
     }
@@ -143,11 +143,10 @@ namespace nog
         // whatever it left sounding.
         if (! settings.enabled || held.empty())
         {
-            if (soundingNote >= 0)
-            {
-                events.push_back ({ 0, soundingNote, 0.0f, false });
-                soundingNote = -1;
-            }
+            for (const auto note : sounding)
+                events.push_back ({ 0, note, 0.0f, false });
+
+            sounding.clear();
 
             stepPhase = 0.0;
             stepIndex = 0;
@@ -165,22 +164,78 @@ namespace nog
 
         while (consumed < numSamples)
         {
-            // Swing lengthens every other step and shortens the one after, which
-            // is the whole of what makes a pattern shuffle.
-            const auto swung = (stepIndex % 2) == 0
-                             ? stepLength * (1.0 + static_cast<double> (settings.swing) * 0.33)
-                             : stepLength * (1.0 - static_cast<double> (settings.swing) * 0.33);
+            // A step fires at its *start*, not its end. Firing at the end meant
+            // the first note of a pattern arrived one whole step after the key
+            // went down - inaudible at a sixteenth, and half a beat of silence
+            // at a quarter, which is long enough to feel broken.
+            if (stepPhase <= 0.0)
+            {
+                // Swing lengthens every other step and shortens the one after,
+                // which is the whole of what makes a pattern shuffle. Held for
+                // the length of the step rather than recomputed, because the
+                // step index moves on as soon as the note has fired.
+                currentStepLength = (stepIndex % 2) == 0
+                                  ? stepLength * (1.0 + static_cast<double> (settings.swing) * 0.33)
+                                  : stepLength * (1.0 - static_cast<double> (settings.swing) * 0.33);
 
-            const auto remainingInStep = juce::jmax (1.0, swung - stepPhase);
+                // Anything still sounding is cut before the next note starts.
+                for (const auto note : sounding)
+                    events.push_back ({ juce::jmin (consumed, numSamples - 1), note, 0.0f, false });
+
+                sounding.clear();
+
+                const auto mode = static_cast<Mode> (settings.mode);
+                const auto offset = juce::jlimit (0, numSamples - 1, consumed);
+
+                if (mode == Mode::Chord)
+                {
+                    for (const auto& note : pattern)
+                    {
+                        events.push_back ({ offset, note.note, note.velocity, true });
+                        sounding.push_back (note.note);
+                    }
+
+                    // The whole chord is gated together, exactly as a single
+                    // note would be. Leaving it ungated was what let a chord
+                    // pattern hold voices open for ever.
+                    gateRemaining = currentStepLength
+                                  * static_cast<double> (juce::jlimit (0.05f, 1.0f, settings.gate));
+                }
+                else
+                {
+                    const auto index = mode == Mode::Random
+                                     ? random.nextInt (static_cast<int> (pattern.size()))
+                                     : stepIndex % static_cast<int> (pattern.size());
+
+                    const auto& note = pattern[static_cast<size_t> (index)];
+                    events.push_back ({ offset, note.note, note.velocity, true });
+
+                    sounding.push_back (note.note);
+                    gateRemaining = currentStepLength
+                                  * static_cast<double> (juce::jlimit (0.05f, 1.0f, settings.gate));
+                }
+
+                ++stepIndex;
+
+                if (stepIndex >= 1000000)
+                    stepIndex = 0;
+            }
+
+            const auto remainingInStep = juce::jmax (1.0, currentStepLength - stepPhase);
             const auto chunk = juce::jmin (static_cast<double> (numSamples - consumed), remainingInStep);
 
             // Gate: release the note partway through its step.
-            if (soundingNote >= 0 && gateRemaining > 0.0)
+            if (! sounding.empty() && gateRemaining > 0.0)
             {
                 if (gateRemaining <= chunk)
                 {
-                    events.push_back ({ consumed + static_cast<int> (gateRemaining), soundingNote, 0.0f, false });
-                    soundingNote = -1;
+                    const auto offset = juce::jlimit (0, numSamples - 1,
+                                                      consumed + static_cast<int> (gateRemaining));
+
+                    for (const auto note : sounding)
+                        events.push_back ({ offset, note, 0.0f, false });
+
+                    sounding.clear();
                     gateRemaining = 0.0;
                 }
                 else
@@ -192,47 +247,8 @@ namespace nog
             stepPhase += chunk;
             consumed += static_cast<int> (chunk);
 
-            if (stepPhase + 0.5 >= swung)
-            {
+            if (stepPhase + 0.5 >= currentStepLength)
                 stepPhase = 0.0;
-
-                // Anything still sounding is cut before the next note starts.
-                if (soundingNote >= 0)
-                {
-                    events.push_back ({ juce::jmin (consumed, numSamples - 1), soundingNote, 0.0f, false });
-                    soundingNote = -1;
-                }
-
-                const auto mode = static_cast<Mode> (settings.mode);
-                const auto offset = juce::jlimit (0, numSamples - 1, consumed);
-
-                if (mode == Mode::Chord)
-                {
-                    for (const auto& note : pattern)
-                        events.push_back ({ offset, note.note, note.velocity, true });
-
-                    // Chord mode has no single sounding note to gate, so the
-                    // notes are released by the next step's clear-down.
-                    soundingNote = -1;
-                }
-                else
-                {
-                    const auto index = mode == Mode::Random
-                                     ? random.nextInt (static_cast<int> (pattern.size()))
-                                     : stepIndex % static_cast<int> (pattern.size());
-
-                    const auto& note = pattern[static_cast<size_t> (index)];
-                    events.push_back ({ offset, note.note, note.velocity, true });
-
-                    soundingNote = note.note;
-                    gateRemaining = swung * static_cast<double> (juce::jlimit (0.05f, 1.0f, settings.gate));
-                }
-
-                ++stepIndex;
-
-                if (stepIndex >= 1000000)
-                    stepIndex = 0;
-            }
         }
     }
 }

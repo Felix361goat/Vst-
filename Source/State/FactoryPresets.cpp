@@ -30,6 +30,7 @@ namespace nog::presets
     std::vector<Preset> motionPresets();
     std::vector<Preset> worldPresets();
     std::vector<Preset> sparklePresets();
+    std::vector<Preset> malletPresets();
 
     juce::StringArray categories()
     {
@@ -61,6 +62,7 @@ namespace nog::presets
             append (motionPresets());
             append (worldPresets());
             append (sparklePresets());
+            append (malletPresets());
             append (bassPresets());
             append (leadPresets());
             append (pluckPresets());

@@ -582,7 +582,7 @@ namespace nog::presets
             .master (-14.0f)
             .done());
 
-        list.push_back (Build ("Reverse Swell", "FX")
+        list.push_back (Build ("Synth Reverse Swell", "FX")
             .voices (6)
             .osc (0, wt::BasicShapes, wt::saw, 0.6f)
             .oscOff (1)

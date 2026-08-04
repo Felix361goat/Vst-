@@ -220,3 +220,29 @@ envelope so a chord arrives rather than starts, a high-pass under the top line
 so it does not muddy the middle, the widener instead of a nine-voice stack so
 a wide chord stays in tune, and a Motion pattern on a delay send so the repeats
 come and go while the pluck stays even.
+
+### Eighteen more sample sources, and two arpeggiator bugs they exposed
+
+Mallets and tuned metal (vibraphone with its motor tremolo baked in, xylophone,
+tubular bell, crotale, gamelan gong, singing bowl, steel tongue drum, wood
+block), three more plucked strings (mandolin as a real double course, oud,
+guzheng), voices and air (choir "ee", whistle, bottle blow), and four individual
+sounds: a water drop whose pitch *rises*, ice, a reversed swell, a sub drop.
+
+Thirty-four patches, most of them arpeggiated, because that is what struck
+material is for: a bar has an attack and a decay and nothing in between, so a
+held chord does almost nothing with it while a pattern does everything.
+
+Writing them turned up two real arpeggiator bugs that no existing patch happened
+to reach:
+
+- **The first note arrived one whole step late.** A step fired at its end rather
+  than its start. At a sixteenth that is 125 ms and nobody noticed; the first
+  patch to use a quarter-note division sat silent for half a beat after the key
+  went down. Steps now fire at their start, and the swung length is held for the
+  duration of the step rather than recomputed after the index has moved on.
+
+- **Chord mode never released its notes.** It started every note in the pattern
+  but tracked only one as sounding, so the clear-down had nothing to release and
+  a chord pattern held voices open for ever. The arp now tracks every note it
+  has started, and gates a chord exactly as it gates a single note.
