@@ -1,5 +1,7 @@
 #include "UI/Panels/ModulatorPanels.h"
 
+#include "PluginProcessor.h"
+
 #include "Params/ParameterIDs.h"
 #include "UI/Panels/SynthPanels.h"
 
@@ -423,8 +425,104 @@ namespace nog::ui
     }
 
     // -----------------------------------------------------------------------
-    ModulatorsPanel::ModulatorsPanel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix)
+    MotionPanel::MotionPanel (NogSuiteProcessor& processorToUse, int index)
+        : processor   (processorToUse),
+          motionIndex (index),
+          enable (processorToUse.getValueTreeState(), ids::motion (index, ids::motionEnable), "ON"),
+          rate   (processorToUse.getValueTreeState(), ids::motion (index, ids::motionRate), {}),
+          smooth (processorToUse.getValueTreeState(), ids::motion (index, ids::motionSmooth), "Smooth"),
+          swing  (processorToUse.getValueTreeState(), ids::motion (index, ids::motionSwing), "Swing"),
+          depth  (processorToUse.getValueTreeState(), ids::motion (index, ids::motionDepth), "Depth")
     {
+        addAllChildren (*this, { &enable, &rate, &smooth, &swing, &depth });
+
+        for (auto* knob : { &smooth, &swing, &depth })
+            knob->setAccentColour (colours::candyOrange);
+
+        auto& state = processorToUse.getValueTreeState();
+
+        for (int i = 0; i < ids::numMotionSteps; ++i)
+        {
+            auto slider = std::make_unique<juce::Slider> (juce::Slider::LinearBarVertical,
+                                                          juce::Slider::NoTextBox);
+            slider->setColour (juce::Slider::trackColourId, colours::candyOrange.withAlpha (0.85f));
+            slider->setColour (juce::Slider::backgroundColourId, juce::Colours::black.withAlpha (0.35f));
+
+            stepAttachments[static_cast<size_t> (i)] =
+                std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+                    state, ids::motionStep (index, i), *slider);
+
+            addAndMakeVisible (*slider);
+            steps[static_cast<size_t> (i)] = std::move (slider);
+        }
+
+        startTimerHz (20);
+    }
+
+    void MotionPanel::timerCallback()
+    {
+        // Highlighting the step that is sounding is what turns eight sliders
+        // into something you can see running, which is most of why a pattern
+        // editor is easier to use than eight numbers.
+        const auto value = processor.getEngine().getMotionValue (motionIndex);
+
+        auto nearest = -1;
+        auto smallest = 2.0f;
+
+        for (int i = 0; i < ids::numMotionSteps; ++i)
+        {
+            const auto level = static_cast<float> (steps[static_cast<size_t> (i)]->getValue());
+            const auto distance = std::abs (level - value);
+
+            if (distance < smallest)
+            {
+                smallest = distance;
+                nearest = i;
+            }
+        }
+
+        if (nearest != playingStep)
+        {
+            playingStep = nearest;
+            repaint();
+        }
+    }
+
+    void MotionPanel::paint (juce::Graphics& g)
+    {
+        paintGlassPanel (g, getLocalBounds().toFloat().reduced (2.0f), 6.0f, true);
+    }
+
+    void MotionPanel::resized()
+    {
+        auto bounds = getLocalBounds().reduced (8);
+
+        auto top = bounds.removeFromTop (28);
+        enable.setBounds (top.removeFromLeft (56).reduced (2, 2));
+        top.removeFromLeft (6);
+        rate.setBounds (top.removeFromLeft (110).reduced (2, 2));
+
+        bounds.removeFromTop (6);
+
+        // The knobs go down the right-hand side so the pattern gets the width.
+        auto side = bounds.removeFromRight (200);
+        layoutRow (side, { &smooth, &swing, &depth });
+
+        bounds.removeFromRight (8);
+
+        const auto width = bounds.getWidth() / ids::numMotionSteps;
+
+        for (int i = 0; i < ids::numMotionSteps; ++i)
+        {
+            auto cell = i == ids::numMotionSteps - 1 ? bounds : bounds.removeFromLeft (width);
+            steps[static_cast<size_t> (i)]->setBounds (cell.reduced (3, 2));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    ModulatorsPanel::ModulatorsPanel (NogSuiteProcessor& processor, const ModMatrix& matrix)
+    {
+        auto& state = processor.getValueTreeState();
         tabs.setTabBarDepth (24);
         tabs.setOutline (0);
 
@@ -440,6 +538,13 @@ namespace nog::ui
             lfos[static_cast<size_t> (i)] = std::make_unique<LfoPanel> (state, matrix, i);
             tabs.addTab ("LFO " + juce::String (i + 1), juce::Colours::transparentBlack,
                          lfos[static_cast<size_t> (i)].get(), false);
+        }
+
+        for (int i = 0; i < ids::numMotions; ++i)
+        {
+            motions[static_cast<size_t> (i)] = std::make_unique<MotionPanel> (processor, i);
+            tabs.addTab ("MOTION " + juce::String (i + 1), juce::Colours::transparentBlack,
+                         motions[static_cast<size_t> (i)].get(), false);
         }
 
         tabs.addTab ("MIDI", juce::Colours::transparentBlack, &midiSources, false);

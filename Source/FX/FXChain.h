@@ -4,6 +4,7 @@
 #include <memory>
 #include <juce_dsp/juce_dsp.h>
 
+#include "Modulation/ModMatrix.h"
 #include "Params/ParameterStore.h"
 
 namespace nog::fx
@@ -60,7 +61,8 @@ namespace nog::fx
         void prepare (const juce::dsp::ProcessSpec& spec);
         void reset();
 
-        void process (juce::AudioBuffer<float>& buffer, const ParameterStore& parameters);
+        void process (juce::AudioBuffer<float>& buffer, const ParameterStore& parameters,
+                      const ModulationFrame& globalModulation);
 
         /** Control names for a type, for the editor to label its knobs. */
         std::array<const char*, 3> getControlNames (Type type) const;

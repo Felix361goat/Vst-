@@ -52,6 +52,9 @@ namespace nog
         frame.setSource (mod::Source::Macro2, macros[1]);
         frame.setSource (mod::Source::Macro3, macros[2]);
         frame.setSource (mod::Source::Macro4, macros[3]);
+
+        frame.setSource (mod::Source::Motion1, motionValues[0]);
+        frame.setSource (mod::Source::Motion2, motionValues[1]);
     }
 
     void ModMatrix::apply (ModulationFrame& frame) const noexcept
@@ -93,5 +96,11 @@ namespace nog
     {
         if (juce::isPositiveAndBelow (index, ids::numMacros))
             macros[static_cast<size_t> (index)] = value;
+    }
+
+    void ModMatrix::setMotion (int index, float value) noexcept
+    {
+        if (juce::isPositiveAndBelow (index, ids::numMotions))
+            motionValues[static_cast<size_t> (index)] = value;
     }
 }

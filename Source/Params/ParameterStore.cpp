@@ -159,12 +159,44 @@ namespace nog
             f.c      = find<Float>  (apvts, ids::fx (i, ids::fxParamC));
         }
 
+        for (int i = 0; i < ids::numMotions; ++i)
+        {
+            auto& m = motion[static_cast<size_t> (i)];
+
+            m.enable = find<Bool>   (apvts, ids::motion (i, ids::motionEnable));
+            m.rate   = find<Choice> (apvts, ids::motion (i, ids::motionRate));
+            m.smooth = find<Float>  (apvts, ids::motion (i, ids::motionSmooth));
+            m.swing  = find<Float>  (apvts, ids::motion (i, ids::motionSwing));
+            m.depth  = find<Float>  (apvts, ids::motion (i, ids::motionDepth));
+
+            for (int step = 0; step < ids::numMotionSteps; ++step)
+                m.steps[static_cast<size_t> (step)] = find<Float> (apvts, ids::motionStep (i, step));
+        }
+
         // -- modulation destination table -----------------------------------
         // Virtual destinations (pitch) stay null on purpose; see mod::isVirtual.
         auto setDest = [this] (mod::Dest d, juce::RangedAudioParameter* p)
         {
             destinations[static_cast<size_t> (d)] = p;
         };
+
+        // The effect slots are laid out four destinations at a time in the same
+        // order as the slots themselves, so this one is derived rather than
+        // spelled out - twenty-four lines of it would be worse, not clearer.
+        for (int i = 0; i < ids::numFxSlots; ++i)
+        {
+            const auto base = static_cast<int> (mod::Dest::Fx1Mix) + i * 4;
+            const auto& f = fx[static_cast<size_t> (i)];
+
+            setDest (static_cast<mod::Dest> (base + 0), f.mix);
+            setDest (static_cast<mod::Dest> (base + 1), f.a);
+            setDest (static_cast<mod::Dest> (base + 2), f.b);
+            setDest (static_cast<mod::Dest> (base + 3), f.c);
+        }
+
+        static_assert (static_cast<int> (mod::Dest::Fx1Mix) + ids::numFxSlots * 4
+                           == static_cast<int> (mod::Dest::Count),
+                       "The effect destinations must be the last block in mod::Dest");
 
         // Spelled out per oscillator rather than derived by arithmetic on the
         // enum, so that reordering mod::Dest cannot silently rewire the matrix.

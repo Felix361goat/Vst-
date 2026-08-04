@@ -115,6 +115,17 @@ namespace nog
             juce::AudioParameterChoice* via     = nullptr;
         };
 
+        struct MotionSlot
+        {
+            juce::AudioParameterBool*   enable = nullptr;
+            juce::AudioParameterChoice* rate   = nullptr;
+            juce::AudioParameterFloat*  smooth = nullptr;
+            juce::AudioParameterFloat*  swing  = nullptr;
+            juce::AudioParameterFloat*  depth  = nullptr;
+
+            std::array<juce::AudioParameterFloat*, ids::numMotionSteps> steps {};
+        };
+
         struct Effect
         {
             juce::AudioParameterBool*   enable = nullptr;
@@ -170,6 +181,7 @@ namespace nog
         std::array<Lfo,        ids::numLfos>        lfo;
         std::array<ModSlot,    ids::numMatrixSlots> matrix;
         std::array<Effect,     ids::numFxSlots>     fx;
+        std::array<MotionSlot, ids::numMotions>     motion;
         std::array<juce::AudioParameterFloat*, ids::numMacros> macro {};
 
         Sub    sub;

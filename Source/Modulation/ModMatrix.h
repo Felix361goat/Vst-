@@ -83,6 +83,11 @@ namespace nog
         float getModulationDepth (mod::Dest dest) const noexcept;
 
         void setMacro (int index, float value) noexcept;
+
+        /** The global step patterns' current levels. Held here so that voices
+            see them alongside the macros: Motion exists to drive the effects
+            rack, but there is no reason a voice should not use it too. */
+        void setMotion (int index, float value) noexcept;
         void setModWheel (float value) noexcept     { modWheel = value; }
         void setPitchBend (float value) noexcept    { pitchBend = value; }
         void setAftertouch (float value) noexcept   { aftertouch = value; }
@@ -96,7 +101,8 @@ namespace nog
         // thread; it can only ever hold numMatrixSlots entries.
         std::vector<Routing> routings;
 
-        std::array<float, ids::numMacros> macros {};
+        std::array<float, ids::numMacros>  macros {};
+        std::array<float, ids::numMotions> motionValues {};
         float modWheel   = 0.0f;
         float pitchBend  = 0.0f;
         float aftertouch = 0.0f;

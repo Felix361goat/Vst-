@@ -1,6 +1,7 @@
 #include "Engine/SynthEngine.h"
 
 #include "DSP/WavetableBank.h"
+#include "Params/ParameterLayout.h"
 
 namespace nog
 {
@@ -158,6 +159,9 @@ namespace nog
         effects.prepare (spec);
 
         limiter.prepare (sampleRate, numChannels);
+
+        for (auto& motion : motions)
+            motion.prepare (sampleRate);
 
         masterGain.reset (sampleRate, 0.02);
         masterGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (parameters.masterGain->get()));
@@ -486,7 +490,42 @@ namespace nog
         oversampler->processSamplesDown (outputBlock);
     }
 
-    void SynthEngine::process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, double bpm)
+    void SynthEngine::updateGlobalModulation (int numSamples, double bpm, double positionInBeats)
+    {
+        for (int i = 0; i < ids::numMotions; ++i)
+        {
+            const auto& p = parameters.motion[static_cast<size_t> (i)];
+
+            Motion::Settings settings;
+            settings.enabled  = p.enable->get();
+            settings.division = p.rate->getIndex();
+            settings.smooth   = p.smooth->get();
+            settings.swing    = p.swing->get();
+            settings.depth    = p.depth->get();
+
+            for (int step = 0; step < ids::numMotionSteps; ++step)
+                settings.steps[static_cast<size_t> (step)] = p.steps[static_cast<size_t> (step)]->get();
+
+            const auto beatsPerStep = params::choices::tempoDivisionInBeats (settings.division);
+            const auto value = motions[static_cast<size_t> (i)].advance (numSamples, bpm, positionInBeats,
+                                                                        settings, beatsPerStep);
+
+            // Published to the matrix so voices see it too, not only the
+            // effects rack: a pattern on the filter cutoff is as useful as one
+            // on a delay mix.
+            matrix.setMotion (i, value);
+        }
+
+        // Macros, the MIDI controllers and the patterns themselves, so a
+        // routing from any of them into an effect works with no extra plumbing.
+        matrix.applyGlobalSources (globalFrame);
+
+        globalFrame.clearOffsets();
+        matrix.apply (globalFrame);
+    }
+
+    void SynthEngine::process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                               double bpm, double positionInBeats)
     {
         matrix.refresh (parameters);
 
@@ -511,11 +550,21 @@ namespace nog
 
         const auto numSamples = buffer.getNumSamples();
 
+        // Before the voices, so a pattern reaches both them and the rack in the
+        // same block rather than one being a block behind the other.
+        updateGlobalModulation (numSamples, bpm, positionInBeats);
+
         renderVoicesOversampled (buffer, midiMessages, bpm);
 
-        effects.process (buffer, parameters);
+        effects.process (buffer, parameters, globalFrame);
 
-        masterGain.setTargetValue (juce::Decibels::decibelsToGain (parameters.masterGain->get()));
+        // Modulated rather than read straight off the parameter, so a step
+        // pattern on the master level actually gates - which is the oldest
+        // trick in dance music and was not previously possible.
+        const auto gainDecibels = parameters.modulated (mod::Dest::MasterGain,
+                                                        globalFrame.getOffset (mod::Dest::MasterGain));
+
+        masterGain.setTargetValue (juce::Decibels::decibelsToGain (gainDecibels));
         masterGain.applyGain (buffer, numSamples);
 
         // After the master gain, so the ceiling means what it says whatever the

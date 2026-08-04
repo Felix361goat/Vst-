@@ -202,7 +202,7 @@ namespace nog
           topBar (processorToUse),
           fxPanel (processorToUse.getValueTreeState(), processorToUse.getEngine().getEffects()),
           matrixPanel (processorToUse.getValueTreeState()),
-          modulators (processorToUse.getValueTreeState(), processorToUse.getEngine().getModMatrix()),
+          modulators (processorToUse, processorToUse.getEngine().getModMatrix()),
           macros (processorToUse.getValueTreeState())
     {
         setLookAndFeel (&lookAndFeel);

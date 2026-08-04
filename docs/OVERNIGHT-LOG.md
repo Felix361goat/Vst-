@@ -66,3 +66,53 @@ the host as latency; switching it off removes both.
 Three tests: that a signal ten times over the ceiling still comes out at the
 ceiling, that a quiet signal passes at exactly its own level, and that a
 zero-ramp full-scale burst does not slip past.
+
+## On the pitch-shifter idea
+
+Same answer as ShaperBox, for the same reason: shifting the pitch of an audio
+file is something you do to a file, not to a note a synthesiser is playing, so
+it wants to be an audio-effect plugin rather than part of an instrument.
+
+Worth knowing though: NOG Suite already pitches a loaded sample across the whole
+keyboard, with Catmull-Rom interpolation and per-voice mip selection rather than
+the nearest-neighbour resampling a naive sampler does. For one-shots and chops
+that is often all that is wanted, and it is already better than dragging a clip.
+
+What it does *not* do is hold the length while changing the pitch, or hold the
+formants while changing both. Those need a phase vocoder or PSOLA, which is a
+real piece of DSP and belongs in the separate plugin along with the rhythmic
+effects — they would share most of their machinery.
+
+### Motion: global step patterns, and an effects rack that can be modulated
+
+Two things were missing, and they were the same thing seen from either end.
+Effect parameters could not be modulated at all — the one part of the synth
+where movement matters most. And every LFO was per-voice, so even if they could
+have been, thirty-two voices would each have had their own opinion about the
+mix of a single delay.
+
+Motion is a tempo-locked eight-step pattern that belongs to the instrument
+rather than to a note. Two of them, each with rate, smoothing, swing and depth.
+A step sequencer rather than a waveform, because that is what makes a part
+sound sequenced instead of merely wobbling: a gate on an effect mix, a filter
+moving in sixteenths, a pan that hops.
+
+The clock comes from the host playhead rather than being counted locally, so a
+pattern stays locked to the bar however the transport is scrubbed or looped.
+With the transport stopped it free runs, so patches still audition properly.
+
+Wired through:
+- Twenty-four new modulation destinations, four per effect slot.
+- A global modulation frame the rack resolves its parameters through.
+- Motion published into the matrix alongside the macros, so voices see it too.
+- Master gain now read through the modulation rather than straight off the
+  parameter, which is what makes a trance gate possible at all.
+- A MOTION tab per pattern in the modulators panel: eight vertical sliders and
+  three knobs.
+
+Ten patches use it, from a straight trance gate to two patterns running against
+each other at different rates.
+
+Tests: that the step reported is a function of the host position and survives a
+backwards jump, that a pattern is audible on an effect, and that it gates the
+master level.

@@ -650,7 +650,8 @@ namespace nog::fx
         return slots[0].effects[static_cast<size_t> (index)]->getControlNames();
     }
 
-    void FXChain::process (juce::AudioBuffer<float>& buffer, const ParameterStore& parameters)
+    void FXChain::process (juce::AudioBuffer<float>& buffer, const ParameterStore& parameters,
+                           const ModulationFrame& globalModulation)
     {
         const auto numChannels = buffer.getNumChannels();
         const auto numSamples  = buffer.getNumSamples();
@@ -669,11 +670,21 @@ namespace nog::fx
 
             auto& effect = slots[static_cast<size_t> (i)].effects[static_cast<size_t> (type)];
 
-            effect->setParameters (slotParameters.a->get(),
-                                   slotParameters.b->get(),
-                                   slotParameters.c->get());
+            // Modulated per block rather than per sample: an effect that
+            // rebuilt its coefficients every sample would cost more than the
+            // effect itself, and a block is short enough that a step pattern
+            // still lands where it should.
+            const auto base = static_cast<int> (mod::Dest::Fx1Mix) + i * 4;
 
-            const auto mix = slotParameters.mix->get();
+            const auto valueOf = [&parameters, &globalModulation] (int destination)
+            {
+                const auto dest = static_cast<mod::Dest> (destination);
+                return parameters.modulated (dest, globalModulation.getOffset (dest));
+            };
+
+            effect->setParameters (valueOf (base + 1), valueOf (base + 2), valueOf (base + 3));
+
+            const auto mix = valueOf (base + 0);
 
             // Effects run fully wet and the mix is applied here, which keeps
             // every slot's mix control behaving identically.

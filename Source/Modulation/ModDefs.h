@@ -29,6 +29,7 @@ namespace nog::mod
         Aftertouch,
         Random,
         Macro1, Macro2, Macro3, Macro4,
+        Motion1, Motion2,
         Count
     };
 
@@ -47,6 +48,16 @@ namespace nog::mod
         Lfo1Rate, Lfo2Rate, Lfo3Rate, Lfo4Rate,
 
         MasterGain,
+
+        // The effects rack. Global rather than per-voice: the rack runs once on
+        // the summed output, so only a source that belongs to the instrument
+        // rather than to a note can drive it.
+        Fx1Mix, Fx1A, Fx1B, Fx1C,
+        Fx2Mix, Fx2A, Fx2B, Fx2C,
+        Fx3Mix, Fx3A, Fx3B, Fx3C,
+        Fx4Mix, Fx4A, Fx4B, Fx4C,
+        Fx5Mix, Fx5A, Fx5B, Fx5C,
+        Fx6Mix, Fx6A, Fx6B, Fx6C,
         Count
     };
 
@@ -66,7 +77,8 @@ namespace nog::mod
             "Pitch Bend",
             "Aftertouch",
             "Random",
-            "Macro 1", "Macro 2", "Macro 3", "Macro 4"
+            "Macro 1", "Macro 2", "Macro 3", "Macro 4",
+            "Motion 1", "Motion 2"
         };
         static_assert (names.size() == static_cast<size_t> (numSources),
                        "Source enum and sourceNames() table have drifted apart");
@@ -91,7 +103,14 @@ namespace nog::mod
 
             "LFO 1 Rate", "LFO 2 Rate", "LFO 3 Rate", "LFO 4 Rate",
 
-            "Master Gain"
+            "Master Gain",
+
+            "FX 1 Mix", "FX 1 A", "FX 1 B", "FX 1 C",
+            "FX 2 Mix", "FX 2 A", "FX 2 B", "FX 2 C",
+            "FX 3 Mix", "FX 3 A", "FX 3 B", "FX 3 C",
+            "FX 4 Mix", "FX 4 A", "FX 4 B", "FX 4 C",
+            "FX 5 Mix", "FX 5 A", "FX 5 B", "FX 5 C",
+            "FX 6 Mix", "FX 6 A", "FX 6 B", "FX 6 C"
         };
         static_assert (names.size() == static_cast<size_t> (numDests),
                        "Dest enum and destNames() table have drifted apart");
@@ -130,6 +149,22 @@ namespace nog::mod
     inline constexpr bool isVirtual (Dest d) noexcept
     {
         return d == Dest::Osc1Pitch || d == Dest::Osc2Pitch;
+    }
+
+    /** True for destinations that live outside the voices.
+
+        The effects rack processes the summed output once per block, so a voice
+        has nothing to say about it - thirty-two of them would each have their
+        own opinion. These are resolved from a single global modulation frame
+        instead, and a routing into one of them from a per-voice source such as
+        an envelope simply contributes nothing.
+    */
+    inline constexpr bool isGlobal (Dest d) noexcept
+    {
+        const auto value = static_cast<int> (d);
+
+        return value >= static_cast<int> (Dest::Fx1Mix)
+            && value <= static_cast<int> (Dest::Fx6C);
     }
 
     /** Modulation range of a virtual destination at an amount of 1.0.

@@ -102,12 +102,27 @@ namespace nog
 
         auto bpm = 120.0;
 
+        // Negative means the transport is not running, which tells the motion
+        // patterns to free run rather than sit frozen on step one.
+        auto positionInBeats = -1.0;
+
         if (auto* transport = getPlayHead())
+        {
             if (const auto position = transport->getPosition())
+            {
                 if (const auto hostBpm = position->getBpm())
                     bpm = *hostBpm;
 
-        engine.process (buffer, midiMessages, bpm);
+                // Taken from the playhead rather than accumulated locally, so a
+                // pattern stays locked to the bar however the transport is
+                // scrubbed, looped or restarted.
+                if (position->getIsPlaying())
+                    if (const auto beats = position->getPpqPosition())
+                        positionInBeats = *beats;
+            }
+        }
+
+        engine.process (buffer, midiMessages, bpm, positionInBeats);
 
         // The oversampling setting can change between blocks, and with it the
         // reported latency.

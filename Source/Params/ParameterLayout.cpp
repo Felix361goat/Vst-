@@ -205,6 +205,33 @@ namespace nog::params
             return g;
         }
 
+        std::unique_ptr<Group> buildMotionGroup (int index)
+        {
+            const auto number = juce::String (index + 1);
+            auto g = group ("motion" + number, "Motion " + number);
+
+            g->addChild (boolParam   (ids::motion (index, ids::motionEnable),
+                                      "Motion " + number + " On", false),
+                         choiceParam (ids::motion (index, ids::motionRate),
+                                      "Motion " + number + " Rate", choices::tempoDivisions(), 7),
+                         floatParam  (ids::motion (index, ids::motionSmooth),
+                                      "Motion " + number + " Smooth", linear (0.0f, 1.0f), 0.0f, fmtPercent),
+                         floatParam  (ids::motion (index, ids::motionSwing),
+                                      "Motion " + number + " Swing", linear (0.0f, 1.0f), 0.0f, fmtPercent),
+                         floatParam  (ids::motion (index, ids::motionDepth),
+                                      "Motion " + number + " Depth", linear (0.0f, 1.0f), 1.0f, fmtPercent));
+
+            // A pattern that starts flat and full does nothing until it is
+            // drawn, which is the right default: switching Motion on should not
+            // change the sound until a shape has been asked for.
+            for (int step = 0; step < ids::numMotionSteps; ++step)
+                g->addChild (floatParam (ids::motionStep (index, step),
+                                         "Motion " + number + " Step " + juce::String (step + 1),
+                                         linear (0.0f, 1.0f), 1.0f, fmtPercent));
+
+            return g;
+        }
+
         std::unique_ptr<Group> buildOscillatorGroup (int index)
         {
             const auto number = juce::String (index + 1);
@@ -419,6 +446,9 @@ namespace nog::params
         Layout layout;
 
         layout.add (buildGlobalGroup(), buildArpGroup());
+
+        for (int i = 0; i < ids::numMotions; ++i)
+            layout.add (buildMotionGroup (i));
 
         for (int i = 0; i < ids::numOscillators; ++i)
             layout.add (buildOscillatorGroup (i));

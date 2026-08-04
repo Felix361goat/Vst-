@@ -29,6 +29,15 @@ namespace nog::ids
     inline constexpr int numMatrixSlots = 16;
     inline constexpr int numFxSlots     = 6;
 
+    /** Global step-pattern modulators. Two is enough to move an effect and the
+        filter against each other without turning the panel into a spreadsheet. */
+    inline constexpr int numMotions     = 2;
+
+    /** Steps in a motion pattern. Sixteen would be a bar of semiquavers, but
+        eight covers the rhythms that actually get used and keeps the parameter
+        count and the panel honest. */
+    inline constexpr int numMotionSteps = 8;
+
     // -- helpers ------------------------------------------------------------
     /** Builds "osc1_level" style IDs. @p index is zero-based, IDs are one-based. */
     inline juce::String indexed (juce::StringRef prefix, int index, juce::StringRef suffix)
@@ -42,6 +51,13 @@ namespace nog::ids
     inline juce::String matrix (int i, juce::StringRef p) { return indexed ("mod", i, p); }
     inline juce::String fx     (int i, juce::StringRef p) { return indexed ("fx",  i, p); }
     inline juce::String macro  (int i)                    { return "macro" + juce::String (i + 1); }
+    inline juce::String motion (int i, juce::StringRef p) { return indexed ("motion", i, p); }
+
+    /** "motion1_step3" - one level per step of the pattern. */
+    inline juce::String motionStep (int i, int step)
+    {
+        return motion (i, "step" + juce::String (step + 1));
+    }
 
     // -- global -------------------------------------------------------------
     inline constexpr const char* masterGain     = "master_gain";
@@ -52,6 +68,13 @@ namespace nog::ids
     inline constexpr const char* pitchBendRange = "bend_range";
     inline constexpr const char* velocitySens   = "velocity_sens";
     inline constexpr const char* limiter        = "limiter";
+
+    // -- motion -------------------------------------------------------------
+    inline constexpr const char* motionEnable = "on";
+    inline constexpr const char* motionRate   = "rate";     // tempo division index
+    inline constexpr const char* motionSmooth = "smooth";
+    inline constexpr const char* motionSwing  = "swing";
+    inline constexpr const char* motionDepth  = "depth";
     inline constexpr const char* oversampling   = "oversampling";
 
     // -- arpeggiator --------------------------------------------------------

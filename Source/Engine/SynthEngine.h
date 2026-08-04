@@ -9,6 +9,7 @@
 #include "DSP/Limiter.h"
 #include "FX/FXChain.h"
 #include "Modulation/ModMatrix.h"
+#include "Modulation/Motion.h"
 #include "Params/ParameterStore.h"
 
 namespace nog
@@ -35,7 +36,17 @@ namespace nog
         void reset();
 
         /** Renders one block. @p buffer is expected to be cleared already. */
-        void process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages, double bpm);
+        void process (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                      double bpm, double positionInBeats = -1.0);
+
+        /** The value each motion pattern is currently putting out, for the
+            editor to draw. */
+        float getMotionValue (int index) const noexcept
+        {
+            return juce::isPositiveAndBelow (index, ids::numMotions)
+                       ? motions[static_cast<size_t> (index)].getValue()
+                       : 0.0f;
+        }
 
         int getActiveVoiceCount() const noexcept;
 
@@ -99,6 +110,15 @@ namespace nog
         ModMatrix          matrix;
         fx::FXChain        effects;
         dsp::Limiter       limiter;
+
+        /** Global step patterns and the frame they feed. The effects rack runs
+            once on the summed output, so its modulation cannot come from a
+            voice - it comes from here. */
+        /** Advances the patterns and applies the matrix into globalFrame. */
+        void updateGlobalModulation (int numSamples, double bpm, double positionInBeats);
+
+        std::array<Motion, ids::numMotions> motions;
+        ModulationFrame                     globalFrame;
         dsp::SampleLibrary samples;
         Arpeggiator        arpeggiator;
 

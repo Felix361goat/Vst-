@@ -260,6 +260,35 @@ namespace nog::presets
             return set (ids::fx (slot, ids::fxParamC), c);
         }
 
+        /** Switches on a global step pattern. @p division indexes
+            tempoDivisions(); the levels are one per step, 0..1. */
+        Build& motion (int index, int division, std::initializer_list<float> levels,
+                       float smooth = 0.0f, float swing = 0.0f, float depth = 1.0f)
+        {
+            set (ids::motion (index, ids::motionEnable), 1.0f);
+            set (ids::motion (index, ids::motionRate), static_cast<float> (division));
+            set (ids::motion (index, ids::motionSmooth), smooth);
+            set (ids::motion (index, ids::motionSwing), swing);
+            set (ids::motion (index, ids::motionDepth), depth);
+
+            auto step = 0;
+
+            for (const auto level : levels)
+            {
+                if (step >= ids::numMotionSteps)
+                    break;
+
+                set (ids::motionStep (index, step++), level);
+            }
+
+            // Anything the caller did not name stays open, so a short pattern
+            // gates rather than silences the rest of the bar.
+            while (step < ids::numMotionSteps)
+                set (ids::motionStep (index, step++), 1.0f);
+
+            return *this;
+        }
+
         /** Turns the arpeggiator on. @p division indexes tempoDivisions();
             7 is a sixteenth, 6 an eighth. */
         Build& arp (int mode, int division, int octaves = 1, float gate = 0.5f, float swing = 0.0f)

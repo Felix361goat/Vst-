@@ -16,6 +16,7 @@
 #include "Engine/SynthEngine.h"
 #include "DSP/Envelope.h"
 #include "DSP/Limiter.h"
+#include "Modulation/Motion.h"
 #include "DSP/Oscillator.h"
 #include "DSP/Wavetable.h"
 #include "DSP/WavetableBank.h"
@@ -721,6 +722,161 @@ namespace
                                 "effect type " + juce::String (type) + " produced bad samples");
                     }
                 }
+            }
+
+            beginTest ("a motion pattern lands on the beat the host is at");
+            {
+                // The clock comes from the playhead rather than being counted
+                // locally, so that a pattern stays put when the transport is
+                // scrubbed or looped. That only works if the step it reports is
+                // a function of the host position, which is what this checks.
+                nog::Motion motion;
+                motion.prepare (testSampleRate);
+
+                nog::Motion::Settings settings;
+                settings.enabled = true;
+                settings.depth   = 1.0f;
+                settings.smooth  = 0.0f;
+
+                // Alternating full and silent, so the step is unambiguous.
+                for (int i = 0; i < nog::ids::numMotionSteps; ++i)
+                    settings.steps[static_cast<size_t> (i)] = i % 2 == 0 ? 1.0f : 0.0f;
+
+                constexpr double beatsPerStep = 1.0;
+
+                for (int beat = 0; beat < 8; ++beat)
+                {
+                    const auto value = motion.advance (64, 120.0, static_cast<double> (beat),
+                                                       settings, beatsPerStep);
+
+                    expectWithinAbsoluteError (value, beat % 2 == 0 ? 1.0f : 0.0f, 0.01f);
+                }
+
+                // Jumping backwards, as a loop does, must give the same answer
+                // rather than continuing from wherever a local counter had got to.
+                const auto afterJump = motion.advance (64, 120.0, 2.0, settings, beatsPerStep);
+                expectWithinAbsoluteError (afterJump, 1.0f, 0.01f);
+            }
+
+            beginTest ("a motion pattern gates the master level");
+            {
+                // The oldest trick in dance music, and it only works if the
+                // master gain is read through the modulation rather than
+                // straight off the parameter.
+                TestProcessor processor;
+                processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                auto& motion = processor.parameters.motion[0];
+                motion.enable->setValueNotifyingHost (1.0f);
+                motion.depth->setValueNotifyingHost (1.0f);
+                motion.smooth->setValueNotifyingHost (0.0f);
+
+                // Fully closed everywhere: with the routing set to pull the
+                // level down, the output has to collapse.
+                for (int i = 0; i < nog::ids::numMotionSteps; ++i)
+                    motion.steps[static_cast<size_t> (i)]->setValueNotifyingHost (0.0f);
+
+                auto& route = processor.parameters.matrix[0];
+                route.enabled->setValueNotifyingHost (1.0f);
+                route.source->setValueNotifyingHost (route.source->convertTo0to1 (
+                    static_cast<float> (nog::mod::Source::Motion1)));
+                route.dest->setValueNotifyingHost (route.dest->convertTo0to1 (
+                    static_cast<float> (nog::mod::Dest::MasterGain)));
+                route.amount->setValueNotifyingHost (route.amount->convertTo0to1 (1.0f));
+                route.bipolar->setValueNotifyingHost (1.0f);
+
+                const auto peakOf = [&processor]
+                {
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+                    auto peak = 0.0f;
+
+                    for (int block = 0; block < 24; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        if (block >= 8)
+                            peak = juce::jmax (peak, buffer.getMagnitude (0, testBlockSize));
+                    }
+
+                    return peak;
+                };
+
+                const auto closed = peakOf();
+
+                // Fully open, same routing: the level comes back.
+                for (int i = 0; i < nog::ids::numMotionSteps; ++i)
+                    motion.steps[static_cast<size_t> (i)]->setValueNotifyingHost (1.0f);
+
+                processor.engine.reset();
+                const auto open = peakOf();
+
+                expect (open > closed * 2.0f,
+                        "the pattern should gate the level: open " + juce::String (open, 5)
+                            + " against closed " + juce::String (closed, 5));
+            }
+
+            beginTest ("a motion pattern drives an effect");
+            {
+                // The whole reason Motion exists: the effects rack runs once on
+                // the summed output, so no per-voice modulator can reach it.
+                TestProcessor processor;
+                processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                auto& slot = processor.parameters.fx[0];
+                slot.enable->setValueNotifyingHost (1.0f);
+                slot.type->setValueNotifyingHost (slot.type->convertTo0to1 (
+                    static_cast<float> (nog::fx::FXChain::Type::BitCrusher)));
+                slot.mix->setValueNotifyingHost (0.0f);
+
+                auto& motion = processor.parameters.motion[0];
+                motion.enable->setValueNotifyingHost (1.0f);
+                motion.depth->setValueNotifyingHost (1.0f);
+
+                for (int i = 0; i < nog::ids::numMotionSteps; ++i)
+                    motion.steps[static_cast<size_t> (i)]->setValueNotifyingHost (1.0f);
+
+                auto& route = processor.parameters.matrix[0];
+                route.enabled->setValueNotifyingHost (1.0f);
+                route.source->setValueNotifyingHost (route.source->convertTo0to1 (
+                    static_cast<float> (nog::mod::Source::Motion1)));
+                route.dest->setValueNotifyingHost (route.dest->convertTo0to1 (
+                    static_cast<float> (nog::mod::Dest::Fx1Mix)));
+                route.amount->setValueNotifyingHost (route.amount->convertTo0to1 (1.0f));
+
+                const auto render = [&processor]
+                {
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+                    auto total = 0.0;
+
+                    for (int block = 0; block < 16; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        for (int i = 0; i < testBlockSize; ++i)
+                            total += std::abs (static_cast<double> (buffer.getSample (0, i)));
+                    }
+
+                    return total;
+                };
+
+                const auto withMotion = render();
+
+                motion.enable->setValueNotifyingHost (0.0f);
+                processor.engine.reset();
+
+                const auto without = render();
+
+                expect (std::abs (withMotion - without) > 1.0,
+                        "the pattern should be audible on the effect: "
+                            + juce::String (withMotion, 3) + " against " + juce::String (without, 3));
             }
 
             beginTest ("the limiter holds the ceiling and is transparent below it");

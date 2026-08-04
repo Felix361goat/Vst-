@@ -104,11 +104,45 @@ namespace nog::ui
         juce::Label help;
     };
 
+    /**
+        One global step pattern.
+
+        Eight vertical sliders and four knobs. The sliders are the pattern - a
+        gate on an effect mix, a filter that moves in sixteenths - and drawing
+        one is the whole interaction, so they get most of the panel.
+    */
+    class MotionPanel final : public juce::Component,
+                              private juce::Timer
+    {
+    public:
+        MotionPanel (NogSuiteProcessor& processor, int index);
+
+        void paint (juce::Graphics& g) override;
+        void resized() override;
+
+    private:
+        void timerCallback() override;
+
+        NogSuiteProcessor& processor;
+        int motionIndex;
+
+        ToggleBox enable;
+        ChoiceBox rate;
+        Knob smooth, swing, depth;
+
+        std::array<std::unique_ptr<juce::Slider>, ids::numMotionSteps> steps;
+        std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>,
+                   ids::numMotionSteps> stepAttachments;
+
+        /** Which step is sounding, so the panel shows the pattern running. */
+        int playingStep = -1;
+    };
+
     /** Tabbed container holding every envelope and LFO. */
     class ModulatorsPanel final : public juce::Component
     {
     public:
-        ModulatorsPanel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix);
+        ModulatorsPanel (NogSuiteProcessor& processor, const ModMatrix& matrix);
 
         void resized() override;
 
@@ -117,6 +151,7 @@ namespace nog::ui
 
         std::array<std::unique_ptr<EnvelopePanel>, ids::numEnvelopes> envelopes;
         std::array<std::unique_ptr<LfoPanel>,      ids::numLfos>      lfos;
+        std::array<std::unique_ptr<MotionPanel>, ids::numMotions> motions;
         MidiSourcesPanel midiSources;
     };
 }
