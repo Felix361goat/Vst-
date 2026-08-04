@@ -51,6 +51,7 @@ namespace nog::ids
     inline constexpr const char* glideMode      = "glide_mode";      // off / always / legato
     inline constexpr const char* pitchBendRange = "bend_range";
     inline constexpr const char* velocitySens   = "velocity_sens";
+    inline constexpr const char* limiter        = "limiter";
     inline constexpr const char* oversampling   = "oversampling";
 
     // -- arpeggiator --------------------------------------------------------

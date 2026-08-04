@@ -154,6 +154,7 @@ namespace nog
         juce::AudioParameterInt*    pitchBendRange = nullptr;
         juce::AudioParameterFloat*  velocitySens   = nullptr;
         juce::AudioParameterChoice* oversampling   = nullptr;
+        juce::AudioParameterBool*   limiterEnable = nullptr;
 
         // -- arpeggiator ----------------------------------------------------
         juce::AudioParameterBool*   arpEnable  = nullptr;

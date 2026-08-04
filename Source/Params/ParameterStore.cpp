@@ -41,6 +41,7 @@ namespace nog
         pitchBendRange = find<Int>    (apvts, ids::pitchBendRange);
         velocitySens   = find<Float>  (apvts, ids::velocitySens);
         oversampling   = find<Choice> (apvts, ids::oversampling);
+        limiterEnable  = find<Bool>   (apvts, ids::limiter);
 
         arpEnable  = find<Bool>   (apvts, ids::arpEnable);
         arpMode    = find<Choice> (apvts, ids::arpMode);

@@ -107,6 +107,7 @@ namespace nog::ui
 
     private:
         ChoiceBox voiceMode, glideMode, oversampling;
+        ToggleBox limiter;
         Knob polyphony, glideTime, bendRange, velocitySens;
         juce::Label help;
     };

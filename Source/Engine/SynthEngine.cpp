@@ -43,10 +43,18 @@ namespace nog
 
     int SynthEngine::getLatencySamples() noexcept
     {
-        if (auto* oversampler = getActiveOversampler())
-            return juce::roundToInt (oversampler->getLatencyInSamples());
+        auto latency = 0;
 
-        return 0;
+        if (auto* oversampler = getActiveOversampler())
+            latency += juce::roundToInt (oversampler->getLatencyInSamples());
+
+        // The limiter looks ahead, so it holds the signal back. Reporting that
+        // is what lets the host line the plugin up with everything else; a
+        // silently late synth is worse than a slightly delayed one.
+        if (parameters.limiterEnable != nullptr && parameters.limiterEnable->get())
+            latency += limiter.getLatencySamples();
+
+        return latency;
     }
 
     Arpeggiator::Settings SynthEngine::getArpSettings() const
@@ -148,6 +156,8 @@ namespace nog
         spec.numChannels      = static_cast<juce::uint32> (numChannels);
 
         effects.prepare (spec);
+
+        limiter.prepare (sampleRate, numChannels);
 
         masterGain.reset (sampleRate, 0.02);
         masterGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (parameters.masterGain->get()));
@@ -507,5 +517,10 @@ namespace nog
 
         masterGain.setTargetValue (juce::Decibels::decibelsToGain (parameters.masterGain->get()));
         masterGain.applyGain (buffer, numSamples);
+
+        // After the master gain, so the ceiling means what it says whatever the
+        // patch is set to.
+        if (parameters.limiterEnable->get())
+            limiter.process (buffer);
     }
 }

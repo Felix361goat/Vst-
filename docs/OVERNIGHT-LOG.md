@@ -45,3 +45,24 @@ synthesiser can honestly deliver.
 ---
 
 ## Changes
+
+### Output limiter on the master bus
+
+A synthesiser can produce a signal far louder than the patch implies without
+anyone having asked for it: a filter pushed into self-oscillation, a resonant
+sweep landing on a fundamental, sixteen voices of a patch written for four.
+Startling at best, and genuinely dangerous on headphones.
+
+Look-ahead peak limiting at −1 dBFS rather than a clipper. The delay line holds
+the signal back by the attack time, so the gain is already down when the peak
+arrives — it catches the transient rather than letting the front of it through,
+and adds no harmonics doing so. Below the ceiling it is unity gain and does
+nothing, which is the normal case.
+
+On by default, because the situation it exists for is exactly the one where
+nobody thought to switch it on first. The 1.5 ms of look-ahead is reported to
+the host as latency; switching it off removes both.
+
+Three tests: that a signal ten times over the ceiling still comes out at the
+ceiling, that a quiet signal passes at exactly its own level, and that a
+zero-ramp full-scale burst does not slip past.

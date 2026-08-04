@@ -6,6 +6,7 @@
 #include "Engine/Voice.h"
 #include "DSP/SampleLibrary.h"
 #include "Engine/Arpeggiator.h"
+#include "DSP/Limiter.h"
 #include "FX/FXChain.h"
 #include "Modulation/ModMatrix.h"
 #include "Params/ParameterStore.h"
@@ -97,6 +98,7 @@ namespace nog
         ParameterStore&    parameters;
         ModMatrix          matrix;
         fx::FXChain        effects;
+        dsp::Limiter       limiter;
         dsp::SampleLibrary samples;
         Arpeggiator        arpeggiator;
 

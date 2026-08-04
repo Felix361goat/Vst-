@@ -181,7 +181,12 @@ namespace nog::params
                          intParam (ids::pitchBendRange, "Bend Range", 0, 24, 2),
                          floatParam (ids::velocitySens, "Velocity Sens",
                                      linear (0.0f, 1.0f), 0.75f, fmtPercent),
-                         choiceParam (ids::oversampling, "Oversampling", choices::oversamplingModes(), 0));
+                         choiceParam (ids::oversampling, "Oversampling", choices::oversamplingModes(), 0),
+                         // On by default. It is a safety device, and the case it
+                         // exists for - a filter driven into self-oscillation -
+                         // is exactly the case where nobody thought to switch it
+                         // on beforehand.
+                         boolParam (ids::limiter, "Limiter", true));
 
             return g;
         }

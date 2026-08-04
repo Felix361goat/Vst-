@@ -15,6 +15,7 @@
 #include "Engine/Arpeggiator.h"
 #include "Engine/SynthEngine.h"
 #include "DSP/Envelope.h"
+#include "DSP/Limiter.h"
 #include "DSP/Oscillator.h"
 #include "DSP/Wavetable.h"
 #include "DSP/WavetableBank.h"
@@ -720,6 +721,86 @@ namespace
                                 "effect type " + juce::String (type) + " produced bad samples");
                     }
                 }
+            }
+
+            beginTest ("the limiter holds the ceiling and is transparent below it");
+            {
+                // The point of it is that nothing gets out above the ceiling,
+                // however loud the thing arriving is. The other half matters
+                // just as much: a patch at a sensible level must pass through
+                // completely untouched, or the limiter is a tone control.
+                const auto runThrough = [this] (float amplitude)
+                {
+                    nog::dsp::Limiter limiter;
+                    limiter.prepare (testSampleRate, 2);
+
+                    juce::AudioBuffer<float> buffer (2, 4096);
+
+                    auto highest = 0.0f;
+
+                    for (int block = 0; block < 8; ++block)
+                    {
+                        for (int i = 0; i < buffer.getNumSamples(); ++i)
+                        {
+                            const auto phase = static_cast<float> (block * 4096 + i) / 128.0f;
+                            const auto value = amplitude * std::sin (phase * juce::MathConstants<float>::twoPi);
+
+                            buffer.setSample (0, i, value);
+                            buffer.setSample (1, i, value);
+                        }
+
+                        limiter.process (buffer);
+
+                        // Skip the first block: the look-ahead line starts empty,
+                        // so its output is the silence it was primed with.
+                        if (block == 0)
+                            continue;
+
+                        for (int i = 0; i < buffer.getNumSamples(); ++i)
+                        {
+                            expect (std::isfinite (buffer.getSample (0, i)));
+                            highest = juce::jmax (highest, std::abs (buffer.getSample (0, i)));
+                        }
+                    }
+
+                    return highest;
+                };
+
+                // Ten times over the ceiling still comes out at the ceiling.
+                const auto loud = runThrough (8.0f);
+                expect (loud <= nog::dsp::Limiter::ceiling * 1.02f,
+                        "a signal far over the ceiling reached " + juce::String (loud, 4));
+
+                // A quiet signal is passed at exactly its own level.
+                const auto quiet = runThrough (0.25f);
+                expectWithinAbsoluteError (quiet, 0.25f, 0.002f);
+            }
+
+            beginTest ("a transient does not slip past the limiter");
+            {
+                // Without look-ahead a limiter lets the front of a transient
+                // through while its gain is still coming down, which is exactly
+                // the part that hurts. The delay line is what prevents that, so
+                // it is worth asserting rather than assuming.
+                nog::dsp::Limiter limiter;
+                limiter.prepare (testSampleRate, 1);
+
+                juce::AudioBuffer<float> buffer (1, 2048);
+                buffer.clear();
+
+                // Silence, then a sudden full-scale burst with no ramp at all.
+                for (int i = 1024; i < 2048; ++i)
+                    buffer.setSample (0, i, i % 2 == 0 ? 6.0f : -6.0f);
+
+                limiter.process (buffer);
+
+                auto highest = 0.0f;
+
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                    highest = juce::jmax (highest, std::abs (buffer.getSample (0, i)));
+
+                expect (highest <= nog::dsp::Limiter::ceiling * 1.02f,
+                        "the transient reached " + juce::String (highest, 4));
             }
 
             beginTest ("the dimension widener widens and still folds to mono");

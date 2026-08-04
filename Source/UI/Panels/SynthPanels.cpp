@@ -341,12 +341,13 @@ namespace nog::ui
         : voiceMode    (state, ids::voiceMode, "Voice Mode"),
           glideMode    (state, ids::glideMode, "Glide Mode"),
           oversampling (state, ids::oversampling, "Oversampling"),
+          limiter      (state, ids::limiter, "LIMITER"),
           polyphony    (state, ids::polyphony, "Voices"),
           glideTime    (state, ids::glideTime, "Glide"),
           bendRange    (state, ids::pitchBendRange, "Bend Range"),
           velocitySens (state, ids::velocitySens, "Vel Sens")
     {
-        addAllChildren (*this, { &voiceMode, &glideMode, &oversampling,
+        addAllChildren (*this, { &voiceMode, &glideMode, &oversampling, &limiter,
                                  &polyphony, &glideTime, &bendRange, &velocitySens });
 
         for (auto* knob : { &polyphony, &glideTime, &bendRange, &velocitySens })
@@ -354,7 +355,8 @@ namespace nog::ui
 
         help.setText ("Oversampling runs the voices at a higher rate before downsampling, "
                       "which removes the aliasing the filter drive would otherwise produce. "
-                      "It costs CPU in proportion.",
+                      "It costs CPU in proportion. The limiter is a safety device on the "
+                      "output: below -1 dBFS it does nothing at all.",
                       juce::dontSendNotification);
         help.setFont (juce::Font (juce::FontOptions (11.0f)));
         help.setColour (juce::Label::textColourId, colours::dimText);
@@ -366,7 +368,9 @@ namespace nog::ui
     {
         auto bounds = getLocalBounds();
 
-        layoutRow (bounds.removeFromTop (44), { &voiceMode, &glideMode, &oversampling }, 6);
+        auto top = bounds.removeFromTop (44);
+        limiter.setBounds (top.removeFromRight (86).reduced (2, 4));
+        layoutRow (top, { &voiceMode, &glideMode, &oversampling }, 6);
         bounds.removeFromTop (8);
         layoutRow (bounds.removeFromTop (knobRowHeight), { &polyphony, &glideTime, &bendRange, &velocitySens });
         bounds.removeFromTop (10);
