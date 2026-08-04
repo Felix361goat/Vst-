@@ -38,6 +38,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/State/Presets/RetroPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/AfroPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/MotionPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/WorldPresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES

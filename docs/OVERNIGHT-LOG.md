@@ -154,3 +154,27 @@ the two apart. Verified against a screenshot.
 
 A test renders the same patch both ways and asserts parallel passes far more
 than serial, which is the audible consequence of the difference.
+
+### Twelve more modelled instruments, and the patches for them
+
+Reeds and pipes (harmonium, accordion, pipe organ), horns (trumpet,
+saxophone), a shakuhachi that is mostly breath, four more plucked and struck
+sources (banjo, koto, hammered dulcimer, celesta), and two hand drums.
+
+The drums needed a new model. A membrane is not a bar or a string: its modes
+follow the zeros of a Bessel function, at 1.59, 2.14, 2.30 and so on rather
+than at whole multiples. That is why an undamped drum has no clear pitch — and
+why a tabla, which is built to suppress most of those modes, does.
+
+Appended to the end of the bank so no existing patch's sample index moved.
+Fifty-four generated sources now, every pitched one checked against the note it
+declares.
+
+Twenty-five patches, several of which are the first real use of the second
+filter and the modulation curves:
+- A muted trumpet is a band-pass — a harmon mute takes the bottom out as much
+  as the top, which is why one cuts through without being loud.
+- A close-miked djembe is the *parallel* case: a low-pass keeping the body and
+  a high-pass keeping the slap, summed, leaves the mid scooped out.
+- The trumpet and saxophone open their filter through a curve rather than
+  linearly, so blowing harder reads as effort rather than as a volume change.

@@ -1188,6 +1188,183 @@ namespace nog::dsp
             return buffer;
         }
 
+        // -- wind and reed ---------------------------------------------------
+        //
+        // A blown pipe is not a plucked string with a different envelope: the
+        // air column is driven continuously, so the spectrum is set by which
+        // harmonics the bore supports rather than by how it was excited. A
+        // stopped pipe supports only the odd ones, which is why a clarinet and
+        // a flute of the same length sound an octave apart.
+
+        juce::AudioBuffer<float> makeReedOrgan()
+        {
+            // A harmonium: a free reed with a strong odd series and just enough
+            // of the even ones to stop it sounding like a clarinet.
+            return sustainedLoop (noteHz (48), 1.2,
+                                  { 1.0f, 0.30f, 0.62f, 0.18f, 0.40f, 0.12f, 0.26f, 0.08f,
+                                    0.16f, 0.05f, 0.10f, 0.03f },
+                                  0.025f, 2.5f, 4820);
+        }
+
+        juce::AudioBuffer<float> makeAccordion()
+        {
+            // Two reeds a few cents apart, which is the beating that makes an
+            // accordion sound like an accordion rather than an organ. The
+            // detune is folded into the harmonic amplitudes as a slow drift.
+            return sustainedLoop (noteHz (48), 1.4,
+                                  { 1.0f, 0.55f, 0.70f, 0.35f, 0.45f, 0.22f, 0.28f, 0.14f,
+                                    0.18f, 0.09f, 0.11f, 0.05f },
+                                  0.03f, 9.0f, 4821);
+        }
+
+        juce::AudioBuffer<float> makePipeOrgan()
+        {
+            // Principal rank plus its octave and twelfth, which is how an organ
+            // stop is actually built - the "harmonics" are separate pipes.
+            return sustainedLoop (noteHz (48), 1.2,
+                                  { 1.0f, 0.62f, 0.45f, 0.30f, 0.10f, 0.22f, 0.05f, 0.14f,
+                                    0.03f, 0.08f },
+                                  0.015f, 1.5f, 4822);
+        }
+
+        juce::AudioBuffer<float> makeTrumpet()
+        {
+            // Brass with the energy pushed further up than the section patch:
+            // a solo trumpet is all upper middle, which is why one of them can
+            // be heard over an orchestra.
+            return sustainedLoop (noteHz (60), 1.0,
+                                  { 0.40f, 0.62f, 0.85f, 0.90f, 0.72f, 0.55f, 0.40f, 0.28f,
+                                    0.20f, 0.14f, 0.09f, 0.06f, 0.04f },
+                                  0.02f, 4.0f, 4823);
+        }
+
+        juce::AudioBuffer<float> makeSaxophone()
+        {
+            // A conical reed instrument: odd harmonics dominate but the even
+            // ones are far from absent, which is the difference between a sax
+            // and a clarinet.
+            return sustainedLoop (noteHz (48), 1.2,
+                                  { 1.0f, 0.42f, 0.75f, 0.30f, 0.52f, 0.22f, 0.35f, 0.16f,
+                                    0.22f, 0.10f, 0.14f, 0.06f, 0.08f },
+                                  0.05f, 6.0f, 4824);
+        }
+
+        juce::AudioBuffer<float> makeShakuhachi()
+        {
+            // Almost a sine, and mostly breath. The noise is the instrument as
+            // much as the tone is.
+            return sustainedLoop (noteHz (60), 1.0,
+                                  { 1.0f, 0.22f, 0.30f, 0.08f, 0.06f },
+                                  0.16f, 8.0f, 4825);
+        }
+
+        // -- more plucked and struck -----------------------------------------
+
+        juce::AudioBuffer<float> makeBanjo()
+        {
+            // A skin head over a very short string: bright, and it dies almost
+            // immediately. Plucked right by the bridge.
+            return pluckedString (noteHz (48), 1.6, 0.90f, 0.88f, 0.9955f, 0.05f, 4826, 0.2f);
+        }
+
+        juce::AudioBuffer<float> makeKoto()
+        {
+            // Silk over a long wooden body: dark excitation, long ring, and
+            // plucked a third of the way along which hollows out the middle.
+            return pluckedString (noteHz (48), 3.0, 0.30f, 0.58f, 0.9988f, 0.33f, 4827);
+        }
+
+        juce::AudioBuffer<float> makeDulcimer()
+        {
+            // Struck rather than plucked, so the excitation is a hammer's short
+            // contact rather than a fingertip's release - which is brighter at
+            // the very start and duller straight afterwards.
+            return pluckedString (noteHz (48), 2.4, 0.72f, 0.50f, 0.9982f, 0.11f, 4828);
+        }
+
+        juce::AudioBuffer<float> makeCelesta()
+        {
+            // A struck steel plate over a resonator. Same physics as the
+            // glockenspiel, but with a felt hammer, so the upper modes arrive
+            // far quieter and die far sooner.
+            return struckBar (noteHz (72), 2.0,
+                              { 1.0f, 2.76f, 5.40f, 8.93f },
+                              { 0.9f, 0.18f, 0.06f, 0.02f },
+                              1.6f, 4829, 0.25f);
+        }
+
+        // -- hand percussion --------------------------------------------------
+        //
+        // A drum head is a membrane, not a bar or a string: its modes follow
+        // the zeros of a Bessel function and are nowhere near a harmonic
+        // series. That is why an undamped drum has no clear pitch, and why the
+        // ones that do are built to suppress most of those modes.
+
+        /** A circular membrane, with the mode ratios a real one has. */
+        juce::AudioBuffer<float> membrane (float frequency, double seconds,
+                                           const std::vector<float>& amplitudes,
+                                           float decayShape, float noiseAmount, int seed)
+        {
+            // Bessel zeros over the first: the modes of an ideal drum head.
+            static const std::vector<float> modes { 1.0f, 1.593f, 2.135f, 2.295f, 2.653f, 2.917f };
+
+            const auto length = lengthFor (seconds);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+
+            for (size_t m = 0; m < modes.size() && m < amplitudes.size(); ++m)
+            {
+                const auto modeFrequency = frequency * modes[m];
+
+                if (modeFrequency > 18000.0f)
+                    continue;
+
+                const auto increment = modeFrequency / static_cast<float> (rate);
+                const auto rateOfDecay = decayShape * (0.9f + modes[m] * 1.4f);
+
+                auto phase = 0.0f;
+
+                for (int i = 0; i < length; ++i)
+                {
+                    out[i] += std::sin (phase * twoPi) * amplitudes[m] * decay (i, length, rateOfDecay);
+                    phase += increment;
+                    phase -= std::floor (phase);
+                }
+            }
+
+            // The slap of the hand, which on a hand drum is most of the sound.
+            Noise noise (seed);
+            auto lowPass = 0.0f;
+            const auto slap = lengthFor (0.03);
+
+            for (int i = 0; i < slap; ++i)
+            {
+                lowPass += 0.5f * (noise.next() - lowPass);
+                out[i] += lowPass * decay (i, slap, 5.0f) * noiseAmount;
+            }
+
+            fadeTail (buffer, 0.04);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeTabla()
+        {
+            // A tabla is tuned: the black patch on the head damps the modes
+            // that would otherwise make it a pitchless thud, leaving the
+            // fundamental and the first overtone close to harmonic.
+            return membrane (noteHz (60), 1.2, { 1.0f, 0.30f, 0.10f, 0.05f, 0.02f, 0.01f },
+                             2.6f, 0.35f, 4830);
+        }
+
+        juce::AudioBuffer<float> makeDjembe()
+        {
+            // Untuned by comparison, and far more of the sound is the slap.
+            return membrane (noteHz (48), 0.9, { 1.0f, 0.55f, 0.40f, 0.30f, 0.20f, 0.12f },
+                             3.4f, 0.7f, 4831);
+        }
+
         struct Definition
         {
             const char* name;
@@ -1249,7 +1426,20 @@ namespace nog::dsp
                 { "Dial Up",       makeDialUp,       false, 60, false },
                 { "Tape Stop",     makeTapeStop,     false, 60, false },
                 { "Telephone Bell", makeTelephoneBell, false, 60, false },
-                { "CRT Hum",       makeCrtHum,       true,  60, false }
+                { "CRT Hum",       makeCrtHum,       true,  60, false },
+
+                { "Reed Organ",    makeReedOrgan,    true,  48, true },
+                { "Accordion",     makeAccordion,    true,  48, true },
+                { "Pipe Organ",    makePipeOrgan,    true,  48, true },
+                { "Trumpet",       makeTrumpet,      true,  60, true },
+                { "Saxophone",     makeSaxophone,    true,  48, true },
+                { "Shakuhachi",    makeShakuhachi,   true,  60, true },
+                { "Banjo",         makeBanjo,        false, 48, true },
+                { "Koto",          makeKoto,         false, 48, true },
+                { "Dulcimer",      makeDulcimer,     false, 48, true },
+                { "Celesta",       makeCelesta,      false, 72, true },
+                { "Tabla",         makeTabla,        false, 60, true },
+                { "Djembe",        makeDjembe,       false, 48, true }
             };
 
             return list;
