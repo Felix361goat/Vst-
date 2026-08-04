@@ -116,3 +116,23 @@ each other at different rates.
 Tests: that the step reported is a function of the host position and survives a
 backwards jump, that a pattern is audible on an effect, and that it gates the
 master level.
+
+### Per-slot modulation curves
+
+Every routing was linear, so an envelope could only push a destination in a
+straight line. The envelopes already had per-stage curve control; the matrix
+did not, which meant the same envelope bent one way driving the amplitude and
+another way driving a filter.
+
+The shaping function moved out of Envelope into DSP/Curve.h and is now used by
+both, so a routing bends exactly the way an envelope stage does — a routing
+shaped by a different function from the envelope driving it would be a surprise
+every time anyone compared the two.
+
+Applied to the source before the bipolar re-centring, so an envelope that rises
+slowly still rises slowly whichever way the routing points; doing it afterwards
+would bend the negative half the opposite way.
+
+Zero by default. A test pins the ends as fixed points of the curve whatever it
+is set to, and checks the middle bends in the documented direction — the first
+version of that test had the sign backwards, which the code caught.

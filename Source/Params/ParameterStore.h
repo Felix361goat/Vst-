@@ -113,6 +113,9 @@ namespace nog
 
             /** A second source that scales this slot, or None. */
             juce::AudioParameterChoice* via     = nullptr;
+
+            /** Bends the source before it is scaled; 0 is linear. */
+            juce::AudioParameterFloat*  curve   = nullptr;
         };
 
         struct MotionSlot

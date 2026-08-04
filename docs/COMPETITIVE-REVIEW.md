@@ -90,17 +90,18 @@ Slots also cannot be reordered; the chain is fixed 1 to 6.
 
 **Verdict: bit crusher and flanger are quick wins. Reordering is a UI job.**
 
-### 6. Modulation is linear only — via scaling built, curves outstanding
+### 6. Modulation is linear only — built
 
 Vital's remap system and Serum 2's editable modulation curves both let a source
 be reshaped per routing — a linear envelope driving a destination exponentially,
 for instance. NOG Suite applies every routing linearly.
 
 A per-slot curve control, reusing the same shaping function the envelopes
-already use, would cover most of it. The matrix slot parameters would need one
-more entry, which is a backwards-compatible addition.
+already use, covers most of it. Built: the shaping function moved out of
+Envelope into DSP/Curve.h and the matrix applies it to the source before the
+amount and the bipolar re-centring. Zero by default, so nothing existing moved.
 
-**Verdict: moderate value, low difficulty.**
+**Verdict: built. Drawable per-slot shapes remain deferred.**
 
 ### 7. Fixed LFO shapes, and fewer modulators
 

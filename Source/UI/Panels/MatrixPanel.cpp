@@ -32,12 +32,22 @@ namespace nog::ui
 
         amountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             state, ids::matrix (index, ids::modAmount), amount);
+
+        // No text box: at sixteen rows there is no width for one, and the
+        // handle position says everything a curve control needs to.
+        curve.setSliderStyle (juce::Slider::LinearHorizontal);
+        curve.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        curve.setTooltip ("Bends the source before it is scaled");
+
+        curveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+            state, ids::matrix (index, ids::modCurve), curve);
     }
 
     MatrixPanel::MatrixPanel (juce::AudioProcessorValueTreeState& state)
     {
-        const auto headerNames = std::array { "SOURCE", "VIA", "DESTINATION", "AMOUNT" };
-        const auto headerLabels = std::array { &sourceHeader, &viaHeader, &destinationHeader, &amountHeader };
+        const auto headerNames = std::array { "SOURCE", "VIA", "DESTINATION", "AMOUNT", "CURVE" };
+        const auto headerLabels = std::array { &sourceHeader, &viaHeader, &destinationHeader,
+                                               &amountHeader, &curveHeader };
 
         for (size_t i = 0; i < headerLabels.size(); ++i)
         {
@@ -66,6 +76,7 @@ namespace nog::ui
         addAndMakeVisible (row.via);
         addAndMakeVisible (row.destination);
         addAndMakeVisible (row.amount);
+        addAndMakeVisible (row.curve);
         addAndMakeVisible (row.bipolar);
     }
 
@@ -105,6 +116,7 @@ namespace nog::ui
         columns.source      = area.removeFromLeft (cell * 2);
         columns.via         = area.removeFromLeft (cell);
         columns.destination = area.removeFromLeft (cell * 2);
+        columns.curve       = area.removeFromRight (juce::jmin (70, area.getWidth() / 3));
         columns.amount      = area;
 
         return columns;
@@ -120,6 +132,7 @@ namespace nog::ui
         viaHeader.setBounds (headerColumns.via.withTrimmedLeft (4));
         destinationHeader.setBounds (headerColumns.destination.withTrimmedLeft (4));
         amountHeader.setBounds (headerColumns.amount.withTrimmedLeft (4));
+        curveHeader.setBounds (headerColumns.curve.withTrimmedLeft (2));
 
         for (auto& row : rows)
         {
@@ -134,6 +147,7 @@ namespace nog::ui
             row->via.setBounds (columns.via.reduced (2, 1));
             row->destination.setBounds (columns.destination.reduced (2, 1));
             row->amount.setBounds (columns.amount.reduced (2, 1));
+            row->curve.setBounds (columns.curve.reduced (2, 4));
             row->bipolar.setBounds (columns.bipolar.reduced (2, 1));
         }
     }

@@ -1,5 +1,7 @@
 #include "Modulation/ModMatrix.h"
 
+#include "DSP/Curve.h"
+
 namespace nog
 {
     ModMatrix::ModMatrix()
@@ -34,7 +36,9 @@ namespace nog
             const auto via = slot.via != nullptr ? static_cast<mod::Source> (slot.via->getIndex())
                                                 : mod::Source::None;
 
-            routings.push_back ({ source, dest, amount, slot.bipolar->get(), via });
+            const auto curve = slot.curve != nullptr ? slot.curve->get() : 0.0f;
+
+            routings.push_back ({ source, dest, amount, slot.bipolar->get(), via, curve });
         }
 
         for (int i = 0; i < ids::numMacros; ++i)
@@ -62,6 +66,12 @@ namespace nog
         for (const auto& routing : routings)
         {
             auto value = frame.getSource (routing.source);
+
+            // Shaped before the re-centring, so an envelope that rises slowly
+            // still rises slowly whichever way the routing points. Doing it
+            // after would bend the negative half the opposite way.
+            if (routing.curve != 0.0f)
+                value = dsp::shapeCurve (value, routing.curve);
 
             // The bipolar switch re-centres a 0..1 source around zero, so an
             // envelope can push a destination down as well as up.

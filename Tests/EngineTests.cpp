@@ -247,6 +247,61 @@ namespace
                 expectWithinAbsoluteError (frame.getOffset (nog::mod::Dest::FilterReso), 0.0f, 1.0e-6f);
             }
 
+            beginTest ("a curve bends the source without changing its ends");
+            {
+                // Every routing was linear, so an envelope could only ever push
+                // a destination in a straight line. A curve has to bend the
+                // middle while leaving nothing and everything exactly where
+                // they were - otherwise it is a depth control with extra steps.
+                TestProcessor processor;
+                auto& slot = processor.parameters.matrix[0];
+
+                slot.enabled->setValueNotifyingHost (1.0f);
+                slot.source->setValueNotifyingHost (
+                    slot.source->convertTo0to1 (static_cast<float> (nog::mod::Source::Macro1)));
+                slot.dest->setValueNotifyingHost (
+                    slot.dest->convertTo0to1 (static_cast<float> (nog::mod::Dest::FilterCutoff)));
+                slot.amount->setValueNotifyingHost (slot.amount->convertTo0to1 (1.0f));
+
+                const auto offsetFor = [&processor, &slot] (float source, float curve)
+                {
+                    slot.curve->setValueNotifyingHost (slot.curve->convertTo0to1 (curve));
+                    processor.parameters.macro[0]->setValueNotifyingHost (source);
+
+                    nog::ModMatrix matrix;
+                    matrix.refresh (processor.parameters);
+
+                    nog::ModulationFrame frame;
+                    matrix.applyGlobalSources (frame);
+                    frame.clearOffsets();
+                    matrix.apply (frame);
+
+                    return frame.getOffset (nog::mod::Dest::FilterCutoff);
+                };
+
+                // The ends are fixed points of the curve whatever it is set to.
+                for (const auto curve : { -1.0f, -0.5f, 0.0f, 0.5f, 1.0f })
+                {
+                    expectWithinAbsoluteError (offsetFor (0.0f, curve), 0.0f, 1.0e-4f);
+                    expectWithinAbsoluteError (offsetFor (1.0f, curve), 1.0f, 1.0e-4f);
+                }
+
+                // Halfway is where the bend shows.
+                // Positive is fast-then-slow and negative is slow-then-fast,
+                // matching the envelope stages - which is the whole reason the
+                // two share one function.
+                const auto linear    = offsetFor (0.5f, 0.0f);
+                const auto fastStart = offsetFor (0.5f, 1.0f);
+                const auto slowStart = offsetFor (0.5f, -1.0f);
+
+                expectWithinAbsoluteError (linear, 0.5f, 1.0e-3f);
+
+                expect (fastStart > linear + 0.1f,
+                        "a positive curve should start quickly, got " + juce::String (fastStart, 4));
+                expect (slowStart < linear - 0.1f,
+                        "a negative curve should start slowly, got " + juce::String (slowStart, 4));
+            }
+
             beginTest ("a via source scales the slot rather than adding to it");
             {
                 // Via is what puts a modulator under the player's control: an

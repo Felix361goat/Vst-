@@ -33,9 +33,11 @@ namespace nog::ui
             ChoiceBox via;
             ToggleBox bipolar;
             juce::Slider amount;
+            juce::Slider curve;
             juce::Label  number;
 
             std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> amountAttachment;
+            std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> curveAttachment;
         };
 
         void addRowComponents (Row& row);
@@ -44,13 +46,13 @@ namespace nog::ui
             up with the controls they describe at any window width. */
         struct Columns
         {
-            juce::Rectangle<int> number, enabled, source, via, destination, amount, bipolar;
+            juce::Rectangle<int> number, enabled, source, via, destination, amount, curve, bipolar;
         };
 
         static Columns splitIntoColumns (juce::Rectangle<int> area);
 
         std::array<std::unique_ptr<Row>, ids::numMatrixSlots> rows;
 
-        juce::Label sourceHeader, viaHeader, destinationHeader, amountHeader;
+        juce::Label sourceHeader, viaHeader, destinationHeader, amountHeader, curveHeader;
     };
 }

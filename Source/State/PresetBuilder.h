@@ -240,6 +240,21 @@ namespace nog::presets
             return *this;
         }
 
+        /** As route(), with the source bent before it is scaled. Positive is
+            fast-then-slow, negative slow-then-fast, matching the envelopes. */
+        Build& routeCurved (mod::Source source, mod::Dest destination, float amount,
+                            float curve, bool bipolar = false)
+        {
+            const auto slot = nextModSlot;
+
+            route (source, destination, amount, bipolar);
+
+            if (slot < ids::numMatrixSlots)
+                set (ids::matrix (slot, ids::modCurve), curve);
+
+            return *this;
+        }
+
         /** Fills the next free effect slot. The three controls mean different
             things per effect; see FXChain.cpp. */
         Build& fx (fx::FXChain::Type type, float mix, float a, float b, float c)

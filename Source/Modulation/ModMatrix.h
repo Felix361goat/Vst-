@@ -60,6 +60,9 @@ namespace nog
 
             /** Scales the slot by a second source. None means full depth. */
             mod::Source via     = mod::Source::None;
+
+            /** Bends the source before it is scaled; 0 leaves it linear. */
+            float       curve   = 0.0f;
         };
 
         ModMatrix();

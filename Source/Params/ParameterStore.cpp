@@ -145,6 +145,7 @@ namespace nog
             m.amount  = find<Float>  (apvts, ids::matrix (i, ids::modAmount));
             m.bipolar = find<Bool>   (apvts, ids::matrix (i, ids::modBipolar));
             m.via     = find<Choice> (apvts, ids::matrix (i, ids::modVia));
+            m.curve   = find<Float>  (apvts, ids::matrix (i, ids::modCurve));
         }
 
         for (int i = 0; i < ids::numFxSlots; ++i)

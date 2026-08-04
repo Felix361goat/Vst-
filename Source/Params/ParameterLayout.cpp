@@ -413,7 +413,11 @@ namespace nog::params
                              // None, so a patch saved before this existed loads
                              // with the routing it had.
                              choiceParam (ids::matrix (i, ids::modVia), "Mod " + number + " Via",
-                                          mod::sourceChoices(), 0));
+                                          mod::sourceChoices(), 0),
+                             // Bends the source before it is scaled. Zero is
+                             // linear, which is what every existing patch has.
+                             floatParam  (ids::matrix (i, ids::modCurve), "Mod " + number + " Curve",
+                                          linear (-1.0f, 1.0f), 0.0f, fmtPercent));
             }
 
             return g;

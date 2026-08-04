@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <juce_core/juce_core.h>
+#include "DSP/Curve.h"
 
 namespace nog::dsp
 {
@@ -180,16 +181,9 @@ namespace nog::dsp
             return false;
         }
 
-        /** Bends a 0..1 ramp. curve < 0 is slow-then-fast, curve > 0 the
-            reverse; 0 passes the ramp through untouched. */
-        static float shape (float x, float curve) noexcept
-        {
-            if (std::abs (curve) < 1.0e-4f)
-                return x;
-
-            const auto exponent = std::pow (4.0f, -curve);
-            return std::pow (juce::jlimit (0.0f, 1.0f, x), exponent);
-        }
+        /** Bends a 0..1 ramp. Shared with the modulation matrix, so a routing
+            shaped by a curve bends exactly the way an envelope stage does. */
+        static float shape (float x, float curve) noexcept { return dsp::shapeCurve (x, curve); }
 
         double   sampleRate = 44100.0;
         Settings settings;
