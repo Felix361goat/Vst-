@@ -201,3 +201,22 @@ the same colour do not run in lockstep and sound like one loud voice.
 A test renders every textured colour and requires each to be both audible and
 different from white — a colour that quietly fell back to noise would sound
 plausible and be wrong.
+
+### Twenty-two more in the sparkle family
+
+The patches the leads-as-chords sound comes from, extended. They share one
+shape because that shape is the sound: a wide detuned saw for body, a quiet
+bright partial above it for the glint, heavy key tracking so the filter opens
+as the line climbs, and a long delay and reverb behind it.
+
+What varies is what supplies the glint — a glockenspiel, a celesta, a piano
+hammer, a choir, a koto — how far the filter tracks, and whether the patch is
+voiced to be played as a line or held as a chord. Several are deliberately
+quieter and slower to open than a lead would be, because a patch voiced for a
+single note becomes a wall when six of them sound at once.
+
+Several use the night's new pieces where they earn it: a curve on the filter
+envelope so a chord arrives rather than starts, a high-pass under the top line
+so it does not muddy the middle, the widener instead of a nine-voice stack so
+a wide chord stays in tune, and a Motion pattern on a delay send so the repeats
+come and go while the pluck stays even.
