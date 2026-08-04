@@ -1755,6 +1755,317 @@ namespace nog::dsp
             return buffer;
         }
 
+        // -- old media --------------------------------------------------------
+        //
+        // The sound of broadcast and tape before everything went clean. These
+        // are modelled, not sampled: an actual advert or television theme
+        // belongs to whoever made it, and none of that can be shipped inside a
+        // plugin. What can be modelled is the *equipment* - the FM chips the
+        // jingles were written on, the band-limited transmitter, the tape the
+        // whole lot ran through - and that is where the character came from
+        // anyway. Nobody remembers a 1987 station ident for its melody.
+
+        /** A two-operator FM tone with a fixed envelope: the chip every jingle,
+            ident and shopping channel of the era was written on. */
+        juce::AudioBuffer<float> fmSting (float frequency, double seconds, float ratio,
+                                          float index, float indexDecay, float amplitudeDecay)
+        {
+            const auto length = lengthFor (seconds);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            auto phase = 0.0f;
+            auto modPhase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto currentIndex = index * decay (i, length, indexDecay);
+                const auto modulator = std::sin (modPhase * twoPi);
+
+                out[i] = std::sin (phase * twoPi + currentIndex * modulator)
+                       * decay (i, length, amplitudeDecay);
+
+                phase += frequency / static_cast<float> (rate);
+                modPhase += frequency * ratio / static_cast<float> (rate);
+
+                phase -= std::floor (phase);
+                modPhase -= std::floor (modPhase);
+            }
+
+            fadeTail (buffer, 0.03);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeStationSting()
+        {
+            // Brass-shaped FM: a high modulator index that collapses fast, so
+            // it barks on the attack and settles into a tone.
+            return fmSting (noteHz (48), 1.6, 1.0f, 6.0f, 16.0f, 2.2f);
+        }
+
+        juce::AudioBuffer<float> makeNewsroomHit()
+        {
+            // The orchestra hit: a dense inharmonic stab with a noise front,
+            // gone in a quarter of a second, and on every news bed ever made.
+            const auto length = lengthFor (0.7);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x4E17);
+            auto lowPass = 0.0f;
+
+            const auto base = noteHz (48);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+                auto value = 0.0f;
+
+                // Sixteen partials with the top ones slightly sharp, which is
+                // what a room full of instruments not quite in tune sounds like.
+                for (int h = 1; h <= 16; ++h)
+                {
+                    const auto detune = 1.0f + static_cast<float> (h) * 0.0009f;
+                    value += std::sin (twoPi * base * static_cast<float> (h) * detune * t)
+                           / static_cast<float> (h);
+                }
+
+                lowPass += 0.30f * (noise.next() - lowPass);
+
+                out[i] = (value * 0.28f + lowPass * 0.5f * std::exp (-60.0f * t))
+                       * decay (i, length, 9.0f);
+            }
+
+            fadeTail (buffer, 0.02);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeMuzakBell()
+        {
+            // The soft FM bell that every hold line and lift used, with a ratio
+            // just off a whole number so it never quite settles.
+            return fmSting (noteHz (60), 2.4, 3.02f, 2.2f, 5.0f, 1.6f);
+        }
+
+        juce::AudioBuffer<float> makePaChime()
+        {
+            // The two-note announcement chime: a fourth, struck softly, with
+            // the second note arriving before the first has gone.
+            const auto length = lengthFor (2.2);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+
+            const auto first  = noteHz (60);
+            const auto second = noteHz (65);
+            const auto gap    = lengthFor (0.35);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+                out[i] += std::sin (twoPi * first * t) * std::exp (-2.2f * t) * 0.6f;
+                out[i] += std::sin (twoPi * first * 2.76f * t) * std::exp (-5.0f * t) * 0.12f;
+            }
+
+            for (int i = gap; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i - gap) / static_cast<float> (rate);
+                out[i] += std::sin (twoPi * second * t) * std::exp (-2.2f * t) * 0.6f;
+                out[i] += std::sin (twoPi * second * 2.76f * t) * std::exp (-5.0f * t) * 0.12f;
+            }
+
+            fadeTail (buffer, 0.06);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeAmJingle()
+        {
+            // A square through a transmitter: everything below three hundred
+            // hertz and above three kilohertz simply is not there, and that
+            // narrowness is the entire sound of a radio jingle.
+            const auto frequency = noteHz (60);
+            const auto period = rate / static_cast<double> (frequency);
+            const auto cycles = juce::jmax (1, juce::roundToInt (rate * 0.5 / period));
+            const auto length = static_cast<int> (std::round (period * cycles));
+
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto phase = static_cast<double> (i) / period;
+                auto value = 0.0f;
+
+                // Odd harmonics only, and nothing past the eleventh: a square
+                // wave as a narrow transmitter would deliver it.
+                for (int h = 1; h <= 11; h += 2)
+                    value += static_cast<float> (std::sin (phase * h * juce::MathConstants<double>::twoPi))
+                           / static_cast<float> (h);
+
+                out[i] = value * 0.7f;
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeCassetteWow()
+        {
+            // A tone through a tape transport with a slipping capstan: wow is
+            // the slow drift, flutter the fast one, and together they are why
+            // anything off cassette never sits quite still.
+            const auto length = lengthFor (3.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0xCA55);
+            auto lowPass = 0.0f;
+            auto phase = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                const auto wow     = 0.010f * std::sin (twoPi * 0.7f * t);
+                const auto flutter = 0.004f * std::sin (twoPi * 7.3f * t);
+
+                phase += noteHz (48) * (1.0f + wow + flutter) / static_cast<float> (rate);
+                phase -= std::floor (phase);
+
+                lowPass += 0.20f * (noise.next() - lowPass);
+
+                out[i] = std::sin (phase * twoPi) * 0.8f
+                       + std::sin (phase * twoPi * 2.0f) * 0.15f
+                       + lowPass * 0.05f;
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeCrowdWash()
+        {
+            // Applause, or a laugh track, or a hall: a few thousand short
+            // broadband transients per second is all any of those are.
+            const auto length = lengthFor (4.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+            juce::Random claps (0xC1A9);
+            Noise noise (0xC1AA);
+
+            auto bed = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                bed += 0.4f * (noise.next() - bed);
+                out[i] = bed * 0.12f;
+            }
+
+            constexpr int numClaps = 5200;
+
+            for (int c = 0; c < numClaps; ++c)
+            {
+                const auto start = claps.nextInt (length - 700);
+                const auto amplitude = juce::jmap (claps.nextFloat(), 0.02f, 0.16f);
+                const auto decayRate = juce::jmap (claps.nextFloat(), 200.0f, 800.0f);
+
+                auto local = 0.0f;
+                Noise clap (0xC000 + c);
+
+                for (int n = 0; n < 700; ++n)
+                {
+                    const auto t = static_cast<float> (n) / static_cast<float> (rate);
+                    local += 0.55f * (clap.next() - local);
+                    out[start + n] += local * amplitude * std::exp (-decayRate * t);
+                }
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeRotaryDial()
+        {
+            // A pulse-dial telephone: the loop opens and closes once per digit
+            // and the mechanism clatters back. Seven pulses is the number 7.
+            const auto length = lengthFor (1.2);
+            juce::AudioBuffer<float> buffer (1, length);
+            buffer.clear();
+
+            auto* out = buffer.getWritePointer (0);
+            Noise noise (0x0D1A);
+
+            const auto pulseGap = lengthFor (0.1);
+
+            for (int pulse = 0; pulse < 7; ++pulse)
+            {
+                const auto start = pulse * pulseGap;
+                auto lowPass = 0.0f;
+
+                for (int n = 0; n < pulseGap && start + n < length; ++n)
+                {
+                    const auto t = static_cast<float> (n) / static_cast<float> (rate);
+                    lowPass += 0.45f * (noise.next() - lowPass);
+
+                    out[start + n] += lowPass * std::exp (-90.0f * t) * 0.7f
+                                    + std::sin (twoPi * 340.0f * t) * std::exp (-70.0f * t) * 0.25f;
+                }
+            }
+
+            fadeTail (buffer, 0.05);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeAnswerBeep()
+        {
+            // The answering machine tone: one thousand hertz, hard on and hard
+            // off, because a cheap oscillator gated by a relay has no envelope.
+            const auto length = lengthFor (0.55);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            const auto on = lengthFor (0.42);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+                out[i] = i < on ? std::sin (twoPi * 1000.0f * t) * 0.8f : 0.0f;
+            }
+
+            fadeTail (buffer, 0.005);
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeTapeSplice()
+        {
+            // A join in the tape: a click, then a fraction of a second where
+            // there is nothing on the oxide at all.
+            const auto length = lengthFor (0.6);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x5911);
+            auto lowPass = 0.0f;
+
+            const auto dropoutStart = lengthFor (0.03);
+            const auto dropoutEnd   = lengthFor (0.12);
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                lowPass += 0.5f * (noise.next() - lowPass);
+
+                const auto click = std::exp (-400.0f * t);
+                const auto hiss  = i >= dropoutStart && i < dropoutEnd ? 0.0f : 0.25f;
+
+                out[i] = lowPass * (click + hiss);
+            }
+
+            fadeTail (buffer, 0.02);
+            return buffer;
+        }
+
         struct Definition
         {
             const char* name;
@@ -1854,7 +2165,18 @@ namespace nog::dsp
                 { "Water Drop",    makeWaterDrop,    false, 60, false },
                 { "Ice Crackle",   makeIceCrackle,   true,  60, false },
                 { "Reverse Swell", makeReverseSwell, false, 60, false },
-                { "Sub Drop",      makeSubDrop,      false, 60, false }
+                { "Sub Drop",      makeSubDrop,      false, 60, false },
+
+                { "Station Sting", makeStationSting, false, 48, true },
+                { "Newsroom Hit",  makeNewsroomHit,  false, 48, true },
+                { "Muzak Bell",    makeMuzakBell,    false, 60, true },
+                { "PA Chime",      makePaChime,      false, 60, true },
+                { "AM Jingle",     makeAmJingle,     true,  60, true },
+                { "Cassette Wow",  makeCassetteWow,  true,  48, true },
+                { "Crowd Wash",    makeCrowdWash,    true,  60, false },
+                { "Rotary Dial",   makeRotaryDial,   false, 60, false },
+                { "Answer Beep",   makeAnswerBeep,   false, 60, false },
+                { "Tape Splice",   makeTapeSplice,   false, 60, false }
             };
 
             return list;

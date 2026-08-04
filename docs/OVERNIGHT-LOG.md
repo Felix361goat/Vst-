@@ -246,3 +246,24 @@ to reach:
   but tracked only one as sounding, so the clear-down had nothing to release and
   a chord pattern held voices open for ever. The arp now tracks every note it
   has started, and gates a chord exactly as it gates a single note.
+
+### Broadcast and tape
+
+Ten more sources and eighteen patches from the era of adverts, station idents
+and hold music.
+
+Modelled, not sampled, and deliberately so: an actual advert or television
+theme belongs to whoever made it and none of it can ship inside a plugin. What
+*can* be modelled is the equipment — the two-operator FM chip every jingle was
+written on, the transmitter that threw away everything below three hundred hertz
+and above three kilohertz, the tape transport with a slipping capstan. That is
+where the character came from in any case; nobody remembers a 1987 station ident
+for its melody.
+
+The narrowness is done with the second filter rather than an EQ curve, because
+outside a transmitter's band there genuinely is nothing, and a shelf is not the
+same claim as a wall. Hold music, a tannoy chime and an AM jingle all get that
+treatment and all three are unmistakable because of it.
+
+Sequenced, the orchestra hit stops being a punctuation mark and becomes the
+riff, which is what half of nineties dance did with it.

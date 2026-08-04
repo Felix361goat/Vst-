@@ -41,6 +41,7 @@ set(NOG_ENGINE_SOURCES
     ${NOG_SOURCE_DIR}/State/Presets/WorldPresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/SparklePresets.cpp
     ${NOG_SOURCE_DIR}/State/Presets/MalletPresets.cpp
+    ${NOG_SOURCE_DIR}/State/Presets/BroadcastPresets.cpp
 )
 
 set(NOG_PLUGIN_SOURCES
