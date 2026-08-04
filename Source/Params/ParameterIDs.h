@@ -132,6 +132,20 @@ namespace nog::ids
     inline constexpr const char* filterMix      = "flt_mix";
     inline constexpr const char* filterKeytrack = "flt_keytrack";
 
+    // -- second filter ------------------------------------------------------
+    // Its own IDs rather than an indexed pair, because filter one already
+    // shipped under these names and renaming it would orphan every saved patch.
+    inline constexpr const char* filter2Enable   = "flt2_enable";
+    inline constexpr const char* filter2Type     = "flt2_type";
+    inline constexpr const char* filter2Cutoff   = "flt2_cutoff";
+    inline constexpr const char* filter2Reso     = "flt2_reso";
+    inline constexpr const char* filter2Drive    = "flt2_drive";
+    inline constexpr const char* filter2Mix      = "flt2_mix";
+    inline constexpr const char* filter2Keytrack = "flt2_keytrack";
+
+    /** Serial puts filter two after filter one; parallel sums them. */
+    inline constexpr const char* filterRouting   = "flt_routing";
+
     // -- envelope (per index) ----------------------------------------------
     inline constexpr const char* envAttack      = "attack";
     inline constexpr const char* envHold        = "hold";

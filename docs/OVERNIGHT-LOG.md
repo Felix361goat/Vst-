@@ -136,3 +136,21 @@ would bend the negative half the opposite way.
 Zero by default. A test pins the ends as fixed points of the curve whatever it
 is set to, and checks the middle bends in the documented direction — the first
 version of that test had the sign backwards, which the code caught.
+
+### A second filter, with serial and parallel routing
+
+The largest remaining gap against Serum and Vital. One filter can shape a
+sound; two can split it. A low-pass followed by a high-pass leaves a band,
+while the same two summed leave everything except a band — those are opposite
+results from the same pair, and the routing switch is what chooses between them.
+
+Off by default, with its own parameter IDs rather than being folded into an
+indexed pair, because filter one already shipped under its names and renaming
+it would orphan every saved patch. Its four continuous controls are modulation
+destinations, appended after the effect block so nothing already saved shifts.
+
+Its panel sits beside the first on the OSC page, in yellow so a glance tells
+the two apart. Verified against a screenshot.
+
+A test renders the same patch both ways and asserts parallel passes far more
+than serial, which is the audible consequence of the difference.

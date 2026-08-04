@@ -23,6 +23,7 @@ namespace nog::params
         juce::StringArray warpModes();
         juce::StringArray filterTypes();
         juce::StringArray lfoShapes();
+        juce::StringArray filterRoutings();
         juce::StringArray lfoSyncModes();
         juce::StringArray lfoTriggerModes();
         juce::StringArray voiceModes();

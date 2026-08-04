@@ -23,6 +23,7 @@ namespace nog
 
         subOscillator.prepare (sampleRate);
         filter.prepare (sampleRate);
+        filter2.prepare (sampleRate);
 
         for (auto& envelope : envelopes)
             envelope.prepare (sampleRate);
@@ -43,6 +44,7 @@ namespace nog
         subOscillator.reset();
         noise.reset();
         filter.reset();
+        filter2.reset();
 
         for (auto& envelope : envelopes)
             envelope.reset();
@@ -90,6 +92,7 @@ namespace nog
             subOscillator.noteOn();
             noise.reset();
             filter.reset();
+            filter2.reset();
             previousAmplitude = 0.0f;
         }
 
@@ -334,6 +337,22 @@ namespace nog
 
             filter.setParameters (static_cast<dsp::StateVariableFilter::Type> (parameters.filter.type->getIndex()),
                                   tracked, reso, drive);
+
+            if (parameters.filter2.enable->get())
+            {
+                const auto cutoff2 = parameters.modulated (mod::Dest::Filter2Cutoff,
+                                                           frame.getOffset (mod::Dest::Filter2Cutoff));
+                const auto reso2   = parameters.modulated (mod::Dest::Filter2Reso,
+                                                           frame.getOffset (mod::Dest::Filter2Reso));
+                const auto drive2  = parameters.modulated (mod::Dest::Filter2Drive,
+                                                           frame.getOffset (mod::Dest::Filter2Drive));
+
+                const auto tracked2 = cutoff2 * std::exp2 (parameters.filter2.keytrack->get()
+                                                           * (currentNote - 60.0f) / 12.0f);
+
+                filter2.setParameters (static_cast<dsp::StateVariableFilter::Type> (parameters.filter2.type->getIndex()),
+                                       tracked2, reso2, drive2);
+            }
         }
     }
 
@@ -356,6 +375,9 @@ namespace nog
 
         const auto masterMix    = parameters.filter.mix->get();
         const auto filterOn     = parameters.filter.enable->get();
+        const auto filter2On    = parameters.filter2.enable->get();
+        const auto filter2Mix   = parameters.filter2.mix->get();
+        const auto parallel     = parameters.filterRouting->getIndex() == 1;
         const auto noiseOn      = parameters.noise.enable->get();
         const auto velocitySens = parameters.velocitySens->get();
 
@@ -423,13 +445,42 @@ namespace nog
                     }
                 }
 
-                if (filterOn)
+                if (filterOn || filter2On)
                 {
-                    const auto wetLeft  = filter.processSample (0, filteredLeft);
-                    const auto wetRight = filter.processSample (1, filteredRight);
+                    const auto inputLeft  = filteredLeft;
+                    const auto inputRight = filteredRight;
 
-                    filteredLeft  += (wetLeft  - filteredLeft)  * masterMix;
-                    filteredRight += (wetRight - filteredRight) * masterMix;
+                    if (filterOn)
+                    {
+                        const auto wetLeft  = filter.processSample (0, inputLeft);
+                        const auto wetRight = filter.processSample (1, inputRight);
+
+                        filteredLeft  += (wetLeft  - filteredLeft)  * masterMix;
+                        filteredRight += (wetRight - filteredRight) * masterMix;
+                    }
+
+                    if (filter2On)
+                    {
+                        // Serial feeds it whatever filter one produced; parallel
+                        // feeds it the same input and sums, which is what makes
+                        // a band-pass pair out of a low and a high.
+                        const auto source2Left  = parallel ? inputLeft  : filteredLeft;
+                        const auto source2Right = parallel ? inputRight : filteredRight;
+
+                        const auto wetLeft  = filter2.processSample (0, source2Left);
+                        const auto wetRight = filter2.processSample (1, source2Right);
+
+                        if (parallel)
+                        {
+                            filteredLeft  += (wetLeft  - inputLeft)  * filter2Mix;
+                            filteredRight += (wetRight - inputRight) * filter2Mix;
+                        }
+                        else
+                        {
+                            filteredLeft  += (wetLeft  - filteredLeft)  * filter2Mix;
+                            filteredRight += (wetRight - filteredRight) * filter2Mix;
+                        }
+                    }
                 }
 
                 left[offset + i]  += (filteredLeft  + dryLeft)  * amplitude;

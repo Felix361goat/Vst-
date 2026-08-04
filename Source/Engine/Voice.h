@@ -124,6 +124,11 @@ namespace nog
         dsp::NoiseGenerator  noise;
         dsp::StateVariableFilter filter;
 
+        /** The second filter. Serial puts it after the first, parallel sums
+            the two - which is the difference between shaping a sound and
+            splitting it into two bands. */
+        dsp::StateVariableFilter filter2;
+
         std::array<dsp::Envelope, ids::numEnvelopes> envelopes;
         std::array<dsp::Lfo,      ids::numLfos>      lfos;
 

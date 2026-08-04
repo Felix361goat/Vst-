@@ -58,6 +58,8 @@ namespace nog::mod
         Fx4Mix, Fx4A, Fx4B, Fx4C,
         Fx5Mix, Fx5A, Fx5B, Fx5C,
         Fx6Mix, Fx6A, Fx6B, Fx6C,
+
+        Filter2Cutoff, Filter2Reso, Filter2Drive, Filter2Mix,
         Count
     };
 
@@ -110,7 +112,9 @@ namespace nog::mod
             "FX 3 Mix", "FX 3 A", "FX 3 B", "FX 3 C",
             "FX 4 Mix", "FX 4 A", "FX 4 B", "FX 4 C",
             "FX 5 Mix", "FX 5 A", "FX 5 B", "FX 5 C",
-            "FX 6 Mix", "FX 6 A", "FX 6 B", "FX 6 C"
+            "FX 6 Mix", "FX 6 A", "FX 6 B", "FX 6 C",
+
+            "Filter 2 Cutoff", "Filter 2 Reso", "Filter 2 Drive", "Filter 2 Mix"
         };
         static_assert (names.size() == static_cast<size_t> (numDests),
                        "Dest enum and destNames() table have drifted apart");

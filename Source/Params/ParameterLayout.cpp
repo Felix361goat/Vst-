@@ -43,6 +43,7 @@ namespace nog::params
             return { "Sine", "Triangle", "Saw Up", "Saw Down", "Square", "Random S&H", "Random Glide" };
         }
 
+        juce::StringArray filterRoutings()  { return { "Serial", "Parallel" }; }
         juce::StringArray lfoSyncModes()    { return { "Free", "Tempo" }; }
         juce::StringArray lfoTriggerModes() { return { "Trigger", "Envelope", "Free Run" }; }
         juce::StringArray voiceModes()      { return { "Poly", "Mono", "Legato" }; }
@@ -323,7 +324,26 @@ namespace nog::params
                          floatParam (ids::filterReso, "Resonance", linear (0.0f, 1.0f), 0.1f, fmtPercent),
                          floatParam (ids::filterDrive, "Drive", linear (0.0f, 1.0f), 0.0f, fmtPercent),
                          floatParam (ids::filterMix, "Filter Mix", linear (0.0f, 1.0f), 1.0f, fmtPercent),
-                         floatParam (ids::filterKeytrack, "Key Track", linear (-1.0f, 1.0f), 0.0f, fmtPercent));
+                         floatParam (ids::filterKeytrack, "Key Track", linear (-1.0f, 1.0f), 0.0f, fmtPercent),
+                         choiceParam (ids::filterRouting, "Filter Routing", choices::filterRoutings(), 0));
+
+            return g;
+        }
+
+        std::unique_ptr<Group> buildFilter2Group()
+        {
+            auto g = group ("filter2", "Filter 2");
+
+            // Off by default: one filter is what every existing patch has, and
+            // a second one switched on would change all of them.
+            g->addChild (boolParam  (ids::filter2Enable, "Filter 2 On", false),
+                         choiceParam (ids::filter2Type, "Filter 2 Type", choices::filterTypes(), 2),
+                         floatParam (ids::filter2Cutoff, "Filter 2 Cutoff",
+                                     skewed (20.0f, 20000.0f, 1000.0f), 200.0f, fmtHertz, "Hz"),
+                         floatParam (ids::filter2Reso, "Filter 2 Resonance", linear (0.0f, 1.0f), 0.1f, fmtPercent),
+                         floatParam (ids::filter2Drive, "Filter 2 Drive", linear (0.0f, 1.0f), 0.0f, fmtPercent),
+                         floatParam (ids::filter2Mix, "Filter 2 Mix", linear (0.0f, 1.0f), 1.0f, fmtPercent),
+                         floatParam (ids::filter2Keytrack, "Filter 2 Key Track", linear (-1.0f, 1.0f), 0.0f, fmtPercent));
 
             return g;
         }
@@ -459,7 +479,8 @@ namespace nog::params
 
         layout.add (buildSubGroup(),
                     buildNoiseGroup(),
-                    buildFilterGroup());
+                    buildFilterGroup(),
+                    buildFilter2Group());
 
         for (int i = 0; i < ids::numEnvelopes; ++i)
             layout.add (buildEnvelopeGroup (i));

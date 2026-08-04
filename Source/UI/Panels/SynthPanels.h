@@ -98,6 +98,21 @@ namespace nog::ui
         Knob cutoff, resonance, drive, mix, keytrack;
     };
 
+    /** The second filter, plus the routing switch that decides whether it
+        follows the first or sits beside it. */
+    class Filter2Panel final : public juce::Component
+    {
+    public:
+        Filter2Panel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix);
+
+        void resized() override;
+
+    private:
+        ToggleBox enable;
+        ChoiceBox type, routing;
+        Knob cutoff, resonance, drive, mix, keytrack;
+    };
+
     class GlobalPanel final : public juce::Component
     {
     public:

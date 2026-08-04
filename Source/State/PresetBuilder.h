@@ -158,6 +158,22 @@ namespace nog::presets
 
         Build& filterOff() { return set (ids::filterEnable, 0.0f); }
 
+        /** The second filter. @p parallel sums it with the first rather than
+            putting it afterwards, which is how a band-pass pair is made out of
+            a low-pass and a high-pass. */
+        Build& filter2 (int type, float cutoffHz, float resonance, bool parallel = false,
+                        float drive = 0.0f, float mix = 1.0f, float keyTrack = 0.0f)
+        {
+            set (ids::filter2Enable, 1.0f);
+            set (ids::filter2Type, static_cast<float> (type));
+            set (ids::filter2Cutoff, cutoffHz);
+            set (ids::filter2Reso, resonance);
+            set (ids::filter2Drive, drive);
+            set (ids::filter2Mix, mix);
+            set (ids::filter2Keytrack, keyTrack);
+            return set (ids::filterRouting, parallel ? 1.0f : 0.0f);
+        }
+
         // -- envelopes ------------------------------------------------------
         /** Times in milliseconds, sustain 0..1, curves -1..1. Envelope 1 is the
             amplitude envelope. */

@@ -337,6 +337,41 @@ namespace nog::ui
     }
 
     // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    Filter2Panel::Filter2Panel (juce::AudioProcessorValueTreeState& state, const ModMatrix& matrix)
+        : enable    (state, ids::filter2Enable, "ON"),
+          type      (state, ids::filter2Type, {}),
+          routing   (state, ids::filterRouting, {}),
+          cutoff    (state, ids::filter2Cutoff, "Cutoff"),
+          resonance (state, ids::filter2Reso, "Reso"),
+          drive     (state, ids::filter2Drive, "Drive"),
+          mix       (state, ids::filter2Mix, "Mix"),
+          keytrack  (state, ids::filter2Keytrack, "Key Trk")
+    {
+        addAllChildren (*this, { &enable, &type, &routing,
+                                 &cutoff, &resonance, &drive, &mix, &keytrack });
+
+        for (auto* knob : { &cutoff, &resonance, &drive, &mix, &keytrack })
+            knob->setAccentColour (colours::candyYellow);
+
+        cutoff.showModulationFor (matrix, mod::Dest::Filter2Cutoff);
+        resonance.showModulationFor (matrix, mod::Dest::Filter2Reso);
+        drive.showModulationFor (matrix, mod::Dest::Filter2Drive);
+        mix.showModulationFor (matrix, mod::Dest::Filter2Mix);
+    }
+
+    void Filter2Panel::resized()
+    {
+        auto bounds = getLocalBounds();
+
+        auto top = bounds.removeFromTop (controlRowHeight);
+        enable.setBounds (top.removeFromLeft (46).reduced (2, 4));
+        routing.setBounds (top.removeFromRight (100).reduced (2, 4));
+        type.setBounds (top.reduced (2, 4));
+
+        layoutRow (bounds.removeFromTop (knobRowHeight), { &cutoff, &resonance, &drive, &mix, &keytrack });
+    }
+
     GlobalPanel::GlobalPanel (juce::AudioProcessorValueTreeState& state)
         : voiceMode    (state, ids::voiceMode, "Voice Mode"),
           glideMode    (state, ids::glideMode, "Glide Mode"),

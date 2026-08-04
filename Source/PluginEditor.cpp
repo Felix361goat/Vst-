@@ -26,16 +26,18 @@ namespace nog
                   osc2Panel (processor, matrix, 1),
                   subPanel (processor.getValueTreeState(), matrix),
                   noisePanel (processor.getValueTreeState(), matrix),
-                  filterPanel (processor.getValueTreeState(), matrix)
+                  filterPanel (processor.getValueTreeState(), matrix),
+                  filter2Panel (processor.getValueTreeState(), matrix)
             {
                 osc1Section.setContent (osc1Panel);
                 osc2Section.setContent (osc2Panel);
                 subSection.setContent (subPanel);
                 noiseSection.setContent (noisePanel);
                 filterSection.setContent (filterPanel);
+                filter2Section.setContent (filter2Panel);
 
                 for (auto* section : { &osc1Section, &osc2Section, &subSection,
-                                       &noiseSection, &filterSection })
+                                       &noiseSection, &filterSection, &filter2Section })
                     addAndMakeVisible (section);
             }
 
@@ -53,13 +55,17 @@ namespace nog
 
                 bounds.removeFromTop (4);
 
-                // Sub and noise are narrow; the filter takes the space left over
-                // because it carries the most controls.
-                const auto narrow = bounds.getWidth() / 4;
+                // Sub and noise are narrow; the two filters split what is left,
+                // because between them they carry the most controls.
+                const auto narrow = bounds.getWidth() / 6;
 
                 subSection.setBounds (bounds.removeFromLeft (narrow).reduced (3));
                 noiseSection.setBounds (bounds.removeFromLeft (narrow).reduced (3));
-                filterSection.setBounds (bounds.reduced (3));
+
+                const auto filterWidth = bounds.getWidth() / 2;
+
+                filterSection.setBounds (bounds.removeFromLeft (filterWidth).reduced (3));
+                filter2Section.setBounds (bounds.reduced (3));
             }
 
         private:
@@ -67,12 +73,14 @@ namespace nog
             SectionPanel osc2Section   { "Oscillator 2" };
             SectionPanel subSection    { "Sub" };
             SectionPanel noiseSection  { "Noise" };
-            SectionPanel filterSection { "Filter" };
+            SectionPanel filterSection { "Filter 1" };
+            SectionPanel filter2Section { "Filter 2" };
 
             OscillatorPanel osc1Panel, osc2Panel;
             SubPanel        subPanel;
             NoisePanel      noisePanel;
             FilterPanel     filterPanel;
+            Filter2Panel    filter2Panel;
         };
 
         /** The GLOBAL tab. */

@@ -16,6 +16,7 @@
 #include "Engine/SynthEngine.h"
 #include "DSP/Envelope.h"
 #include "DSP/Limiter.h"
+#include "DSP/StateVariableFilter.h"
 #include "Modulation/Motion.h"
 #include "DSP/Oscillator.h"
 #include "DSP/Wavetable.h"
@@ -749,6 +750,64 @@ namespace
                 expect (processor.engine.getActiveVoiceCount() <= 4,
                         "active voices: " + juce::String (processor.engine.getActiveVoiceCount()));
                 expect (isBufferHealthy (buffer));
+            }
+
+            beginTest ("the two filters differ in serial and in parallel");
+            {
+                // Serial and parallel are not two ways of saying the same
+                // thing: a low-pass then a high-pass leaves a band, while the
+                // two summed leaves everything except a band. If the routing
+                // switch produced the same audio either way it would be doing
+                // nothing.
+                const auto renderWith = [this] (bool parallel)
+                {
+                    TestProcessor processor;
+
+                    auto& one = processor.parameters.filter;
+                    one.enable->setValueNotifyingHost (1.0f);
+                    one.cutoff->setValueNotifyingHost (one.cutoff->convertTo0to1 (900.0f));
+
+                    auto& two = processor.parameters.filter2;
+                    two.enable->setValueNotifyingHost (1.0f);
+                    two.type->setValueNotifyingHost (two.type->convertTo0to1 (
+                        static_cast<float> (nog::dsp::StateVariableFilter::Type::HighPass24)));
+                    two.cutoff->setValueNotifyingHost (two.cutoff->convertTo0to1 (600.0f));
+
+                    processor.parameters.filterRouting->setValueNotifyingHost (parallel ? 1.0f : 0.0f);
+
+                    processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 45, 1.0f), 0);
+
+                    auto total = 0.0;
+
+                    for (int block = 0; block < 16; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        for (int i = 0; i < testBlockSize; ++i)
+                        {
+                            expect (std::isfinite (buffer.getSample (0, i)));
+                            total += std::abs (static_cast<double> (buffer.getSample (0, i)));
+                        }
+                    }
+
+                    return total;
+                };
+
+                const auto serial   = renderWith (false);
+                const auto parallel = renderWith (true);
+
+                expect (serial > 0.0 && parallel > 0.0, "both routings should make sound");
+
+                // Parallel keeps everything either filter passes, so it is the
+                // louder of the two by a clear margin at these settings.
+                expect (parallel > serial * 1.5,
+                        "parallel should pass far more than serial: "
+                            + juce::String (parallel, 2) + " against " + juce::String (serial, 2));
             }
 
             beginTest ("every effect type runs without producing garbage");

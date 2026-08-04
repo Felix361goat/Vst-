@@ -62,7 +62,7 @@ while voices are reading it — that last part is the actual work.
 
 **Verdict: high value, moderate difficulty.**
 
-### 4. One filter, eight types
+### 4. One filter, eight types — second filter built
 
 Serum 2 has two filters and around forty types including comb, flanger, phaser
 and formant models. NOG Suite has one filter with eight types from a single

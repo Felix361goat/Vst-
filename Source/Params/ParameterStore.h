@@ -190,6 +190,9 @@ namespace nog
         Sub    sub;
         Noise  noise;
         Filter filter;
+        Filter filter2;
+
+        juce::AudioParameterChoice* filterRouting = nullptr;
 
     private:
         /** Parameter backing each modulation destination, indexed by Dest. */

@@ -100,6 +100,16 @@ namespace nog
         filter.mix      = find<Float>  (apvts, ids::filterMix);
         filter.keytrack = find<Float>  (apvts, ids::filterKeytrack);
 
+        filter2.enable   = find<Bool>   (apvts, ids::filter2Enable);
+        filter2.type     = find<Choice> (apvts, ids::filter2Type);
+        filter2.cutoff   = find<Float>  (apvts, ids::filter2Cutoff);
+        filter2.reso     = find<Float>  (apvts, ids::filter2Reso);
+        filter2.drive    = find<Float>  (apvts, ids::filter2Drive);
+        filter2.mix      = find<Float>  (apvts, ids::filter2Mix);
+        filter2.keytrack = find<Float>  (apvts, ids::filter2Keytrack);
+
+        filterRouting = find<Choice> (apvts, ids::filterRouting);
+
         // -- envelopes ------------------------------------------------------
         for (int i = 0; i < ids::numEnvelopes; ++i)
         {
@@ -196,8 +206,8 @@ namespace nog
         }
 
         static_assert (static_cast<int> (mod::Dest::Fx1Mix) + ids::numFxSlots * 4
-                           == static_cast<int> (mod::Dest::Count),
-                       "The effect destinations must be the last block in mod::Dest");
+                           == static_cast<int> (mod::Dest::Filter2Cutoff),
+                       "The effect destinations must stay one contiguous block of four per slot");
 
         // Spelled out per oscillator rather than derived by arithmetic on the
         // enum, so that reordering mod::Dest cannot silently rewire the matrix.
@@ -239,6 +249,11 @@ namespace nog
         setDest (mod::Dest::FilterReso,   filter.reso);
         setDest (mod::Dest::FilterDrive,  filter.drive);
         setDest (mod::Dest::FilterMix,    filter.mix);
+
+        setDest (mod::Dest::Filter2Cutoff, filter2.cutoff);
+        setDest (mod::Dest::Filter2Reso,   filter2.reso);
+        setDest (mod::Dest::Filter2Drive,  filter2.drive);
+        setDest (mod::Dest::Filter2Mix,    filter2.mix);
 
         for (int i = 0; i < ids::numLfos; ++i)
         {
