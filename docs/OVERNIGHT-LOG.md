@@ -178,3 +178,26 @@ filter and the modulation curves:
   a high-pass keeping the slap, summed, leaves the mid scooped out.
 - The trumpet and saxophone open their filter through a curve rather than
   linearly, so blowing harder reads as effort rather than as a volume change.
+
+### Noise with character
+
+Filtered white noise is the correct answer to "what does pink noise sound like"
+and the wrong answer to "what should a noise layer add to a patch". A real
+texture has structure over time, and structure is what makes a noise layer
+sound like breath, or tape, or rain, rather than like a hiss with an envelope
+on it. Serum plays noise samples for exactly this reason.
+
+Six textured colours join the three generated ones: tape, vinyl and radio reuse
+the existing beds, and wind, rain and breath are new. Rain is a steady hiss with
+two and a half thousand individual resonant drops scattered over it — the drops
+are what stop it being static. Wind is a resonant band whose centre wanders on a
+slow random walk, because wind is not loud noise, it is noise that keeps
+changing its mind about which frequencies it contains. Breath is periodic: in
+for a second and a half, out for longer, then a pause.
+
+Each voice starts its texture at a random position, so several voices playing
+the same colour do not run in lockstep and sound like one loud voice.
+
+A test renders every textured colour and requires each to be both audible and
+different from white — a colour that quietly fell back to noise would sound
+plausible and be wrong.

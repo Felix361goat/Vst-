@@ -133,7 +133,8 @@ namespace nog::presets
             return set (ids::subToFilter, throughFilter ? 1.0f : 0.0f);
         }
 
-        /** @p colour 0 white, 1 pink, 2 brown. */
+        /** @p colour 0 white, 1 pink, 2 brown, then the textured ones:
+            3 tape, 4 vinyl, 5 radio, 6 wind, 7 rain, 8 breath. */
         Build& noise (int colour, float level, bool throughFilter = true)
         {
             set (ids::noiseEnable, 1.0f);

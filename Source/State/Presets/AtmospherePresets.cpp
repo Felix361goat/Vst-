@@ -596,6 +596,84 @@ namespace nog::presets
             .master (-11.0f)
             .done());
 
+        // -- textured noise ---------------------------------------------------
+        //
+        // The noise layer plays a recording rather than filtering randomness in
+        // these, which is what lets it sound like a place instead of a hiss.
+
+        list.push_back (Build ("Rain Window Pad", "Ambient")
+            .voices (10)
+            .osc (0, wt::Formant, 0.32f, 0.42f)
+            .osc (1, wt::BasicShapes, 0.38f, 0.22f)
+            .tune (1, -1)
+            .unison (0, 5, 0.11f, 0.55f, 0.9f, 0.25f)
+            .noise (7, 0.22f)
+            .filter (flt::LP24, 1800.0f, 0.05f, 0.0f, 1.0f, 0.35f)
+            .env (0, 700.0f, 2800.0f, 0.85f, 2200.0f)
+            .lfoFree (0, 0, 0.08f)
+            .route (Src::Lfo1, Dst::FilterCutoff, 0.16f, true)
+            .fx (FX::Reverb, 0.52f, 0.92f, 0.22f, 1.0f)
+            .master (-9.0f)
+            .done());
+
+        list.push_back (Build ("Wind Drone", "Ambient")
+            .voices (6)
+            .osc (0, wt::BasicShapes, wt::sine, 0.32f)
+            .oscOff (1)
+            .tune (0, -1)
+            .noise (6, 0.55f)
+            .filter (flt::BP12, 700.0f, 0.30f, 0.10f, 1.0f, 0.2f)
+            .env (0, 1200.0f, 3000.0f, 0.88f, 2600.0f)
+            .lfoFree (0, 0, 0.06f)
+            .route (Src::Lfo1, Dst::FilterCutoff, 0.45f, true)
+            .fx (FX::Reverb, 0.58f, 0.94f, 0.20f, 1.0f)
+            .master (-10.0f)
+            .done());
+
+        list.push_back (Build ("Breath Pad", "Pad")
+            .voices (10)
+            .osc (0, wt::Formant, 0.28f, 0.45f)
+            .osc (1, wt::BasicShapes, 0.42f, 0.20f)
+            .tune (1, 0)
+            .unison (0, 3, 0.09f, 0.5f, 0.85f, 0.2f)
+            .noise (8, 0.28f)
+            .filter (flt::LP24, 2400.0f, 0.06f, 0.0f, 1.0f, 0.4f)
+            .env (0, 500.0f, 2400.0f, 0.85f, 1800.0f)
+            .fx (FX::Chorus, 0.26f, 0.09f, 0.36f, 0.3f)
+            .fx (FX::Reverb, 0.50f, 0.90f, 0.22f, 1.0f)
+            .master (-9.0f)
+            .done());
+
+        list.push_back (Build ("Tape Keys", "Keys")
+            .voices (12)
+            .osc (0, wt::FmBell, 0.30f, 0.55f)
+            .osc (1, wt::BasicShapes, wt::triangle, 0.22f)
+            .tune (1, 1)
+            .noise (3, 0.10f, false)
+            .filter (flt::LP24, 2200.0f, 0.05f, 0.0f, 1.0f, 0.45f)
+            .env (0, 3.0f, 2200.0f, 0.25f, 600.0f)
+            .fx (FX::Eq, 1.0f, 0.42f, 0.40f, 0.3f)
+            .fx (FX::Reverb, 0.36f, 0.78f, 0.26f, 1.0f)
+            .master (-8.0f)
+            .done());
+
+        list.push_back (Build ("Radio Lead", "Lead")
+            .voices (1, 1)
+            .glide (28.0f, 2)
+            .osc (0, wt::BasicShapes, wt::saw, 0.55f)
+            .oscOff (1)
+            .noise (5, 0.16f)
+            // A band leaves the sound where a small speaker leaves it, which is
+            // most of why a radio sounds like a radio.
+            .filter (flt::LP24, 2800.0f, 0.16f, 0.20f, 1.0f, 0.55f)
+            .filter2 (flt::HP24, 500.0f, 0.20f)
+            .env (0, 4.0f, 800.0f, 0.80f, 260.0f)
+            .fx (FX::Distortion, 0.16f, 0.22f, 0.5f, 0.5f)
+            .fx (FX::Delay, 0.22f, 0.26f, 0.30f, 0.8f)
+            .fx (FX::Reverb, 0.26f, 0.66f, 0.28f, 1.0f)
+            .master (-9.0f)
+            .done());
+
         return list;
     }
 }

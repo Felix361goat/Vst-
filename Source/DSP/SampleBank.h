@@ -45,6 +45,11 @@ namespace nog::dsp
 
         Sample::Ptr get (int index) const;
 
+        /** The texture behind a noise colour, or nullptr for the generated
+            ones. Kept here rather than in the noise generator so the indices
+            live beside the table that defines them. */
+        static int noiseTextureIndex (int colour);
+
     private:
         SampleBank();
 

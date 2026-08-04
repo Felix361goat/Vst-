@@ -752,6 +752,67 @@ namespace
                 expect (isBufferHealthy (buffer));
             }
 
+            beginTest ("the textured noise colours play their texture");
+            {
+                // Three colours are filtered randomness and the rest play a
+                // recording. A textured colour that quietly fell back to noise
+                // would sound plausible and be wrong, so each one has to be
+                // both audible and different from white.
+                const auto renderColour = [this] (int colour)
+                {
+                    TestProcessor processor;
+
+                    auto& noise = processor.parameters.noise;
+                    noise.enable->setValueNotifyingHost (1.0f);
+                    noise.level->setValueNotifyingHost (1.0f);
+                    noise.colour->setValueNotifyingHost (noise.colour->convertTo0to1 (
+                        static_cast<float> (colour)));
+
+                    // Oscillators off, so what is measured is the noise layer.
+                    for (int i = 0; i < nog::ids::numOscillators; ++i)
+                        processor.parameters.osc[static_cast<size_t> (i)]
+                            .enable->setValueNotifyingHost (0.0f);
+
+                    processor.prepareToPlay (testSampleRate, testBlockSize);
+
+                    juce::AudioBuffer<float> buffer (2, testBlockSize);
+                    juce::MidiBuffer midi;
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+                    auto total = 0.0;
+
+                    for (int block = 0; block < 24; ++block)
+                    {
+                        processor.processBlock (buffer, midi);
+                        midi.clear();
+
+                        expect (isBufferHealthy (buffer));
+
+                        for (int i = 0; i < testBlockSize; ++i)
+                            total += std::abs (static_cast<double> (buffer.getSample (0, i)));
+                    }
+
+                    return total;
+                };
+
+                const auto white = renderColour (0);
+                expect (white > 1.0, "white noise should be audible");
+
+                const auto names = nog::params::choices::noiseColours();
+
+                // Every textured colour, from Tape onwards.
+                for (int colour = 3; colour < names.size(); ++colour)
+                {
+                    const auto total = renderColour (colour);
+
+                    expect (total > 0.5,
+                            names[colour] + " noise is effectively silent (" + juce::String (total, 3) + ")");
+
+                    expect (std::abs (total - white) > 0.01,
+                            names[colour] + " noise is indistinguishable from white");
+                }
+            }
+
             beginTest ("the two filters differ in serial and in parallel");
             {
                 // Serial and parallel are not two ways of saying the same

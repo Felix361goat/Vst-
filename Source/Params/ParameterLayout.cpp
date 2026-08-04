@@ -48,7 +48,9 @@ namespace nog::params
         juce::StringArray lfoTriggerModes() { return { "Trigger", "Envelope", "Free Run" }; }
         juce::StringArray voiceModes()      { return { "Poly", "Mono", "Legato" }; }
         juce::StringArray glideModes()      { return { "Off", "Always", "Legato" }; }
-        juce::StringArray noiseColours()    { return { "White", "Pink", "Brown" }; }
+        juce::StringArray noiseColours()    { return { "White", "Pink", "Brown",
+                                                       "Tape", "Vinyl", "Radio",
+                                                       "Wind", "Rain", "Breath" }; }
         juce::StringArray oversamplingModes() { return { "Off", "2x", "4x" }; }
 
         juce::StringArray effectTypes()

@@ -1,5 +1,6 @@
 #include "Engine/Voice.h"
 
+#include "DSP/SampleBank.h"
 #include "DSP/WavetableBank.h"
 #include "Params/ParameterLayout.h"
 
@@ -22,6 +23,7 @@ namespace nog
             oscillator.prepare (sampleRate);
 
         subOscillator.prepare (sampleRate);
+        noise.prepare (sampleRate);
         filter.prepare (sampleRate);
         filter2.prepare (sampleRate);
 
@@ -321,7 +323,16 @@ namespace nog
             subOscillator.setFrequency (midiNoteToHz (currentNote + static_cast<float> (parameters.sub.octave->get() * 12)));
         }
 
-        noise.setColour (static_cast<dsp::NoiseGenerator::Colour> (parameters.noise.colour->getIndex()));
+        const auto noiseColour = parameters.noise.colour->getIndex();
+        noise.setColour (static_cast<dsp::NoiseGenerator::Colour> (noiseColour));
+
+        // The textured colours play a recording. Looked up per block rather
+        // than cached, because it is one array index and caching it would mean
+        // another thing that can go stale when a preset changes the colour.
+        if (const auto index = dsp::SampleBank::noiseTextureIndex (noiseColour); index >= 0)
+            noise.setTexture (dsp::SampleBank::factory().get (index).get());
+        else
+            noise.setTexture (nullptr);
 
         // -- filter ---------------------------------------------------------
         {

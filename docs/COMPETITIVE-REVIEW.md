@@ -140,8 +140,10 @@ generated sources. Granular and spectral remain deferred.**
 - **No output limiter.** A safety limiter would stop a self-oscillating filter
   from producing a nasty surprise.
 - **Separate pitch bend up/down ranges.**
-- **Noise is generated, not sampled** — Serum plays noise samples, which is why
-  its noise layer has character.
+- ~~**Noise is generated, not sampled**~~ — built. Six textured colours play a
+  recording: tape, vinyl, radio, wind, rain and breath. The three generated
+  ones remain, since filtered noise is still the right answer when what is
+  wanted is actually noise.
 
 ---
 

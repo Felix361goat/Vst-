@@ -1365,6 +1365,118 @@ namespace nog::dsp
                              3.4f, 0.7f, 4831);
         }
 
+        // -- noise textures ---------------------------------------------------
+        //
+        // For the noise layer rather than the oscillators. What separates these
+        // from filtered white noise is structure over time: wind gusts, rain
+        // has individual drops, breath has a shape. A noise layer built from
+        // any of them sounds like a thing, where one built from a filter
+        // sounds like a hiss with an envelope on it.
+
+        juce::AudioBuffer<float> makeWind()
+        {
+            const auto length = lengthFor (4.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x717D);
+            auto lowPass = 0.0f, bandState = 0.0f, gust = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                // Gusts: a slow random walk that opens and closes a resonant
+                // band. Wind is not loud noise, it is noise that keeps changing
+                // its mind about which frequencies it contains.
+                gust = 0.99995f * gust + 0.00005f * noise.next();
+
+                const auto centre = juce::jlimit (0.02f, 0.35f, 0.12f + gust * 3.0f);
+
+                lowPass += centre * (noise.next() - lowPass);
+                bandState += 0.25f * (lowPass - bandState);
+
+                const auto level = 0.55f + 0.45f * std::sin (twoPi * 0.13f * t + gust * 8.0f);
+
+                out[i] = (lowPass - bandState * 0.6f) * level;
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeRain()
+        {
+            const auto length = lengthFor (4.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0x2A11);
+            juce::Random drops (0x2A12);
+
+            auto hiss = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                // A steady bed with individual drops on top. The drops are what
+                // makes it rain rather than static.
+                hiss += 0.5f * (noise.next() - hiss);
+                out[i] = hiss * 0.35f;
+            }
+
+            // Each drop is a very short resonant blip; a few thousand of them
+            // across four seconds is roughly what moderate rain sounds like.
+            constexpr int numDrops = 2600;
+
+            for (int d = 0; d < numDrops; ++d)
+            {
+                const auto start = drops.nextInt (length - 400);
+                const auto frequency = juce::jmap (drops.nextFloat(), 1800.0f, 7000.0f);
+                const auto amplitude = juce::jmap (drops.nextFloat(), 0.05f, 0.35f);
+                const auto decayRate = juce::jmap (drops.nextFloat(), 260.0f, 900.0f);
+
+                for (int n = 0; n < 400; ++n)
+                {
+                    const auto t = static_cast<float> (n) / static_cast<float> (rate);
+                    out[start + n] += std::sin (twoPi * frequency * t) * amplitude * std::exp (-decayRate * t);
+                }
+            }
+
+            return buffer;
+        }
+
+        juce::AudioBuffer<float> makeBreath()
+        {
+            const auto length = lengthFor (4.0);
+            juce::AudioBuffer<float> buffer (1, length);
+            auto* out = buffer.getWritePointer (0);
+
+            Noise noise (0xB4EA);
+            auto lowPass = 0.0f, highPass = 0.0f, previous = 0.0f;
+
+            for (int i = 0; i < length; ++i)
+            {
+                const auto t = static_cast<float> (i) / static_cast<float> (rate);
+
+                // Breathing is periodic: in for about a second and a half, out
+                // for rather longer, with a pause. The envelope is the sound.
+                const auto cycle = std::fmod (t, 3.6f);
+                const auto level = cycle < 1.4f ? std::sin (cycle / 1.4f * juce::MathConstants<float>::pi)
+                                 : cycle < 3.0f ? std::sin ((cycle - 1.4f) / 1.6f * juce::MathConstants<float>::pi) * 0.75f
+                                                : 0.0f;
+
+                lowPass += 0.30f * (noise.next() - lowPass);
+
+                // A gentle high-pass: breath has almost nothing below a few
+                // hundred hertz, and leaving it in only makes it rumble.
+                highPass = 0.985f * (highPass + lowPass - previous);
+                previous = lowPass;
+
+                out[i] = highPass * level;
+            }
+
+            return buffer;
+        }
+
         struct Definition
         {
             const char* name;
@@ -1439,7 +1551,13 @@ namespace nog::dsp
                 { "Dulcimer",      makeDulcimer,     false, 48, true },
                 { "Celesta",       makeCelesta,      false, 72, true },
                 { "Tabla",         makeTabla,        false, 60, true },
-                { "Djembe",        makeDjembe,       false, 48, true }
+                { "Djembe",        makeDjembe,       false, 48, true },
+
+                // For the noise layer rather than the oscillators, though
+                // nothing stops an oscillator loading one.
+                { "Wind",          makeWind,         true,  60, false },
+                { "Rain",          makeRain,         true,  60, false },
+                { "Breath",        makeBreath,       true,  60, false }
             };
 
             return list;
@@ -1495,6 +1613,18 @@ namespace nog::dsp
             return false;
 
         return definitions()[static_cast<size_t> (index)].pitched;
+    }
+
+    int SampleBank::noiseTextureIndex (int colour)
+    {
+        // Matches NoiseGenerator::Colour. White, pink and brown are generated,
+        // so the first textured colour is index three.
+        static const std::vector<int> byColour { -1, -1, -1, 16, 17, 18, 54, 55, 56 };
+
+        if (! juce::isPositiveAndBelow (colour, static_cast<int> (byColour.size())))
+            return -1;
+
+        return byColour[static_cast<size_t> (colour)];
     }
 
     Sample::Ptr SampleBank::get (int index) const
