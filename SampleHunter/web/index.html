@@ -74,10 +74,17 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .hunt-in{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
 .stat{color:var(--dim);font-size:13px}
 @media (max-width:1100px){
-  .row{grid-template-columns:40px 1fr 110px;grid-template-areas:"p n a" "w w w" "m m m"}
+  .row{grid-template-columns:40px minmax(0,1fr) auto}
   .row>.c-wave{grid-column:1/-1}
   .row>.c-meta{display:none}
-  .head{display:none}
+  .row.head{display:none}
+}
+@media (max-width:600px){
+  .bar,.filters{padding-left:16px;padding-right:16px}
+  .row>.acts{grid-column:1/-1;justify-content:flex-start}
+  .drawer .bar{gap:8px}
+  .drawer.closed .hunt-opt{display:none}
+  main{padding-bottom:200px}
 }
 </style>
 </head>
@@ -125,9 +132,9 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <span class="dot" id="dot"></span>
     <b>Neue Samples suchen</b>
     <input class="hunt-in" id="huntCount" type="number" value="15" min="1" max="200" style="width:64px"> Stück
-    <input class="hunt-in" id="huntTerms" placeholder="optional: kora, tumbi, steel guitar …" style="flex:1;min-width:180px">
-    <label class="stat"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
-    <label class="stat" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
+    <input class="hunt-in hunt-opt" id="huntTerms" placeholder="optional: kora, tumbi, steel guitar …" style="flex:1;min-width:180px">
+    <label class="stat hunt-opt"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
+    <label class="stat hunt-opt" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
     <button class="btn primary" id="huntBtn">Los</button>
     <button class="btn" id="stopBtn">Stop</button>
     <button class="btn" id="logBtn">Log</button>
