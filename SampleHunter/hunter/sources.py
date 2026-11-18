@@ -104,7 +104,18 @@ WEIRD_TERMS = [
     "trance music", "ceremony", "spirit", "shaman",
 ]
 
-ALL_TERMS = list(dict.fromkeys(INSTRUMENTS + STYLES + VOCALS + WEIRD_TERMS))
+# Everyday sounds: still searchable by name (--terms), but not dug by default,
+# because they mostly turn up ordinary folk, pop and dance music.
+EVERYDAY = {
+    "ukulele", "banjo", "mandolin", "accordion", "concertina", "harmonica", "autoharp",
+    "cuatro", "cavaquinho", "charango", "bandoneon", "celesta", "glockenspiel",
+    "music box", "bells", "whistling", "xylophone", "marimba", "zither", "ocarina",
+    "pan pipes", "steelpan", "bagpipe", "danzon", "son cubano", "cumbia", "mariachi",
+    "calypso", "mento", "flamenco", "fado", "csardas", "hawaiian", "highlife",
+    "palm wine", "juju", "lullaby", "work song", "polka", "tango", "novelty",
+}
+
+ALL_TERMS = [t for t in dict.fromkeys(INSTRUMENTS + STYLES + VOCALS + WEIRD_TERMS) if t not in EVERYDAY]
 
 LICENSE_PD = "pd"          # public domain or CC0
 LICENSE_PD_US = "pd-us"    # US public domain by age

@@ -54,6 +54,8 @@ def main() -> int:
                     help="also dig pre-1950 material (78s): legally clean, but crackly")
     ap.add_argument("--max-grain", type=float, default=55.0,
                     help="drop samples with more crackle/hiss/muffle than this, 0-100 (100 = keep all)")
+    ap.add_argument("--min-weird", type=float, default=45.0,
+                    help="with the AI ear: drop samples that sound too ordinary, 0-100 (0 = keep all)")
     ap.add_argument("--no-ear", action="store_true", help="do not use the AI ear even if installed")
     ap.add_argument("--min-score", type=float, default=58.0, help="minimum score, 0-100")
     ap.add_argument("--per-track", type=int, default=2, help="max samples cut from one recording")
@@ -242,7 +244,10 @@ def judge(path: str, windows: list, args) -> list:
             log("    verworfen: zu viel Rauschen/Knistern (Grain %.0f)" % v["grain"])
             continue
         if v["weird"] is not None:
-            w.score = round(0.5 * w.score + 0.5 * v["weird"], 1)
+            if v["weird"] < args.min_weird:
+                log("    verworfen: klingt zu gewöhnlich (weird %.0f)" % v["weird"])
+                continue
+            w.score = round(0.4 * w.score + 0.6 * v["weird"], 1)
         kept.append(w)
     return kept
 

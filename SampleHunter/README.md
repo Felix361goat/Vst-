@@ -120,7 +120,7 @@ heruntergeladen hat.
 - **Weirdness**: klingt es eher nach „hypnotisches Riff auf einem
   ungewöhnlichen Instrument, nasal, schnarrend, metallisch, ritueller Trance“
   oder eher nach „normaler Folk mit Gitarre, Blaskapelle, Tanzorchester,
-  Kirchenchor, Pop“? Zählt zur Hälfte in den Score.
+  Kirchenchor, Pop“? Zählt zu 60 % in den Score; unter 45 fliegt es raus (`--min-weird`).
 - **Klang-Fingerabdruck**: damit funktionieren „Ähnliche finden“, das
   Geschmacks-Lernen und die **Suche nach Klang**: beschreib oben einen Sound
   („eerie nasal riff“, „buzzing reed drone“, „metallic bells“, Englisch klappt
