@@ -47,9 +47,39 @@ class Window:
     kind: str = "loop"    # "loop": cut on the beat; "phrase": a free one-shot line
 
 
+_FFMPEG: list = []
+
+
+def ffmpeg() -> str:
+    """The ffmpeg binary: one installed on the system, else the copy that
+    comes with the imageio-ffmpeg package (so nobody has to install it)."""
+    if not _FFMPEG:
+        import shutil
+        exe = shutil.which("ffmpeg")
+        if not exe:
+            try:
+                import imageio_ffmpeg
+                exe = imageio_ffmpeg.get_ffmpeg_exe()
+            except Exception:
+                exe = "ffmpeg"
+        _FFMPEG.append(exe)
+    return _FFMPEG[0]
+
+
+def duration_of(path: str) -> float | None:
+    """Length in seconds, read from ffmpeg's own report (no ffprobe needed)."""
+    import re
+    try:
+        err = subprocess.run([ffmpeg(), "-hide_banner", "-i", path], capture_output=True, text=True).stderr
+    except OSError:
+        return None
+    m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", err)
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else None
+
+
 def decode(path: str, sr: int = SR, channels: int = 1, start: float = 0.0,
            duration: float | None = MAX_SECONDS) -> np.ndarray:
-    cmd = ["ffmpeg", "-v", "error", "-nostdin"]
+    cmd = [ffmpeg(), "-v", "error", "-nostdin"]
     if start > 0:
         cmd += ["-ss", "%.6f" % start]
     cmd += ["-i", path]
@@ -104,11 +134,8 @@ def excerpt_start(path: str, rng=None) -> float:
     """Where to start analysing. Long recordings (concerts, tapes) get a random
     stretch rather than always their opening, which is often tuning or talk."""
     import random
-    try:
-        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                              "-of", "default=nw=1:nk=1", path], capture_output=True, text=True).stdout
-        dur = float(out.strip())
-    except (ValueError, OSError):
+    dur = duration_of(path)
+    if dur is None:
         return 0.0
     if dur <= MAX_SECONDS + 30:
         return 0.0
@@ -274,13 +301,10 @@ def align(reference: str, other: str, at: float, span: float = 6.0) -> float:
 
 def write_audio(dest: str, audio: np.ndarray, sr: int) -> None:
     """WAV (24-bit) or MP3 (320 kbps, with the LAME gapless header) by extension."""
-    if dest.lower().endswith(".mp3"):
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(sr), "-ac", "2",
-                        "-i", "-", "-c:a", "libmp3lame", "-b:a", "320k", dest],
-                       input=np.ascontiguousarray(audio, dtype=np.float32).tobytes(), check=True)
-    else:
-        import soundfile as sf
-        sf.write(dest, audio, sr, subtype="PCM_24")
+    codec = ["-c:a", "libmp3lame", "-b:a", "320k"] if dest.lower().endswith(".mp3") else ["-c:a", "pcm_s24le"]
+    subprocess.run([ffmpeg(), "-v", "error", "-y", "-f", "f32le", "-ar", str(sr), "-ac", "2",
+                    "-i", "-", *codec, dest],
+                   input=np.ascontiguousarray(audio, dtype=np.float32).tobytes(), check=True)
 
 
 def to_wav(src: str, dest: str, duration: float | None = None) -> None:

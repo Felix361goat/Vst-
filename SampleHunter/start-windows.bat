@@ -1,26 +1,23 @@
 @echo off
-rem SampleHunter starten: installiert beim ersten Mal die Python-Pakete
-rem und oeffnet die Bibliothek in einem eigenen Fenster.
+rem SampleHunter starten. Beim ersten Mal werden ca. 300 MB installiert
+rem (App-Fenster und Basis); danach startet es in Sekunden.
 cd /d "%~dp0"
-where ffmpeg >nul 2>nul || (
-  echo ffmpeg fehlt. Einmal ausfuehren:  winget install Gyan.FFmpeg
+where py >nul 2>nul || where python >nul 2>nul || (
+  echo Python fehlt. Einmal ausfuehren:  winget install Python.Python.3.12
   echo Danach dieses Fenster schliessen und neu starten.
   pause
   exit /b 1
 )
 if not exist .venv (
-  echo Erster Start: installiere Pakete, das dauert ein paar Minuten ...
-  py -3 -m venv .venv || python -m venv .venv
-  .venv\Scripts\python -m pip install --upgrade pip
-  .venv\Scripts\python -m pip install -r requirements.txt || (pause & exit /b 1)
+  echo Erster Start: installiere SampleHunter ^(ca. 300 MB, ein paar Minuten^) ...
+  py -3 -m venv .venv 2>nul || python -m venv .venv
+  .venv\Scripts\python -m pip install --upgrade pip -q
 )
-if not exist .venv\ear-ok (
-  echo Installiere das KI-Ohr ^(ca. 1 GB, einmalig^) ...
-  .venv\Scripts\python -m pip install -r requirements-ear.txt && echo ok> .venv\ear-ok
-  if not exist .venv\ear-ok echo KI-Ohr liess sich nicht installieren - SampleHunter laeuft trotzdem, nur ohne.
+if not exist .venv\base-ok-2 (
+  .venv\Scripts\python -m pip install -r requirements.txt || (pause & exit /b 1)
+  echo ok> .venv\base-ok-2
 )
 if not exist .venv\app-ok (
-  echo Installiere das App-Fenster ^(fuer Drag ^& Drop nach FL Studio, einmalig^) ...
   .venv\Scripts\python -m pip install -r requirements-app.txt && echo ok> .venv\app-ok
 )
 if exist .venv\app-ok (

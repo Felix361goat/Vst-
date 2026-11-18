@@ -168,6 +168,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <label class="stat hunt-opt" title="Auch obskure Uploads ohne geklärte Lizenz – keine weltbekannten Namen, bevorzugt kaum gehörte Aufnahmen"><input type="checkbox" id="huntExp" checked> Experiment: auch Lizenz unklar</label>
     <label class="stat hunt-opt"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
     <label class="stat hunt-opt" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
+    <button class="btn hunt-opt" id="earBtn" hidden title="Optional: bessere Bewertung eigener Suchen und Suche nach Klang">🧠 KI-Ohr installieren</button>
     <label class="stat hunt-opt" title="Gräbt immer weiter, solange SampleHunter offen ist: nach jeder Runde startet nach kurzer Pause die nächste"><input type="checkbox" id="huntAuto"> Autopilot</label>
     <button class="btn primary" id="huntBtn">Los</button>
     <button class="btn" id="stopBtn">Stop</button>
@@ -479,7 +480,11 @@ async function listenSearch(){
   $('#listenBtn').textContent = '🔊 hört …';
   try{
     const r = await (await fetch('/api/listen?q=' + encodeURIComponent(q))).json();
-    if(r.error){ alert(r.error === 'KI-Ohr nicht installiert' ? 'Die Klangsuche braucht das KI-Ohr (siehe README).' : 'Klangsuche: ' + r.error); return; }
+    if(r.error){
+      if(r.error === 'KI-Ohr nicht installiert'){ $('#earBtn').click(); }
+      else alert('Klangsuche: ' + r.error);
+      return;
+    }
     if(!r.ids.length){ alert('Noch keine Samples mit KI-Ohr-Analyse in der Bibliothek.'); return; }
     $('#q').value = ''; focus = {type:'text', ids:r.ids, q}; render(); window.scrollTo({top:0});
   } finally { $('#listenBtn').textContent = '🔊 Nach Klang'; }
@@ -504,27 +509,61 @@ $('#collDel').onclick = async () => {
 };
 
 // ---------- hunting ----------
-$('#huntBtn').onclick = async () => {
+let caps = {hunt:true, ear:true}, huntAfterInstall = false;
+async function install(what){
+  await fetch('/api/install', {method:'POST', body:JSON.stringify({what})});
+  $('#drawer').classList.remove('closed'); installing = true; poll();
+}
+function showCaps(c){
+  if(!c) return;
+  caps = c;
+  const b = $('#earBtn');
+  b.hidden = !!c.ear;
+  b.disabled = !!c.installing;
+  b.textContent = c.installing && c.install_what === 'ear' ? '🧠 KI-Ohr wird installiert …' : '🧠 KI-Ohr installieren';
+}
+async function startHunt(){
   const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked, experiment:$('#huntExp').checked, auto:$('#huntAuto').checked})});
-  if(!r.ok) alert('Es läuft schon eine Suche.'); $('#drawer').classList.remove('closed'); poll();
+  if(!r.ok){
+    const j = await r.json().catch(() => ({}));
+    if(j.error === 'needs-hunt'){
+      if(confirm('Für eigene Suchen lädt SampleHunter einmalig ca. 85 MB Analyse-Pakete nach. Jetzt installieren? Die Suche startet danach von selbst.')){
+        huntAfterInstall = true; install('hunt');
+      }
+      return;
+    }
+    alert('Es läuft schon eine Suche.');
+  }
+  $('#drawer').classList.remove('closed'); poll();
+}
+$('#huntBtn').onclick = startHunt;
+$('#earBtn').onclick = () => {
+  if(confirm('Das KI-Ohr bewertet bei deinen eigenen Suchen, wie schräg und wie sauber ein Sample klingt, und macht die Klangsuche möglich. Download: ca. 140 MB jetzt, dazu ca. 615 MB beim ersten Einsatz. Der mitgelieferte Katalog braucht es nicht. Installieren?')) install('ear');
 };
 $('#stopBtn').onclick = () => fetch('/api/stop', {method:'POST'});
 $('#logBtn').onclick = () => $('#drawer').classList.toggle('closed');
-let lastSeen = '', wasHunting = false;
+let lastSeen = '', wasHunting = false, installing = false;
 async function poll(){
   try{
     const r = await (await fetch('/api/log')).json();
-    $('#dot').classList.toggle('live', r.hunting || r.auto); $('#log').textContent = r.lines.join('\n'); $('#log').scrollTop = 1e9;
+    $('#dot').classList.toggle('live', r.hunting || r.auto || r.caps.installing); $('#log').textContent = r.lines.join('\n'); $('#log').scrollTop = 1e9;
+    showCaps(r.caps);
+    if(installing && !r.caps.installing){
+      installing = false;
+      if(huntAfterInstall && r.caps.hunt){ huntAfterInstall = false; startHunt(); return; }
+      toast(r.caps.ear && r.caps.hunt ? 'Installiert.' : 'Installation fertig – Details im Log.');
+    }
     $('#huntAuto').checked = r.auto || $('#huntAuto').checked && r.hunting;
     const latest = r.lines.filter(l => l.includes('✓')).pop() || '';
     if(latest !== lastSeen || (wasHunting && !r.hunting)){ lastSeen = latest; await load(); }
     wasHunting = r.hunting;
-    if(r.hunting || r.auto) setTimeout(poll, 2500);
+    if(r.hunting || r.auto || r.caps.installing) setTimeout(poll, 2500);
   }catch(e){ setTimeout(poll, 4000); }
 }
 async function load(){
   const r = await (await fetch('/api/library')).json();
-  samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections(); showUsage(r.usage);
+  samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections(); showUsage(r.usage); showCaps(r.caps);
+  if(r.caps && r.caps.installing && !installing){ installing = true; poll(); }
   const keys = [...new Set(samples.map(s => s.key))].sort(); const sel = $('#key'), v = sel.value;
   sel.innerHTML = '<option value="">alle</option>' + keys.map(k => `<option>${esc(k)}</option>`).join(''); sel.value = v;
   render();

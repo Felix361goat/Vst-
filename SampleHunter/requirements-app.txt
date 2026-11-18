@@ -1,2 +1,3 @@
+# Das App-Fenster mit Drag & Drop in die DAW (~255 MB).
 PySide6>=6.8
 PySide6-WebEngine

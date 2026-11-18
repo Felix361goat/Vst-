@@ -1,4 +1,5 @@
-# The AI ear (weirdness, crackle detection, search by sound). Optional but
-# recommended; on first use it downloads its model (~600 MB) once.
+# Das KI-Ohr: Weirdness- und Knister-Bewertung bei eigenen Suchen, Suche nach
+# Klang (~140 MB Pakete + ~615 MB Modell beim ersten Einsatz). Optional; die
+# App bietet es per Knopf an. Der mitgelieferte Katalog ist schon bewertet.
 torch>=2.2
 transformers>=4.40

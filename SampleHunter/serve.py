@@ -53,6 +53,35 @@ def hunting() -> bool:
     return p is not None and p.poll() is None
 
 
+def caps() -> dict:
+    """Which optional parts are installed."""
+    import importlib
+    import importlib.util
+    importlib.invalidate_caches()
+    has = lambda m: importlib.util.find_spec(m) is not None  # noqa: E731
+    return {"hunt": has("librosa") and has("scipy"), "ear": has("torch") and has("transformers"),
+            "installing": bool(_install.get("proc") and _install["proc"].poll() is None),
+            "install_what": _install.get("what")}
+
+
+_install: dict = {}
+
+
+def start_install(what: str) -> bool:
+    """pip-install an optional part into this Python, logging to hunt.log."""
+    req = {"hunt": "requirements-hunt.txt", "ear": "requirements-ear.txt"}.get(what)
+    if not req or (_install.get("proc") and _install["proc"].poll() is None):
+        return False
+    log = open(LOG, "w", encoding="utf-8")
+    log.write("Installiere %s … (einmalig)\n" % {"hunt": "Such-Pakete (~85 MB)",
+                                                 "ear": "KI-Ohr (~140 MB, Modell ~615 MB folgt bei der ersten Suche)"}[what])
+    log.flush()
+    _install["what"] = what
+    _install["proc"] = subprocess.Popen([sys.executable, "-m", "pip", "install", "--progress-bar", "off",
+                                         "-r", os.path.join(HERE, req)], stdout=log, stderr=subprocess.STDOUT)
+    return True
+
+
 def start_hunt(body: dict, append: bool = False) -> bool:
     with _hunt_lock:
         if hunting():
@@ -157,6 +186,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/library":
             return self._json({"samples": LIB.all_samples(), "ratings": LIB.ratings(), "usage": STORE.usage(),
+                               "caps": caps(),
                                "collections": LIB.collections(), "hunting": hunting(),
                                "auto": bool(_hunt.get("auto"))})
         if url.path == "/api/log":
@@ -165,7 +195,8 @@ class Handler(SimpleHTTPRequestHandler):
                     lines = fh.read().splitlines()[-40:]
             except FileNotFoundError:
                 lines = []
-            return self._json({"hunting": hunting(), "auto": bool(_hunt.get("auto")), "lines": lines})
+            return self._json({"hunting": hunting(), "auto": bool(_hunt.get("auto")), "lines": lines,
+                               "caps": caps()})
         if url.path == "/api/listen":
             # Search the library by describing a sound.
             q = (urllib.parse.parse_qs(url.query).get("q") or [""])[0].strip()
@@ -174,7 +205,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ids": [], "error": None if q else "leer"})
             try:
                 from hunter import ear
-                if not ear.available():
+                if not caps()["ear"]:
                     return self._json({"ids": [], "error": "KI-Ohr nicht installiert"})
                 t = ear.text_embedding(q)
             except Exception as exc:
@@ -274,7 +305,12 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/collection/delete":
             LIB.drop_collection(str(body.get("name") or ""))
             return self._json({"ok": True, "collections": LIB.collections()})
+        if url.path == "/api/install":
+            ok = start_install(str(body.get("what")))
+            return self._json({"ok": ok, "caps": caps()})
         if url.path == "/api/hunt":
+            if not caps()["hunt"]:
+                return self._json({"ok": False, "error": "needs-hunt", "caps": caps()}, 409)
             _hunt["auto"] = dict(body) if body.get("auto") else None
             if not start_hunt(body):
                 return self._json({"ok": False, "error": "läuft schon"}, 409)

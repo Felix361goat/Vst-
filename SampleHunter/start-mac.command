@@ -1,24 +1,20 @@
 #!/bin/bash
-# SampleHunter starten: installiert beim ersten Mal die Python-Pakete
-# und öffnet die Bibliothek in einem eigenen Fenster.
+# SampleHunter starten. Beim ersten Mal werden ca. 300 MB installiert
+# (App-Fenster und Basis); danach startet es in Sekunden.
 cd "$(dirname "$0")"
-if ! command -v ffmpeg >/dev/null; then
-  echo "ffmpeg fehlt. Einmal ausführen:  brew install ffmpeg"
+if ! command -v python3 >/dev/null; then
+  echo "Python fehlt. Einmal ausführen:  brew install python"
   read -n1 -p "Taste drücken …"; exit 1
 fi
 if [ ! -d .venv ]; then
-  echo "Erster Start: installiere Pakete, das dauert ein paar Minuten …"
+  echo "Erster Start: installiere SampleHunter (ca. 300 MB, ein paar Minuten) …"
   python3 -m venv .venv
-  .venv/bin/pip install --upgrade pip
-  .venv/bin/pip install -r requirements.txt || exit 1
+  .venv/bin/pip install --upgrade pip -q
 fi
-if [ ! -f .venv/ear-ok ]; then
-  echo "Installiere das KI-Ohr (ca. 1 GB, einmalig) …"
-  .venv/bin/pip install -r requirements-ear.txt && touch .venv/ear-ok \
-    || echo "KI-Ohr ließ sich nicht installieren – SampleHunter läuft trotzdem, nur ohne."
+if [ ! -f .venv/base-ok-2 ]; then
+  .venv/bin/pip install -r requirements.txt && touch .venv/base-ok-2 || exit 1
 fi
 if [ ! -f .venv/app-ok ]; then
-  echo "Installiere das App-Fenster (für Drag & Drop in die DAW, einmalig) …"
   .venv/bin/pip install -r requirements-app.txt && touch .venv/app-ok
 fi
 if [ -f .venv/app-ok ]; then
