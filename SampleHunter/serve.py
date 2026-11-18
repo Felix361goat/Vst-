@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import os
 import subprocess
 import sys
@@ -27,13 +28,44 @@ from hunter.library import Library  # noqa: E402
 
 LIB = Library(os.environ.get("HUNTER_LIBRARY", os.path.join(HERE, "library")))
 LOG = os.path.join(LIB.root, "hunt.log")
-_hunt: dict = {"proc": None}
+_hunt: dict = {"proc": None, "auto": None}
 _hunt_lock = threading.Lock()
 
 
 def hunting() -> bool:
     p = _hunt["proc"]
     return p is not None and p.poll() is None
+
+
+def start_hunt(body: dict, append: bool = False) -> bool:
+    with _hunt_lock:
+        if hunting():
+            return False
+        cmd = [sys.executable, os.path.join(HERE, "hunt.py"),
+               "--count", str(max(1, min(500, int(body.get("count", 10))))), "--library", LIB.root]
+        terms = str(body.get("terms") or "").strip()
+        if terms:
+            cmd += ["--terms", terms]
+        for key, flag in (("allow_nc", "--allow-nc"), ("include_claimed", "--include-claimed"),
+                          ("experiment", "--experiment")):
+            if body.get(key):
+                cmd.append(flag)
+        log = open(LOG, "a" if append else "w", encoding="utf-8")
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
+        _hunt["proc"] = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+        return True
+
+
+def autopilot() -> None:
+    """Keeps digging while the app is open: a new round shortly after each one ends."""
+    import time
+    while True:
+        time.sleep(5)
+        params = _hunt.get("auto")
+        if params and not hunting():
+            time.sleep(10)
+            if _hunt.get("auto") and not hunting():
+                start_hunt(params, append=True)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -76,14 +108,15 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/library":
             data = LIB.load()
             return self._json({"samples": data["samples"], "ratings": LIB.ratings(),
-                               "hunting": hunting()})
+                               "collections": LIB.collections(), "hunting": hunting(),
+                               "auto": bool(_hunt.get("auto"))})
         if url.path == "/api/log":
             try:
                 with open(LOG, encoding="utf-8", errors="replace") as fh:
                     lines = fh.read().splitlines()[-40:]
             except FileNotFoundError:
                 lines = []
-            return self._json({"hunting": hunting(), "lines": lines})
+            return self._json({"hunting": hunting(), "auto": bool(_hunt.get("auto")), "lines": lines})
         if url.path == "/api/zip":
             q = urllib.parse.parse_qs(url.query)
             ids = set((q.get("ids") or [""])[0].split(","))
@@ -103,7 +136,8 @@ class Handler(SimpleHTTPRequestHandler):
             body = buf.getvalue()
             self.send_response(200)
             self.send_header("Content-Type", "application/zip")
-            self.send_header("Content-Disposition", 'attachment; filename="samplehunter.zip"')
+            fname = re.sub(r"[^A-Za-z0-9 _-]+", "", (q.get("name") or ["samplehunter"])[0]).strip() or "samplehunter"
+            self.send_header("Content-Disposition", 'attachment; filename="%s.zip"' % fname)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -119,26 +153,19 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/delete":
             LIB.delete(str(body.get("id")))
             return self._json({"ok": True})
+        if url.path == "/api/collect":
+            LIB.collect(str(body.get("id") or ""), str(body.get("name") or ""), bool(body.get("on", True)))
+            return self._json({"ok": True, "collections": LIB.collections()})
+        if url.path == "/api/collection/delete":
+            LIB.drop_collection(str(body.get("name") or ""))
+            return self._json({"ok": True, "collections": LIB.collections()})
         if url.path == "/api/hunt":
-            with _hunt_lock:
-                if hunting():
-                    return self._json({"ok": False, "error": "läuft schon"}, 409)
-                cmd = [sys.executable, os.path.join(HERE, "hunt.py"),
-                       "--count", str(int(body.get("count", 10))), "--library", LIB.root]
-                terms = str(body.get("terms") or "").strip()
-                if terms:
-                    cmd += ["--terms", terms]
-                if body.get("allow_nc"):
-                    cmd.append("--allow-nc")
-                if body.get("include_claimed"):
-                    cmd.append("--include-claimed")
-                if body.get("experiment"):
-                    cmd.append("--experiment")
-                log = open(LOG, "w", encoding="utf-8")
-                env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
-                _hunt["proc"] = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+            _hunt["auto"] = dict(body) if body.get("auto") else None
+            if not start_hunt(body):
+                return self._json({"ok": False, "error": "läuft schon"}, 409)
             return self._json({"ok": True})
         if url.path == "/api/stop":
+            _hunt["auto"] = None
             p = _hunt["proc"]
             if p and p.poll() is None:
                 p.terminate()
@@ -181,7 +208,14 @@ def open_window(url: str, server) -> None:
                              "--no-default-browser-check", "--autoplay-policy=no-user-gesture-required"])
 
     def watch():
+        import time
+        t0 = time.time()
         proc.wait()
+        if time.time() - t0 < 8:
+            # The launcher handed off to another browser process and left:
+            # we cannot tell when the window closes, so keep running.
+            print("Fenster offen – zum Beenden dieses Fenster hier schließen oder Strg+C.")
+            return
         print("Fenster geschlossen – SampleHunter beendet.")
         if hunting():
             _hunt["proc"].terminate()
@@ -199,6 +233,7 @@ def main():
         webbrowser.open("http://localhost:%d" % port)
         return
     url = "http://localhost:%d" % port
+    threading.Thread(target=autopilot, daemon=True).start()
     print("SampleHunter läuft auf", url)
     print("Fenster schließen oder Strg+C zum Beenden.")
     if "--no-browser" not in sys.argv:

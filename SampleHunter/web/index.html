@@ -34,7 +34,7 @@ header{position:sticky;top:0;z-index:5;background:rgba(14,15,18,.92);backdrop-fi
 .sep{width:1px;height:20px;background:var(--line)}
 main{padding:8px 12px 120px}
 .empty{color:var(--dim);text-align:center;padding:80px 20px}
-.row{display:grid;grid-template-columns:40px minmax(160px,1.4fr) minmax(160px,2fr) 64px 64px 90px 150px 156px;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent}
+.row{display:grid;grid-template-columns:40px minmax(160px,1.4fr) minmax(160px,2fr) 64px 64px 90px 150px 186px;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent}
 .row:hover{background:var(--row-h)}
 .row.cur{background:var(--row);border-color:#3a2530}
 .row.disliked{opacity:.45}
@@ -49,7 +49,13 @@ main{padding:8px 12px 120px}
 .tag:hover{color:var(--text)}
 .name small.src{cursor:pointer} .name small.src:hover{color:var(--text);text-decoration:underline}
 .focus{display:flex;gap:10px;align-items:center;margin:6px 8px 10px;padding:8px 12px;border:1px solid #3a2530;background:#1d1418;border-radius:8px;font-size:13px}
-.focus b{color:var(--accent)} .focus button{margin-left:auto}
+.focus b{color:var(--accent)}
+.menu{position:absolute;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;min-width:200px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.menu div{padding:6px 10px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.menu div:hover{background:var(--row-h)}
+.menu .chk{display:inline-block;width:18px;color:var(--accent)}
+.menu .new{color:var(--dim);border-top:1px solid var(--line);margin-top:4px}
+.ico.in-coll{color:var(--accent)} .focus button{margin-left:auto}
 canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .num{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px;text-align:right}
 .num b{color:var(--text);font-weight:600}
@@ -100,7 +106,9 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <div class="logo">SAMPLE<span>HUNTER</span></div>
     <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tonart, Tag …  (/)">
     <span class="stat" id="count"></span>
-    <button class="btn" id="zipBtn" title="Alle gelikten Samples mit CREDITS.txt">Likes als ZIP</button>
+    <select class="btn" id="coll" title="Deine Sammlungen"></select>
+    <button class="btn" id="collDel" title="Diese Sammlung löschen (die Samples bleiben)" hidden>Sammlung löschen</button>
+    <button class="btn" id="zipBtn" title="WAVs mit CREDITS.txt">Likes als ZIP</button>
   </div>
   <div class="filters">
     <span class="chip on" data-lic="pd">Public Domain</span>
@@ -146,6 +154,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <label class="stat hunt-opt" title="Auch obskure Uploads ohne geklärte Lizenz – keine weltbekannten Namen, bevorzugt kaum gehörte Aufnahmen"><input type="checkbox" id="huntExp" checked> Experiment: auch Lizenz unklar</label>
     <label class="stat hunt-opt"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
     <label class="stat hunt-opt" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
+    <label class="stat hunt-opt" title="Gräbt immer weiter, solange SampleHunter offen ist: nach jeder Runde startet nach kurzer Pause die nächste"><input type="checkbox" id="huntAuto"> Autopilot</label>
     <button class="btn primary" id="huntBtn">Los</button>
     <button class="btn" id="stopBtn">Stop</button>
     <button class="btn" id="logBtn">Log</button>
@@ -162,6 +171,7 @@ const ICON = {
   down:'<svg viewBox="0 0 24 24"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>',
   thumbDown:'<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>',
   similar:'<svg viewBox="0 0 24 24"><path d="M2 9c3-4 5-4 8 0s5 4 8 0 3-2 4-2M2 16c3-4 5-4 8 0s5 4 8 0 3-2 4-2"/></svg>',
+  folder:'<svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/></svg>',
   link:'<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>',
   trash:'<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/></svg>',
 };
@@ -228,6 +238,7 @@ function rowHTML(s){
       <button class="ico ${r>0?'liked':''}" data-act="like" title="Like (L)">${ICON.heart}</button>
       <button class="ico ${r<0?'disl':''}" data-act="dislike" title="Nicht mein Ding (D)">${ICON.thumbDown}</button>
       <button class="ico" data-act="similar" title="Ähnliche Samples finden (S)">${ICON.similar}</button>
+      <button class="ico ${Object.values(collections).some(ids => ids.includes(s.id)) ? 'in-coll' : ''}" data-act="collect" title="Zu einer Sammlung hinzufügen">${ICON.folder}</button>
       <a class="ico" href="/library/${encodeURI(s.file)}" download title="WAV herunterladen">${ICON.down}</a>
       <a class="ico" href="${esc(s.source_url)}" target="_blank" rel="noopener" title="Originalaufnahme auf archive.org (ab ${fmtTime(s.source_start)})">${ICON.link}</a>
     </div>
@@ -247,7 +258,9 @@ function filtered(){
       .map(s => [s, dist(v, vec(s)) + (s.key === ref.key ? 0 : 0.15) + (s.source_url === ref.source_url && s.id !== ref.id ? 0.3 : 0)])
       .sort((a,b) => a[1]-b[1]).slice(0, 40).map(x => x[0]);
   }
+  const inColl = coll ? new Set(collections[coll] || []) : null;
   let out = samples.filter(s => {
+    if(inColl && !inColl.has(s.id)) return false;
     if(!state.lic.has(s.license)) return false;
     if(!state.kinds.has(kindOf(s))) return false;
     const r = ratings[s.id]||0;
@@ -265,7 +278,45 @@ function filtered(){
     bpm:(a,b)=>a.bpm-b.bpm, old:(a,b)=>(a.year||3000)-(b.year||3000)}[$('#sort').value];
   return out.sort(by);
 }
-let focus = null;
+let focus = null, collections = {}, coll = '';
+try { coll = localStorage.getItem('sh-coll') || ''; } catch(e) {}
+function fillCollections(){
+  if(coll && !collections[coll]) coll = '';
+  const sel = $('#coll');
+  sel.innerHTML = `<option value="">Alle Samples</option>` +
+    Object.keys(collections).sort().map(n => `<option value="${esc(n)}">📁 ${esc(n)} (${collections[n].length})</option>`).join('') +
+    `<option value="__new">+ Neue Sammlung …</option>`;
+  sel.value = coll;
+  $('#collDel').hidden = !coll;
+  $('#zipBtn').textContent = coll ? 'Sammlung als ZIP' : 'Likes als ZIP';
+}
+async function collect(id, name, on){
+  const r = await (await fetch('/api/collect', {method:'POST', body:JSON.stringify({id, name, on})})).json();
+  collections = r.collections; fillCollections(); render();
+}
+function newCollectionName(){
+  const n = (prompt('Name der neuen Sammlung:') || '').trim();
+  return n ? n.slice(0, 60) : null;
+}
+function openMenu(btn, s){
+  closeMenu();
+  const m = document.createElement('div'); m.className = 'menu'; m.id = 'menu';
+  const names = Object.keys(collections).sort();
+  m.innerHTML = names.map(n => `<div data-n="${esc(n)}"><span class="chk">${collections[n].includes(s.id) ? '✓' : ''}</span>${esc(n)}</div>`).join('') +
+    `<div class="new" data-new="1">+ Neue Sammlung …</div>`;
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();
+  m.style.top = (r.bottom + scrollY + 4) + 'px';
+  m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
+  m.onclick = e => {
+    const it = e.target.closest('div[data-n],div[data-new]'); if(!it) return;
+    if(it.dataset.new){ const n = newCollectionName(); if(n) collect(s.id, n, true); }
+    else { const n = it.dataset.n; collect(s.id, n, !collections[n].includes(s.id)); }
+    closeMenu();
+  };
+  setTimeout(() => document.addEventListener('click', closeMenu, {once:true}), 0);
+}
+function closeMenu(){ document.getElementById('menu')?.remove(); }
 function vec(s){
   const f = s.features || {}; const v = Object.keys(f).sort().map(k => f[k]);
   v.push(s.bpm ? Math.log2(s.bpm/100) : 0, 0.5*Math.log2(Math.max(s.centroid||1800, 50)/1800));
@@ -323,6 +374,7 @@ $('#list').addEventListener('click', e => {
   if(act === 'like') setRating(s.id, 1);
   if(act === 'dislike') setRating(s.id, -1);
   if(act === 'similar') setFocus('similar', s.id);
+  if(act === 'collect'){ e.stopPropagation(); openMenu(e.target.closest('[data-act]'), s); }
   if(act === 'source') setFocus('source', s.id);
   if(e.target.classList.contains('tag')){ $('#q').value = e.target.textContent; render(); }
 });
@@ -353,33 +405,49 @@ const retune = () => { if(src && playingId){ const s = byId(playingId); const po
 toggleChip('#syncBtn','sync',retune); toggleChip('#loopBtn','loop',() => { if(src) src.loop = state.loop; });
 ['#q','#bpmMin','#bpmMax','#key','#minScore','#sort'].forEach(s => $(s).addEventListener('input', render));
 ['#projBpm','#pitch'].forEach(s => $(s).addEventListener('change', retune));
-$('#zipBtn').onclick = () => { const ids = Object.keys(ratings).filter(k => ratings[k] > 0); if(!ids.length){ alert('Noch keine Likes.'); return; } location.href = '/api/zip?ids=' + ids.join(','); };
+$('#zipBtn').onclick = () => {
+  const ids = coll ? (collections[coll] || []) : Object.keys(ratings).filter(k => ratings[k] > 0);
+  if(!ids.length){ alert(coll ? 'Die Sammlung ist leer.' : 'Noch keine Likes.'); return; }
+  location.href = '/api/zip?ids=' + ids.join(',') + '&name=' + encodeURIComponent(coll || 'samplehunter-likes');
+};
+$('#coll').onchange = async e => {
+  let v = e.target.value;
+  if(v === '__new'){ const n = newCollectionName(); if(n){ await collect('', n, true); v = n; } else v = coll; }
+  coll = v; try{ localStorage.setItem('sh-coll', coll); }catch(_){}
+  fillCollections(); render();
+};
+$('#collDel').onclick = async () => {
+  if(!coll || !confirm(`Sammlung „${coll}“ löschen? Die Samples bleiben in der Bibliothek.`)) return;
+  const r = await (await fetch('/api/collection/delete', {method:'POST', body:JSON.stringify({name:coll})})).json();
+  collections = r.collections; coll = ''; fillCollections(); render();
+};
 
 // ---------- hunting ----------
 $('#huntBtn').onclick = async () => {
-  const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked, experiment:$('#huntExp').checked})});
+  const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked, experiment:$('#huntExp').checked, auto:$('#huntAuto').checked})});
   if(!r.ok) alert('Es läuft schon eine Suche.'); $('#drawer').classList.remove('closed'); poll();
 };
 $('#stopBtn').onclick = () => fetch('/api/stop', {method:'POST'});
 $('#logBtn').onclick = () => $('#drawer').classList.toggle('closed');
-let lastLines = 0, wasHunting = false;
+let lastSeen = '', wasHunting = false;
 async function poll(){
   try{
     const r = await (await fetch('/api/log')).json();
-    $('#dot').classList.toggle('live', r.hunting); $('#log').textContent = r.lines.join('\n'); $('#log').scrollTop = 1e9;
-    const added = r.lines.filter(l => l.includes('✓')).length;
-    if(added !== lastLines || (wasHunting && !r.hunting)){ lastLines = added; await load(); }
+    $('#dot').classList.toggle('live', r.hunting || r.auto); $('#log').textContent = r.lines.join('\n'); $('#log').scrollTop = 1e9;
+    $('#huntAuto').checked = r.auto || $('#huntAuto').checked && r.hunting;
+    const latest = r.lines.filter(l => l.includes('✓')).pop() || '';
+    if(latest !== lastSeen || (wasHunting && !r.hunting)){ lastSeen = latest; await load(); }
     wasHunting = r.hunting;
-    if(r.hunting) setTimeout(poll, 2000);
+    if(r.hunting || r.auto) setTimeout(poll, 2500);
   }catch(e){ setTimeout(poll, 4000); }
 }
 async function load(){
   const r = await (await fetch('/api/library')).json();
-  samples = r.samples; ratings = r.ratings;
+  samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections();
   const keys = [...new Set(samples.map(s => s.key))].sort(); const sel = $('#key'), v = sel.value;
   sel.innerHTML = '<option value="">alle</option>' + keys.map(k => `<option>${esc(k)}</option>`).join(''); sel.value = v;
   render();
-  if(r.hunting && !wasHunting){ wasHunting = true; poll(); }
+  if((r.hunting || r.auto) && !wasHunting){ wasHunting = true; if(r.auto) $('#huntAuto').checked = true; poll(); }
 }
 addEventListener('resize', () => document.querySelectorAll('.row[data-id]').forEach(drawWave));
 load();

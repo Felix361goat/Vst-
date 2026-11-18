@@ -58,7 +58,10 @@ python serve.py --tab                           # stattdessen als Browser-Tab
 | **Sync** + BPM | spielt im Projekttempo, wie eine schneller gedrehte Platte; Tonhöhe geht mit |
 | **Pitch** | in Halbtönen transponieren |
 | Name ziehen | in Explorer/Finder ziehen (Chrome/Edge) |
+| Ordner-Button | Sample in eine Sammlung legen („Beat für X“, „Vocals“ …) |
+| Sammlungs-Menü oben | nur diese Sammlung zeigen; dann lädt der ZIP-Button sie komplett herunter |
 | **Likes als ZIP** | alle gelikten WAVs plus `CREDITS.txt` mit Quellen und Lizenzen |
+| **Autopilot** (unten) | gräbt immer weiter, solange SampleHunter offen ist |
 
 Jedes Sample ist eine 24-Bit-WAV-Datei bei 44,1 kHz, normalisiert auf −1 dBFS,
 auf dem Beat geschnitten und mit 4-ms-Fades. Sie loopt also bei der BPM, die

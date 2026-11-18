@@ -66,6 +66,33 @@ class Library:
                 r[sample_id] = 1 if value > 0 else -1
             self._write(self.ratings_path, r)
 
+    # --- collections: your own folders of samples ----------------------
+    @property
+    def collections_path(self) -> str:
+        return os.path.join(self.root, "collections.json")
+
+    def collections(self) -> dict:
+        return self._read(self.collections_path, {})
+
+    def collect(self, sample_id: str, name: str, on: bool) -> None:
+        name = name.strip()[:60]
+        if not name:
+            return
+        with _lock:
+            c = self._read(self.collections_path, {})
+            ids = c.setdefault(name, [])
+            if on and sample_id and sample_id not in ids:
+                ids.append(sample_id)
+            if not on and sample_id in ids:
+                ids.remove(sample_id)
+            self._write(self.collections_path, c)
+
+    def drop_collection(self, name: str) -> None:
+        with _lock:
+            c = self._read(self.collections_path, {})
+            c.pop(name, None)
+            self._write(self.collections_path, c)
+
     def delete(self, sample_id: str) -> None:
         data = self.load()
         keep = []
