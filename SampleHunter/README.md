@@ -37,22 +37,24 @@ gespeichert wird als MP3.
 
 ## Starten
 
-**Windows:** einmal in der Eingabeaufforderung
-
-```
-winget install Gyan.FFmpeg
-winget install Python.Python.3.12
-```
-
+**Windows:** einmal `winget install Python.Python.3.12` in der Eingabeaufforderung,
 dann `start-windows.bat` doppelklicken.
 
-**macOS:** einmal `brew install ffmpeg python`, dann `start-mac.command` doppelklicken.
+**macOS:** einmal `brew install python`, dann `start-mac.command` doppelklicken.
 
-Beim ersten Start werden die Python-Pakete installiert (dauert ein paar Minuten,
-inklusive KI-Ohr ca. 1 GB; das Modell wird bei der ersten Suche einmal geladen),
-danach öffnet sich SampleHunter als eigene App. Fenster zu = Programm aus. Unten auf **Los**
-klicken, dann beginnt die Suche. Pro Aufnahme dauert das etwa 20–40 Sekunden.
-Neue Samples erscheinen live in der Liste.
+Der erste Start lädt ca. **300 MB** (App-Fenster, Basis-Pakete und ffmpeg, das
+mitkommt) und dauert ein paar Minuten. Danach öffnet sich SampleHunter in
+Sekunden, mit dem Katalog schon drin. Fenster zu = Programm aus.
+
+Was nur bei Bedarf nachgeladen wird:
+
+| | Größe | wofür | wann |
+|---|---|---|---|
+| Such-Pakete | ~85 MB | eigene Suchen | beim ersten Klick auf **Los**, mit Nachfrage |
+| KI-Ohr | ~140 MB + ~615 MB Modell | Weirdness-/Knister-Bewertung eigener Suchen, Suche nach Klang | per Knopf „🧠 KI-Ohr installieren“ |
+
+Der mitgelieferte Katalog ist schon vom KI-Ohr bewertet; zum Stöbern, Anhören
+und Ziehen brauchst du es nicht.
 
 Ohne Browser geht es auch:
 
