@@ -17,6 +17,21 @@ Es gibt zwei Arten von Samples:
   Jahrzehnten in Hip-Hop-Beats auftaucht.
 
 Es ist ein eigenes Programm mit eigenem Fenster, Claude braucht es nicht.
+
+**Die Bibliothek liegt in der Cloud, nicht auf deiner Festplatte.** Jedes
+Sample ist nur ein Verweis: welche Aufnahme (bei archive.org oder Wikimedia),
+ab welcher Sekunde, wie lang. Erst beim Anhören werden genau diese Sekunden
+geladen (ca. 2 s, danach aus dem Cache). Eine Datei auf der Festplatte gibt es
+nur für:
+
+- **angehörte Samples**: ein Cache, der sich bei 400 MB selbst aufräumt;
+- **Favoriten (♥)**: in voller Qualität gesichert, falls die Quelle mal verschwindet;
+- **was du in FL Studio ziehst oder herunterlädst**: liegt in `Musik/SampleHunter`
+  und bleibt dort, weil dein FL-Projekt auf genau diese Datei zeigt.
+
+Oben rechts steht, wie viel SampleHunter lokal belegt. Mit der App kommt ein
+fertiger **Katalog** (`catalog/`), du musst also nicht erst suchen. Deine
+eigenen Suchen kommen dazu.
 Samples ziehst du direkt aus dem Fenster in FL Studio (oder jede andere DAW),
 gespeichert wird als MP3.
 
@@ -48,6 +63,7 @@ python hunt.py --allow-nc                       # auch CC BY-NC (nur nicht-komme
 python hunt.py --include-claimed                # auch Archive-Uploads mit ungeprüfter Lizenz
 python hunt.py --experiment                     # auch obskure Uploads mit ungeklärter Lizenz
 python hunt.py --kinds phrase                   # nur Phrasen
+python hunt.py --store file                     # jedes Sample als Datei behalten statt Cloud
 python app.py                                   # die App (mit Drag & Drop in die DAW)
 python serve.py                                 # ohne App-Paket: im Browser-Fenster
 ```
@@ -59,7 +75,7 @@ python serve.py                                 # ohne App-Paket: im Browser-Fen
 | **Leertaste** | abspielen / stoppen |
 | **↑ ↓** | nächstes Sample (spielt direkt weiter, wenn schon etwas läuft) |
 | **♥ / L** | als Favorit speichern; „♥ Favoriten“ oben zeigt nur die |
-| **D** | nicht mein Ding |
+| **✕ / X** | ablehnen: weg für immer, taucht nie wieder auf (auch nicht in späteren Suchen) und zählt als „nicht mein Geschmack“ |
 | **S** / Wellen-Button | ähnliche Samples finden (Esc = zurück) |
 | Klick auf den Titel | alles aus derselben Aufnahme |
 | **/** | Suche |
@@ -142,6 +158,11 @@ weiter, nur mit der Signal-Analyse.
 Bewegung (Verzierungen, Glissandi), ein Ambitus von ein paar Tönen, gehaltene
 Töne dazwischen, sauberer Anfang und Ende, 1,5–8 Sekunden.
 
+**Sauberer Klang.** Drei Prüfungen, bevor ein Sample in die Bibliothek darf:
+das KI-Ohr (Grain unter 45), ein Klick-Detektor im Signal selbst (unter 30
+Knackser pro Sekunde; alte Platten liegen bei 50–200), und für den Katalog
+noch einmal strenger (Grain unter 40).
+
 **Dein Geschmack.** Jeder Like und Dislike fließt in die nächste Suche ein:
 Suchbegriffe, deren Samples du magst, werden öfter gezogen. Ab drei
 Bewertungen bekommt jedes neue Sample zusätzlich bis zu ±10 Punkte dafür, wie
@@ -175,7 +196,11 @@ app.py             die App: eigenes Fenster, Drag & Drop in die DAW
 serve.py           die Bibliothek (Server; auch allein im Browser nutzbar)
 hunter/sources.py  Quellen, Suchbegriffe, Lizenzregeln
 hunter/analyze.py  Riff-Erkennung und Freak-Score
-hunter/library.py  Bibliothek und Geschmacks-Lernen
+hunter/library.py  Bibliothek, Katalog, Favoriten, Ablehnen, Geschmacks-Lernen
+hunter/cloud.py    Samples aus der Cloud holen, Cache und gesicherte Favoriten
+hunter/ear.py      das KI-Ohr
+catalog/           der mitgelieferte Katalog (nur Verweise, ein paar KB pro Sample)
+tools/build_catalog.py  macht aus Suchergebnissen einen Katalog
 web/index.html     die Oberfläche
 library/           deine Samples (wird angelegt, nicht im Git)
 ```

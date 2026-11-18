@@ -24,10 +24,26 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+from hunter.cloud import Store  # noqa: E402
 from hunter.library import Library  # noqa: E402
 
 LIB = Library(os.environ.get("HUNTER_LIBRARY", os.path.join(HERE, "library")))
 LOG = os.path.join(LIB.root, "hunt.log")
+STORE = Store(LIB.root)
+
+
+def audio_path(sample: dict) -> str:
+    """A playable file for any sample: its own file, or fetched from the cloud."""
+    if sample.get("file") and os.path.exists(os.path.join(LIB.root, sample["file"])):
+        return os.path.join(LIB.root, sample["file"])
+    return STORE.preview(sample)
+
+
+def full_path(sample: dict) -> str:
+    """The best-quality copy, kept on disk for good (for drags and downloads)."""
+    if sample.get("file") and os.path.exists(os.path.join(LIB.root, sample["file"])):
+        return os.path.join(LIB.root, sample["file"])
+    return STORE.keep(sample)
 _hunt: dict = {"proc": None, "auto": None}
 _hunt_lock = threading.Lock()
 
@@ -68,26 +84,38 @@ def autopilot() -> None:
                 start_hunt(params, append=True)
 
 
+EXPORT_DIR = os.environ.get("HUNTER_EXPORT_DIR") or os.path.join(os.path.expanduser("~"), "Music", "SampleHunter")
+
+
 def export_path(sample_id: str, fmt: str) -> str | None:
-    """The sample as a file in the wanted format, named for the DAW.
-    Converted copies are cached in library/_export."""
-    s = next((x for x in LIB.load()["samples"] if x["id"] == sample_id), None)
+    """The sample as a named file in the wanted format, in Music/SampleHunter.
+
+    Whatever you drag into FL Studio or download lands there and stays there:
+    a project refers to the file by its path, so it must never move."""
+    s = LIB.find(sample_id)
     if not s:
         return None
-    src = os.path.join(LIB.root, s["file"])
+    src = full_path(s)
     fmt = "wav" if fmt == "wav" else "mp3"
-    if src.lower().endswith("." + fmt):
-        return src
-    out_dir = os.path.join(LIB.root, "_export")
-    os.makedirs(out_dir, exist_ok=True)
-    dest = os.path.join(out_dir, s["name"] + "." + fmt)
+    os.makedirs(EXPORT_DIR, exist_ok=True)
+    dest = os.path.join(EXPORT_DIR, s["name"] + "." + fmt)
     if not os.path.exists(dest):
         from hunter import analyze
         if fmt == "wav":
             analyze.to_wav(src, dest, s.get("duration"))
+        elif src.lower().endswith(".mp3"):
+            import shutil
+            shutil.copyfile(src, dest)
         else:
             analyze.write_audio(dest, analyze.decode(src, sr=44100, channels=2, duration=None), 44100)
     return dest
+
+
+def _safe(fn, *a):
+    try:
+        fn(*a)
+    except Exception as exc:  # a vanished source must not take the server down
+        print("Hinweis:", exc)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -128,8 +156,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/library":
-            data = LIB.load()
-            return self._json({"samples": data["samples"], "ratings": LIB.ratings(),
+            return self._json({"samples": LIB.all_samples(), "ratings": LIB.ratings(), "usage": STORE.usage(),
                                "collections": LIB.collections(), "hunting": hunting(),
                                "auto": bool(_hunt.get("auto"))})
         if url.path == "/api/log":
@@ -142,8 +169,7 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/listen":
             # Search the library by describing a sound.
             q = (urllib.parse.parse_qs(url.query).get("q") or [""])[0].strip()
-            data = LIB.load()
-            with_emb = [x for x in data["samples"] if x.get("emb")]
+            with_emb = [x for x in LIB.all_samples() if x.get("emb")]
             if not q or not with_emb:
                 return self._json({"ids": [], "error": None if q else "leer"})
             try:
@@ -157,6 +183,22 @@ class Handler(SimpleHTTPRequestHandler):
             E = np.array([x["emb"] for x in with_emb])
             order = np.argsort(-(E @ t))
             return self._json({"ids": [with_emb[i]["id"] for i in order[:60]]})
+        if url.path == "/api/audio":
+            s = LIB.find((urllib.parse.parse_qs(url.query).get("id") or [""])[0])
+            if not s:
+                return self._json({"error": "unbekannt"}, 404)
+            try:
+                path = audio_path(s)
+            except Exception as exc:
+                return self._json({"error": "Quelle nicht erreichbar: %s" % exc}, 502)
+            with open(path, "rb") as fh:
+                body = fh.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav" if path.endswith(".wav") else "audio/mpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if url.path == "/api/file":
             q = urllib.parse.parse_qs(url.query)
             path = export_path((q.get("id") or [""])[0], (q.get("fmt") or ["mp3"])[0])
@@ -174,7 +216,7 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/zip":
             q = urllib.parse.parse_qs(url.query)
             ids = set((q.get("ids") or [""])[0].split(","))
-            data = LIB.load()
+            data = {"samples": LIB.all_samples()}
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
                 credits = []
@@ -204,8 +246,19 @@ class Handler(SimpleHTTPRequestHandler):
         url = urllib.parse.urlparse(self.path)
         body = self._body()
         if url.path == "/api/rate":
-            LIB.rate(str(body.get("id")), int(body.get("value", 0)))
+            sid, value = str(body.get("id")), int(body.get("value", 0))
+            LIB.rate(sid, value)
+            s = LIB.find(sid)
+            if s and not s.get("file"):
+                # Favourites are backed up locally, in case the source vanishes.
+                if value > 0:
+                    threading.Thread(target=lambda: _safe(STORE.keep, s), daemon=True).start()
+                else:
+                    STORE.release(s)
             return self._json({"ok": True})
+        if url.path == "/api/decline":
+            LIB.decline(str(body.get("id")))
+            return self._json({"ok": True, "usage": STORE.usage()})
         if url.path == "/api/delete":
             LIB.delete(str(body.get("id")))
             return self._json({"ok": True})

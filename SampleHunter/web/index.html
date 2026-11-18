@@ -77,6 +77,12 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .ico svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ico.liked{color:var(--accent)} .ico.liked svg{fill:var(--accent)}
 .ico.disl{color:var(--warn)}
+.ico.decline:hover{color:#ff8fa3;border-color:#5a2533}
+.row.loading .play{background:conic-gradient(var(--accent) 0 25%, var(--panel) 0);animation:spin .8s linear infinite}
+.row.loading .play svg{opacity:0}
+@keyframes spin{to{transform:rotate(1turn)}}
+.row.gone{transition:opacity .25s, transform .25s;opacity:0;transform:translateX(30px)}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#24272f;border:1px solid var(--line);padding:9px 14px;border-radius:8px;z-index:30;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 .head{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.6px;padding:6px 8px}
 .head:hover{background:none}
 .drawer{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:6}
@@ -110,6 +116,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tag … oder einen Klang beschreiben und 🔊 drücken  (/)">
     <button class="btn" id="listenBtn" title="Sucht nach Klang statt nach Namen, z. B. „eerie nasal riff“, „buzzing reed drone“, „metallic bells“ (englisch klappt am besten). Braucht das KI-Ohr.">🔊 Nach Klang</button>
     <span class="stat" id="count"></span>
+    <span class="stat" id="usage" title="Was SampleHunter auf deiner Festplatte belegt. Die Bibliothek selbst liegt in der Cloud; gespeichert werden nur angehörte Samples (Cache, räumt sich selbst auf) und deine Favoriten."></span>
     <select class="btn" id="coll" title="Deine Sammlungen"></select>
     <button class="btn" id="collDel" title="Diese Sammlung löschen (die Samples bleiben)" hidden>Sammlung löschen</button>
     <button class="btn" id="zipBtn" title="Alle Samples mit CREDITS.txt">Favoriten als ZIP</button>
@@ -176,6 +183,7 @@ const ICON = {
   pause:'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>',
   heart:'<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
   down:'<svg viewBox="0 0 24 24"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>',
+  x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   thumbDown:'<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>',
   similar:'<svg viewBox="0 0 24 24"><path d="M2 9c3-4 5-4 8 0s5 4 8 0 3-2 4-2M2 16c3-4 5-4 8 0s5 4 8 0 3-2 4-2"/></svg>',
   folder:'<svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/></svg>',
@@ -194,7 +202,9 @@ const buffers = new Map();
 function audio(){ if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); gain = ctx.createGain(); gain.gain.value = .9; gain.connect(ctx.destination);} return ctx; }
 async function buffer(s){
   if(buffers.has(s.id)) return buffers.get(s.id);
-  const r = await fetch('/library/' + s.file); const b = await audio().decodeAudioData(await r.arrayBuffer());
+  const r = await fetch('/api/audio?id=' + s.id);
+  if(!r.ok){ let m = 'Quelle gerade nicht erreichbar.'; try{ m = (await r.json()).error || m; }catch(_){} throw new Error(m); }
+  const b = await audio().decodeAudioData(await r.arrayBuffer());
   buffers.set(s.id, b); return b;
 }
 function rateFor(s){
@@ -205,7 +215,12 @@ function rateFor(s){
 function stop(){ if(src){ try{src.stop()}catch(e){} src.disconnect(); src = null; } const was = playingId; playingId = null; if(was) markRow(was); }
 async function play(s, offsetFrac = 0){
   audio(); if(ctx.state === 'suspended') await ctx.resume();
-  const b = await buffer(s);
+  const el = document.querySelector(`.row[data-id="${s.id}"]`);
+  if(!buffers.has(s.id) && el) el.classList.add('loading');
+  let b;
+  try { b = await buffer(s); }
+  catch(err){ el && el.classList.remove('loading'); toast(err.message); return; }
+  el && el.classList.remove('loading');
   stop();
   src = ctx.createBufferSource(); src.buffer = b; src.loop = state.loop && kindOf(s) === 'loop';
   rate = rateFor(s); src.playbackRate.value = rate; src.connect(gain);
@@ -244,7 +259,7 @@ function rowHTML(s){
     <div class="lic c-meta"><span class="badge ${licClass(s.license)}">${esc(s.license_label)}</span><small>${trust}</small></div>
     <div class="acts">
       <button class="ico ${r>0?'liked':''}" data-act="like" title="Als Favorit speichern (L)">${ICON.heart}</button>
-      <button class="ico ${r<0?'disl':''}" data-act="dislike" title="Nicht mein Ding (D)">${ICON.thumbDown}</button>
+      <button class="ico decline" data-act="decline" title="Ablehnen: weg für immer, kommt nie wieder (X)">${ICON.x}</button>
       <button class="ico" data-act="similar" title="Ähnliche Samples finden (S)">${ICON.similar}</button>
       <button class="ico ${Object.values(collections).some(ids => ids.includes(s.id)) ? 'in-coll' : ''}" data-act="collect" title="Zu einer Sammlung hinzufügen">${ICON.folder}</button>
       <a class="ico" href="/api/file?id=${s.id}&fmt=${fmt()}" download title="Herunterladen (${fmt().toUpperCase()})">${ICON.down}</a>
@@ -370,6 +385,24 @@ function highlight(){ document.querySelectorAll('.row.cur').forEach(e=>e.classLi
 (function tick(){ if(playingId){ const el = document.querySelector(`.row[data-id="${playingId}"]`); if(el) drawWave(el); } requestAnimationFrame(tick); })();
 
 // ---------- actions ----------
+function toast(msg){
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+function showUsage(u){ if(u) $('#usage').textContent = `💾 ${(u.cache_mb + u.kept_mb).toFixed(0)} MB lokal`; }
+async function decline(id){
+  if(playingId === id) stop();
+  const el = document.querySelector(`.row[data-id="${id}"]`);
+  const i = view.findIndex(s => s.id === id), next = view[i+1] || view[i-1];
+  if(el) el.classList.add('gone');
+  const r = await (await fetch('/api/decline', {method:'POST', body:JSON.stringify({id})})).json();
+  samples = samples.filter(s => s.id !== id); delete ratings[id];
+  Object.values(collections).forEach(ids => { const k = ids.indexOf(id); if(k >= 0) ids.splice(k, 1); });
+  showUsage(r.usage);
+  setTimeout(() => { cur = next ? next.id : null; render(); }, 220);
+  toast('Abgelehnt – kommt nie wieder.');
+}
 async function setRating(id, v){
   ratings[id] = (ratings[id] === v) ? 0 : v; if(!ratings[id]) delete ratings[id];
   await fetch('/api/rate', {method:'POST', body:JSON.stringify({id, value:ratings[id]||0})});
@@ -385,7 +418,7 @@ $('#list').addEventListener('click', e => {
   if(e.target.closest('canvas')){ const r = e.target.getBoundingClientRect(); play(s, (e.clientX - r.left)/r.width); return; }
   const act = e.target.closest('[data-act]')?.dataset.act;
   if(act === 'like') setRating(s.id, 1);
-  if(act === 'dislike') setRating(s.id, -1);
+  if(act === 'decline') decline(s.id);
   if(act === 'similar') setFocus('similar', s.id);
   if(act === 'collect'){ e.stopPropagation(); openMenu(e.target.closest('[data-act]'), s); }
   if(act === 'source') setFocus('source', s.id);
@@ -426,7 +459,7 @@ document.addEventListener('keydown', e => {
   else if(e.key === ' '){ e.preventDefault(); const s = byId(cur) || view[0]; if(s) playingId === s.id ? stop() : play(s); }
   else if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); const n = view[Math.max(0, Math.min(view.length-1, i + (e.key==='ArrowDown'?1:-1)))]; if(n){ cur = n.id; highlight(); document.querySelector(`.row[data-id="${n.id}"]`)?.scrollIntoView({block:'nearest'}); if(playingId) play(n); } }
   else if(e.key.toLowerCase() === 'l' && cur) setRating(cur, 1);
-  else if(e.key.toLowerCase() === 'd' && cur) setRating(cur, -1);
+  else if((e.key.toLowerCase() === 'x' || e.key === 'Delete') && cur) decline(cur);
   else if(e.key.toLowerCase() === 's' && cur) setFocus('similar', cur);
   else if(e.key === 'Escape' && focus) setFocus(null);
 });
@@ -490,7 +523,7 @@ async function poll(){
 }
 async function load(){
   const r = await (await fetch('/api/library')).json();
-  samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections();
+  samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections(); showUsage(r.usage);
   const keys = [...new Set(samples.map(s => s.key))].sort(); const sel = $('#key'), v = sel.value;
   sel.innerHTML = '<option value="">alle</option>' + keys.map(k => `<option>${esc(k)}</option>`).join(''); sel.value = v;
   render();

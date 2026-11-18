@@ -24,7 +24,7 @@ import urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from hunter import analyze, ear, sources  # noqa: E402
+from hunter import analyze, cloud, ear, sources  # noqa: E402
 
 EAR = None   # the AI ear module, when it loaded
 from hunter.library import Library, Taste  # noqa: E402
@@ -52,7 +52,12 @@ def main() -> int:
                     help="what to cut: loop (riffs on the beat), phrase (free one-shot lines), or both")
     ap.add_argument("--vintage", action="store_true",
                     help="also dig pre-1950 material (78s): legally clean, but crackly")
-    ap.add_argument("--max-grain", type=float, default=55.0,
+    ap.add_argument("--max-clicks", type=float, default=30.0,
+                    help="drop samples with more clicks/crackle per second than this")
+    ap.add_argument("--store", choices=["cloud", "file"], default="cloud",
+                    help="cloud: keep only a pointer to the source and stream it (default); "
+                         "file: keep every sample as a file in library/samples")
+    ap.add_argument("--max-grain", type=float, default=45.0,
                     help="drop samples with more crackle/hiss/muffle than this, 0-100 (100 = keep all)")
     ap.add_argument("--min-weird", type=float, default=45.0,
                     help="with the AI ear: drop samples that sound too ordinary, 0-100 (0 = keep all)")
@@ -76,9 +81,10 @@ def main() -> int:
     found = 0
     misses = 0
 
-    global EAR, FORMAT
+    global EAR, FORMAT, STORE
     EAR = None
     FORMAT = args.format
+    STORE = args.store
     if not args.no_ear and ear.available():
         log("KI-Ohr wird geladen …")
         try:
@@ -130,7 +136,8 @@ def main() -> int:
             misses += 1
             time.sleep(5)
             continue
-        fresh = [c for c in cands if c.key not in data["processed"]]
+        known = set(data["processed"]) | {x.get("source_key") for x in lib.catalog()}
+        fresh = [c for c in cands if c.key not in known]
         if not args.vintage:
             fresh = [c for c in fresh if not (c.year and c.year < 1950)]
         # Variety: no collection or artist gets to fill the library.
@@ -177,12 +184,16 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
             start = analyze.excerpt_start(tmp)
             windows = []
             if "loop" in kinds:
-                windows += analyze.find_windows(tmp, max_windows=args.per_track,
+                windows += analyze.find_windows(tmp, max_windows=args.per_track * 2,
                                                 min_score=args.min_score - 10, offset=start)
             if "phrase" in kinds:
-                windows += analyze.find_phrases(tmp, max_phrases=args.per_track,
+                windows += analyze.find_phrases(tmp, max_phrases=args.per_track * 2,
                                                 min_score=args.min_score - 10, offset=start)
             windows = judge(tmp, windows, args)
+            # Twice as many candidates were listened to as are kept: the best
+            # of each kind that survived the ear go on.
+            windows = (sorted([w for w in windows if w.kind == "loop"], key=lambda w: -w.score)[:args.per_track]
+                       + sorted([w for w in windows if w.kind == "phrase"], key=lambda w: -w.score)[:args.per_track])
             cut_from, offset = tmp, 0.0
             if windows and f.get("hq_url"):
                 hq = tmp + ".hq" + os.path.splitext(urllib.parse.unquote(f["hq_url"]))[1]
@@ -196,8 +207,11 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
             for w in windows:
                 sample = to_sample(lib, cand, f, w, cut_from, offset)
                 sample["taste"] = taste.bonus(sample)
-                if w.score + sample["taste"] < args.min_score:
-                    os.remove(os.path.join(lib.root, sample["file"]))
+                if w.score + sample["taste"] < args.min_score or sample["id"] in lib.blocked():
+                    for leftover in (os.path.join(lib.root, sample["file"] or "-"),
+                                     os.path.join(lib.root, "_stream", sample["id"] + ".mp3")):
+                        if os.path.exists(leftover):
+                            os.remove(leftover)
                     continue
                 data = lib.load()
                 data["samples"].append(sample)
@@ -239,10 +253,17 @@ def judge(path: str, windows: list, args) -> list:
                  for w in windows]
         verdicts = EAR.listen(clips)
     else:
+        clips = [analyze.decode(path, sr=ear.SR, start=w.start, duration=min(w.duration, 10.0))
+                 for w in windows]
         verdicts = [{"grain": analyze.grain_dsp(path, w), "weird": None, "emb": None} for w in windows]
     kept = []
-    for w, v in zip(windows, verdicts):
-        w.extra = {"freak": w.score, "grain": v["grain"], "weird": v["weird"], "emb": v["emb"]}
+    for w, v, clip in zip(windows, verdicts, clips):
+        cps = analyze.clicks(clip, ear.SR)
+        w.extra = {"freak": w.score, "grain": v["grain"], "weird": v["weird"], "emb": v["emb"],
+                   "clicks": round(cps, 1)}
+        if cps > args.max_clicks:
+            log("    verworfen: Knackser/Kratzer (%.0f pro Sekunde)" % cps)
+            continue
         if v["grain"] > args.max_grain:
             log("    verworfen: zu viel Rauschen/Knistern (Grain %.0f)" % v["grain"])
             continue
@@ -264,6 +285,7 @@ def family(c: sources.Candidate) -> list[str]:
 
 
 FORMAT = "mp3"
+STORE = "cloud"
 
 
 def args_format() -> str:
@@ -280,18 +302,29 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         title = slug(cand.identifier, 24)
     shape = ("%dbpm" % bpm) if w.kind == "loop" else "phrase"
     name = "%s_%s_%s_%s_%s" % (slug(cand.term, 16), title, shape, key, sid[:4])
-    rel = os.path.join("samples", name + "." + args_format())
-    peaks = analyze.export(src, w, os.path.join(lib.root, rel), offset=offset)
+    audio = analyze.cut(src, w, offset=offset)
+    rel = None
+    if STORE == "file":
+        rel = os.path.join("samples", name + "." + args_format())
+        analyze.write_audio(os.path.join(lib.root, rel), audio, 44100)
+    else:
+        # Cloud: only the pointer is kept; this fresh cut warms the preview
+        # cache, which drops old entries when it grows past its limit.
+        cache = os.path.join(lib.root, "_stream")
+        os.makedirs(cache, exist_ok=True)
+        analyze.write_audio(os.path.join(cache, sid + ".mp3"), audio, 44100)
+    peaks = analyze.peaks(audio)
     vintage = bool(cand.year and cand.year < 1960)
     tags = [cand.term] + analyze.describe(w, vintage)
     if cand.downloads < 200:
         tags.append("selten")
     return {
         "id": sid,
+        "source_key": cand.key,
         "kind": w.kind,
         "family": family(cand),
         "name": name,
-        "file": rel.replace(os.sep, "/"),
+        "file": rel.replace(os.sep, "/") if rel else None,
         "term": cand.term,
         "title": cand.title,
         "creator": cand.creator,
@@ -299,6 +332,12 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         "source_url": cand.page_url,
         "source_file": urllib.parse.unquote(os.path.basename(f.get("hq_url") or f["url"])) if src != f.get("url") else f["name"],
         "lossless": src.endswith((".flac", ".wav")),
+        # Where to fetch it again: the app can stream a sample instead of
+        # keeping its file (see cloud.py).
+        "stream": {"url": f["url"], "hq_url": f.get("hq_url"),
+                   "start": round(w.start, 4), "duration": round(w.duration, 4),
+                   "hq_offset": round(offset, 5) if src != f.get("url") else 0.0, "kind": w.kind,
+                   "anchor": cloud.make_anchor(audio)},
         "source_start": round(w.start, 3),
         "license": cand.license,
         "license_label": cand.note or sources.LICENSE_LABELS[cand.license],

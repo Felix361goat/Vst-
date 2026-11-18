@@ -46,7 +46,7 @@ INSTRUMENTS = [
     "tumbi", "sarangi", "shehnai", "santoor", "sitar", "tabla", "harmonium",
     "veena", "nadaswaram", "rubab", "dotar", "dombra", "komuz", "oud", "saz",
     "baglama", "bouzouki", "kanun", "qanun", "kemenche", "duduk", "zurna",
-    "ney", "mijwiz", "kora", "ngoni", "balafon", "mbira", "kalimba", "likembe",
+    "ney flute", "mijwiz", "kora griot", "ngoni", "balafon", "mbira", "kalimba", "likembe",
     "marimba", "xylophone", "berimbau", "cavaquinho", "charango", "cuatro",
     "bandoneon", "accordion", "concertina", "koto", "shamisen", "biwa",
     "shakuhachi", "guzheng", "pipa", "erhu", "yangqin", "gamelan", "angklung",
@@ -89,19 +89,19 @@ VOCALS = [
 WEIRD_TERMS = [
     "ektara", "gopichand", "toombi", "morchang", "algoza", "pungi", "been",
     "ravanahatha", "kamaicha", "sarinda", "esraj", "dilruba", "pena",
-    "khaen", "phin", "sape", "kubing", "kudyapi", "hasapi", "sasando",
+    "khaen", "phin lao", "sape", "kubing", "kudyapi", "hasapi", "sasando",
     "morin khuur", "igil", "tovshuur", "jaw harp", "mouth bow", "musical bow",
     "earth bow", "slit drum", "lithophone", "waterphone", "nyckelharpa",
     "sintir", "guembri", "imzad", "krar", "begena", "masenqo", "goje",
-    "molo", "kontigi", "valiha", "marovany", "inanga", "endongo", "akadinda",
-    "amadinda", "ennanga", "bobre", "cuica", "marimbula", "pifano",
-    "arghul", "mizmar", "suona", "sheng", "hichiriki", "sho", "piri",
+    "molo hausa", "kontigi", "valiha", "marovany", "inanga", "endongo", "akadinda",
+    "amadinda", "ennanga", "bobre bow", "cuica", "marimbula", "pifano",
+    "arghul", "mizmar", "suona", "sheng", "hichiriki", "sho gagaku", "piri",
     "taepyeongso", "zurla", "launeddas", "tenora", "gralla", "bombarde",
     "ondes martenot", "tape loop", "musique concrete", "early electronic",
-    "zar ritual", "bori", "gnawa lila", "kecak", "jaipongan", "tarling",
+    "zar ritual", "bori hausa", "gnawa lila", "kecak", "jaipongan", "tarling",
     "dangdut koplo", "molam", "mor lam", "hocket", "pygmy", "aka pygmies",
     "khoomei", "overtone singing", "kargyraa", "zikr", "dhikr", "possession",
-    "trance music", "ceremony", "spirit", "shaman",
+    "trance music", "ceremonial music", "spirit possession music", "shaman",
 ]
 
 # Everyday sounds: still searchable by name (--terms), but not dug by default,
@@ -313,6 +313,12 @@ def search_ia_claimed(term: str, allow_nc: bool, rng: random.Random, rows: int =
     return out
 
 
+# Talk, not music: podcasts and shows match instrument names in passing.
+NOT_MUSIC = re.compile(r"official|remix|vevo|podcast|episode|\bep\.? ?\d|\bshow\b|recap|interview|"
+                       r"radio|sermon|lecture|talk|news|audiobook|chapter|webinar|meeting|stream",
+                       re.IGNORECASE)
+
+
 def search_ia_any(term: str, allow_nc: bool, rng: random.Random, rows: int = 50,
                   max_downloads: int = 3000) -> list[Candidate]:
     """Experiment mode: any Archive audio, licensed or not, as long as it is
@@ -323,7 +329,7 @@ def search_ia_any(term: str, allow_nc: bool, rng: random.Random, rows: int = 50,
     for d in _ia_query(q, rows, rng):
         title = _first(d.get("title")) or d["identifier"]
         hay = " ".join([title, d["identifier"], _first(d.get("creator"))])
-        if FAMOUS.search(hay) or OFFENSIVE.search(hay) or re.search(r"official|remix|vevo", hay, re.I):
+        if FAMOUS.search(hay) or OFFENSIVE.search(hay) or NOT_MUSIC.search(hay):
             continue
         lic = classify_license(d.get("licenseurl")) if d.get("licenseurl") else LICENSE_UNKNOWN
         note = ""

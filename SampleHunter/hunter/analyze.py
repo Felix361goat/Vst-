@@ -295,26 +295,53 @@ def to_wav(src: str, dest: str, duration: float | None = None) -> None:
     write_audio(dest, audio, 44100)
 
 
-def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0) -> list[float]:
-    """Cut the window from the source at full quality. Returns waveform peaks."""
+def finish(audio: np.ndarray, kind: str = "loop", sr: int = 44100) -> np.ndarray:
+    """The same treatment for every cut: DC off, a 4 ms fade in, a fade out
+    (4 ms for a loop, 120 ms for a phrase), peak at -1 dBFS."""
+    audio = audio - audio.mean(axis=0, keepdims=True)
+    fade = int(0.004 * sr)
+    audio[:fade] *= np.linspace(0, 1, fade, dtype=np.float32)[:, None]
+    tail = fade if kind == "loop" else int(0.12 * sr)
+    audio[-tail:] *= np.linspace(1, 0, tail, dtype=np.float32)[:, None] ** (1 if kind == "loop" else 2)
+    peak = np.max(np.abs(audio)) + 1e-9
+    return (audio * (10 ** (-1 / 20) / peak)).astype(np.float32)
+
+
+def peaks(audio: np.ndarray, n: int = 160) -> list[float]:
+    mono = np.abs(audio).max(axis=1)
+    return [round(float(b.max()), 3) for b in np.array_split(mono, n)]
+
+
+def cut(path: str, w: Window, sr: int = 44100, offset: float = 0.0) -> np.ndarray:
+    """Cut the window from the source at full quality, finished."""
     audio = decode(path, sr=sr, channels=2, start=max(0.0, w.start + offset), duration=w.duration)
     length = int(round(w.duration * sr))
     if len(audio) < length:
         audio = np.vstack([audio, np.zeros((length - len(audio), 2), np.float32)])
-    audio = audio[:length]
-    audio = audio - audio.mean(axis=0, keepdims=True)
-    fade = int(0.004 * sr)
-    ramp = np.linspace(0, 1, fade, dtype=np.float32)[:, None]
-    audio[:fade] *= ramp
-    tail = fade if w.kind == "loop" else int(0.12 * sr)   # a phrase dies away
-    audio[-tail:] *= np.linspace(1, 0, tail, dtype=np.float32)[:, None] ** (1 if w.kind == "loop" else 2)
-    peak = np.max(np.abs(audio)) + 1e-9
-    audio *= 10 ** (-1 / 20) / peak
-    write_audio(dest, audio, sr)
+    return finish(audio[:length], w.kind, sr)
 
-    mono = np.abs(audio).max(axis=1)
-    bins = np.array_split(mono, 160)
-    return [round(float(b.max()), 3) for b in bins]
+
+def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0) -> list[float]:
+    """Cut and write a sample. Returns waveform peaks."""
+    audio = cut(path, w, sr, offset)
+    write_audio(dest, audio, sr)
+    return peaks(audio)
+
+
+def clicks(audio: np.ndarray, sr: int = 44100) -> float:
+    """Clicks and crackle per second: short spikes in the top octaves that
+    stand far above their surroundings. Clean recordings sit near 0; worn
+    records and damaged tapes show tens per second."""
+    from scipy.signal import butter, sosfilt
+    from scipy.ndimage import median_filter
+    mono = audio.mean(axis=1) if audio.ndim == 2 else audio
+    hp = sosfilt(butter(4, 6000, "highpass", fs=sr, output="sos"), mono)
+    env = np.abs(hp)
+    floor = median_filter(env, size=int(0.01 * sr)) + 1e-6
+    spikes = env > 8 * floor
+    # Count onsets of spike runs, not every sample in them.
+    starts = np.flatnonzero(spikes[1:] & ~spikes[:-1])
+    return float(len(starts) / (len(mono) / sr))
 
 
 def describe(w: Window, vintage: bool) -> list[str]:

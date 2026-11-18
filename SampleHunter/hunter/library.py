@@ -29,6 +29,8 @@ class Library:
         os.makedirs(self.cache_dir, exist_ok=True)
         self.path = os.path.join(self.root, "library.json")
         self.ratings_path = os.path.join(self.root, "ratings.json")
+        self.catalog_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "catalog")
+        self._catalog: list | None = None
 
     # --- storage -------------------------------------------------------
     def _read(self, path: str, default):
@@ -49,6 +51,41 @@ class Library:
         data.setdefault("samples", [])
         data.setdefault("processed", {})
         return data
+
+    # --- the shared catalogue: samples found elsewhere, streamed on demand --
+    def catalog(self) -> list:
+        """Samples shipped with the app in catalog/*.json.gz: pointers only,
+        nothing to download until you play or drag one."""
+        if self._catalog is None:
+            import gzip
+            out = []
+            if os.path.isdir(self.catalog_dir):
+                for name in sorted(os.listdir(self.catalog_dir)):
+                    if not name.endswith((".json.gz", ".json")):
+                        continue
+                    opener = gzip.open if name.endswith(".gz") else open
+                    try:
+                        with opener(os.path.join(self.catalog_dir, name), "rt", encoding="utf-8") as fh:
+                            for smp in json.load(fh).get("samples", []):
+                                smp["catalog"] = True
+                                if smp.get("emb_q"):
+                                    smp["emb"] = unpack_emb(smp.pop("emb_q"))
+                                out.append(smp)
+                    except (OSError, ValueError):
+                        continue
+            self._catalog = out
+        return self._catalog
+
+    def all_samples(self) -> list:
+        """Your own finds and the catalogue together, without anything declined."""
+        blocked = self.blocked()
+        own = self.load()["samples"]
+        ids = {x["id"] for x in own}
+        merged = own + [x for x in self.catalog() if x["id"] not in ids]
+        return [x for x in merged if x["id"] not in blocked]
+
+    def find(self, sample_id: str) -> dict | None:
+        return next((x for x in self.all_samples() if x["id"] == sample_id), None)
 
     def save(self, data: dict) -> None:
         with _lock:
@@ -93,19 +130,69 @@ class Library:
             c.pop(name, None)
             self._write(self.collections_path, c)
 
+    # --- declined: gone for good -----------------------------------------
+    @property
+    def blocked_path(self) -> str:
+        return os.path.join(self.root, "declined.json")
+
+    def blocked(self) -> set:
+        return set(self._read(self.blocked_path, []))
+
+    def decline(self, sample_id: str) -> None:
+        """Remove a sample for good: its files go, it never shows up again
+        (not from the catalogue, not from a later hunt), and it counts as a
+        strong dislike for taste learning."""
+        with _lock:
+            b = set(self._read(self.blocked_path, []))
+            b.add(sample_id)
+            self._write(self.blocked_path, sorted(b))
+            r = self._read(self.ratings_path, {})
+            r[sample_id] = -1
+            self._write(self.ratings_path, r)
+            c = self._read(self.collections_path, {})
+            for ids in c.values():
+                if sample_id in ids:
+                    ids.remove(sample_id)
+            self._write(self.collections_path, c)
+        for d in ("_stream", "_kept", "_export"):
+            folder = os.path.join(self.root, d)
+            if os.path.isdir(folder):
+                for f in os.listdir(folder):
+                    if f.startswith(sample_id) or sample_id in f:
+                        try:
+                            os.remove(os.path.join(folder, f))
+                        except OSError:
+                            pass
+        self.delete(sample_id)
+
     def delete(self, sample_id: str) -> None:
         data = self.load()
         keep = []
         for s in data["samples"]:
             if s["id"] == sample_id:
-                try:
-                    os.remove(os.path.join(self.root, s["file"]))
-                except FileNotFoundError:
-                    pass
+                if s.get("file"):
+                    try:
+                        os.remove(os.path.join(self.root, s["file"]))
+                    except FileNotFoundError:
+                        pass
             else:
                 keep.append(s)
         data["samples"] = keep
         self.save(data)
+
+
+def pack_emb(emb: list) -> str:
+    """512 floats as base64 of int8: a sixth of the JSON size, plenty of precision."""
+    import base64
+    q = np.clip(np.round(np.asarray(emb) * 127 / 0.3), -127, 127).astype(np.int8)
+    return base64.b64encode(q.tobytes()).decode()
+
+
+def unpack_emb(text: str) -> list:
+    import base64
+    q = np.frombuffer(base64.b64decode(text), dtype=np.int8).astype(float) * 0.3 / 127
+    q /= np.linalg.norm(q) + 1e-9
+    return [round(float(x), 3) for x in q]
 
 
 class Taste:
