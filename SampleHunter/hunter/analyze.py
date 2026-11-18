@@ -100,11 +100,27 @@ def _bars_for(period: float, tempo_hint: float) -> float:
     return best
 
 
-def find_windows(path: str, max_windows: int = 3, min_score: float = 55.0) -> list[Window]:
+def excerpt_start(path: str, rng=None) -> float:
+    """Where to start analysing. Long recordings (concerts, tapes) get a random
+    stretch rather than always their opening, which is often tuning or talk."""
+    import random
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                              "-of", "default=nw=1:nk=1", path], capture_output=True, text=True).stdout
+        dur = float(out.strip())
+    except (ValueError, OSError):
+        return 0.0
+    if dur <= MAX_SECONDS + 30:
+        return 0.0
+    return (rng or random).uniform(min(60.0, dur - MAX_SECONDS), dur - MAX_SECONDS)
+
+
+def find_windows(path: str, max_windows: int = 3, min_score: float = 55.0,
+                 offset: float = 0.0) -> list[Window]:
     import librosa  # imported here so the rest of the tool starts fast
     from scipy.ndimage import uniform_filter1d, maximum_filter1d
 
-    y = decode(path)
+    y = decode(path, start=offset)
     if len(y) < SR * 15:
         return []
     y = y / (np.max(np.abs(y)) + 1e-9)
@@ -221,7 +237,7 @@ def find_windows(path: str, max_windows: int = 3, min_score: float = 55.0) -> li
         score *= 0.3 + 0.7 * _clip((repeat - 0.35) / 0.45)   # it has to loop
 
         cands.append(Window(
-            start=t0 / fps, duration=dur, beats=nbeats, bpm=bpm,
+            start=offset + t0 / fps, duration=dur, beats=nbeats, bpm=bpm,
             key=_key(cw.mean(axis=1)), score=round(100 * min(score / 0.85, 1.0), 1),
             features={f: round(float(v), 3) for f, v in zip(FEATURES, feats)},
             centroid=c_med))
@@ -323,11 +339,12 @@ PHRASE_FEATURES = ["voiced", "melisma", "range", "steady", "clarity", "exposed",
 PHRASE_WEIGHTS = np.array([0.20, 0.20, 0.12, 0.06, 0.12, 0.14, 0.10, 0.06])
 
 
-def find_phrases(path: str, max_phrases: int = 2, min_score: float = 55.0) -> list[Window]:
+def find_phrases(path: str, max_phrases: int = 2, min_score: float = 55.0,
+                 offset: float = 0.0) -> list[Window]:
     import librosa
     from scipy.ndimage import uniform_filter1d
 
-    y = decode(path)
+    y = decode(path, start=offset)
     if len(y) < SR * 10:
         return []
     y = y / (np.max(np.abs(y)) + 1e-9)
@@ -414,7 +431,7 @@ def find_phrases(path: str, max_phrases: int = 2, min_score: float = 55.0) -> li
         vidx = np.flatnonzero(voiced)
         start = (a + max(0, vidx[0] - 3)) / fps
         end = min(T, a + vidx[-1] + int(0.25 * fps)) / fps
-        cands.append(Window(start=start, duration=end - start, beats=0, bpm=0.0,
+        cands.append(Window(start=offset + start, duration=end - start, beats=0, bpm=0.0,
                             key=_key(cn[:, sl].mean(axis=1)), score=score,
                             features={k: round(float(v), 3) for k, v in zip(PHRASE_FEATURES, feats)},
                             centroid=c_med, kind="phrase"))

@@ -138,11 +138,14 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
             log("  ↓ %s — %s" % (cand.title[:60], f["name"][:50]))
             sources.download(f["url"], tmp)
             kinds = {k.strip() for k in args.kinds.split(",")}
+            start = analyze.excerpt_start(tmp)
             windows = []
             if "loop" in kinds:
-                windows += analyze.find_windows(tmp, max_windows=args.per_track, min_score=args.min_score - 10)
+                windows += analyze.find_windows(tmp, max_windows=args.per_track,
+                                                min_score=args.min_score - 10, offset=start)
             if "phrase" in kinds:
-                windows += analyze.find_phrases(tmp, max_phrases=args.per_track, min_score=args.min_score - 10)
+                windows += analyze.find_phrases(tmp, max_phrases=args.per_track,
+                                                min_score=args.min_score - 10, offset=start)
             cut_from, offset = tmp, 0.0
             if windows and f.get("hq_url"):
                 hq = tmp + ".hq" + os.path.splitext(urllib.parse.unquote(f["hq_url"]))[1]

@@ -309,8 +309,8 @@ LOSSLESS = ["Flac", "24bit Flac", "WAVE"]
 LOSSY = ["VBR MP3", "Ogg Vorbis", "128Kbps MP3", "64Kbps MP3"]
 
 
-def ia_audio_files(identifier: str, max_files: int = 2, max_seconds: float = 900,
-                   max_bytes: int = 250_000_000) -> list[dict]:
+def ia_audio_files(identifier: str, max_files: int = 2, max_seconds: float = 3600,
+                   max_bytes: int = 120_000_000, max_hq_bytes: int = 400_000_000) -> list[dict]:
     """One entry per track: a small lossy file to analyse quickly ("url") and,
     where the item has one, the lossless original to cut from ("hq_url")."""
     meta = _get_json(IA_METADATA + urllib.parse.quote(identifier))
@@ -329,7 +329,7 @@ def ia_audio_files(identifier: str, max_files: int = 2, max_seconds: float = 900
             length = 0
         if length and (length < 20 or length > max_seconds):
             continue
-        if int(f.get("size") or 0) > max_bytes:
+        if int(f.get("size") or 0) > (max_hq_bytes if fmt in LOSSLESS else max_bytes):
             continue
         # Derivatives name their original; group by it.
         stem = re.sub(r"\.[^.]+$", "", f.get("original") if f.get("source") == "derivative" and f.get("original") else f["name"])
