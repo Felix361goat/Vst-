@@ -19,6 +19,13 @@ from . import analyze
 
 _lock = threading.Lock()
 
+# Where catalogue updates come from: the repository on GitHub. The app checks
+# these on start and every half hour; new samples appear without reinstalling.
+CATALOG_URLS = [u.rstrip("/") + "/" for u in os.environ.get("HUNTER_CATALOG_URL", "").split() if u] + [
+    "https://raw.githubusercontent.com/felix361goat/vst-/ccr-3b17585f-r0bt64/SampleHunter/catalog/",
+    "https://raw.githubusercontent.com/felix361goat/vst-/main/SampleHunter/catalog/",
+]
+
 
 class Library:
     def __init__(self, root: str):
@@ -58,23 +65,69 @@ class Library:
         nothing to download until you play or drag one."""
         if self._catalog is None:
             import gzip
-            out = []
-            if os.path.isdir(self.catalog_dir):
-                for name in sorted(os.listdir(self.catalog_dir)):
-                    if not name.endswith((".json.gz", ".json")):
+            by_id: dict = {}
+            # Shipped files first, then updates fetched later (which win).
+            for folder in (self.catalog_dir, self.catalog_updates_dir):
+                if not os.path.isdir(folder):
+                    continue
+                for name in sorted(os.listdir(folder)):
+                    if not name.endswith((".json.gz", ".json")) or name == "index.json":
                         continue
                     opener = gzip.open if name.endswith(".gz") else open
                     try:
-                        with opener(os.path.join(self.catalog_dir, name), "rt", encoding="utf-8") as fh:
+                        with opener(os.path.join(folder, name), "rt", encoding="utf-8") as fh:
                             for smp in json.load(fh).get("samples", []):
                                 smp["catalog"] = True
                                 if smp.get("emb_q"):
                                     smp["emb"] = unpack_emb(smp.pop("emb_q"))
-                                out.append(smp)
+                                by_id[smp["id"]] = smp
                     except (OSError, ValueError):
                         continue
-            self._catalog = out
+            self._catalog = list(by_id.values())
         return self._catalog
+
+    @property
+    def catalog_updates_dir(self) -> str:
+        return os.path.join(self.root, "_catalog")
+
+    def update_catalog(self) -> int:
+        """Fetch new catalogue files from GitHub. Returns how many samples
+        are new. Only the small pointer files come down, never audio."""
+        import hashlib
+        import urllib.request
+        os.makedirs(self.catalog_updates_dir, exist_ok=True)
+        before = {x["id"] for x in self.catalog()}
+        index = None
+        for base in CATALOG_URLS:
+            try:
+                with urllib.request.urlopen(base + "index.json", timeout=20) as r:
+                    index, source = json.loads(r.read().decode()), base
+                break
+            except Exception:
+                continue
+        if not index:
+            return 0
+        for f in index.get("files", []):
+            name = os.path.basename(f["name"])
+            dest = os.path.join(self.catalog_updates_dir, name)
+            for have in (dest, os.path.join(self.catalog_dir, name)):
+                if os.path.exists(have):
+                    with open(have, "rb") as fh:
+                        if hashlib.sha256(fh.read()).hexdigest() == f.get("sha256"):
+                            break
+            else:
+                try:
+                    with urllib.request.urlopen(source + name, timeout=60) as r:
+                        body = r.read()
+                    if f.get("sha256") and hashlib.sha256(body).hexdigest() != f["sha256"]:
+                        continue
+                    with open(dest + ".tmp", "wb") as fh:
+                        fh.write(body)
+                    os.replace(dest + ".tmp", dest)
+                except Exception:
+                    continue
+        self._catalog = None
+        return len({x["id"] for x in self.catalog()} - before)
 
     def all_samples(self) -> list:
         """Your own finds and the catalogue together, without anything declined."""

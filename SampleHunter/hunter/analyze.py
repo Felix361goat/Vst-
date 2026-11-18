@@ -353,9 +353,13 @@ def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0
 
 
 def clicks(audio: np.ndarray, sr: int = 44100) -> float:
-    """Clicks and crackle per second: short spikes in the top octaves that
-    stand far above their surroundings. Clean recordings sit near 0; worn
-    records and damaged tapes show tens per second."""
+    """Clicks and crackle per second.
+
+    A click from a worn record or a damaged tape is a single impulse in the
+    top octaves, far above its surroundings, gone again within a millisecond
+    or two. A hi-hat, shaker or plucked attack is just as sudden but rings on
+    for several milliseconds, so only spikes that die away at once count.
+    Clean recordings sit near 0, worn shellac at 30 and far above."""
     from scipy.signal import butter, sosfilt
     from scipy.ndimage import median_filter
     mono = audio.mean(axis=1) if audio.ndim == 2 else audio
@@ -363,9 +367,21 @@ def clicks(audio: np.ndarray, sr: int = 44100) -> float:
     env = np.abs(hp)
     floor = median_filter(env, size=int(0.01 * sr)) + 1e-6
     spikes = env > 8 * floor
-    # Count onsets of spike runs, not every sample in them.
-    starts = np.flatnonzero(spikes[1:] & ~spikes[:-1])
-    return float(len(starts) / (len(mono) / sr))
+    starts = np.flatnonzero(spikes[1:] & ~spikes[:-1]) + 1
+    if len(starts) == 0:
+        return 0.0
+    head, a, b = int(0.0006 * sr), int(0.0015 * sr), int(0.005 * sr)
+    smooth = np.convolve(env, np.ones(head) / head, mode="same")
+    n = 0
+    for i in starts:
+        if i + b >= len(env):
+            break
+        peak = env[i:i + head].max()
+        tail = smooth[i + a:i + b].mean()
+        before = smooth[max(0, i - b):i - a].mean() if i > b else tail
+        if tail < 0.2 * peak and before < 0.2 * peak:
+            n += 1
+    return float(n / (len(mono) / sr))
 
 
 def describe(w: Window, vintage: bool) -> list[str]:

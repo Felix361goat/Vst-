@@ -116,6 +116,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tag … oder einen Klang beschreiben und 🔊 drücken  (/)">
     <button class="btn" id="listenBtn" title="Sucht nach Klang statt nach Namen, z. B. „eerie nasal riff“, „buzzing reed drone“, „metallic bells“ (englisch klappt am besten). Braucht das KI-Ohr.">🔊 Nach Klang</button>
     <span class="stat" id="count"></span>
+    <button class="btn" id="catBtn" title="Neue Samples aus dem Katalog holen (passiert sonst automatisch beim Start und alle 30 Minuten)">↻ Neue Samples</button>
     <span class="stat" id="usage" title="Was SampleHunter auf deiner Festplatte belegt. Die Bibliothek selbst liegt in der Cloud; gespeichert werden nur angehörte Samples (Cache, räumt sich selbst auf) und deine Favoriten."></span>
     <select class="btn" id="coll" title="Deine Sammlungen"></select>
     <button class="btn" id="collDel" title="Diese Sammlung löschen (die Samples bleiben)" hidden>Sammlung löschen</button>
@@ -509,7 +510,19 @@ $('#collDel').onclick = async () => {
 };
 
 // ---------- hunting ----------
-let caps = {hunt:true, ear:true}, huntAfterInstall = false;
+let caps = {hunt:true, ear:true}, huntAfterInstall = false, seenCatalogNew = null;
+$('#catBtn').onclick = async () => {
+  $('#catBtn').textContent = '↻ prüft …';
+  try {
+    const r = await (await fetch('/api/catalog/update', {method:'POST'})).json();
+    toast(r.new ? `${r.new} neue Samples – Katalog hat jetzt ${r.total}` : `Alles aktuell (${r.total} Samples im Katalog)`);
+    seenCatalogNew = null; await load();
+  } finally { $('#catBtn').textContent = '↻ Neue Samples'; }
+};
+setInterval(async () => {
+  // Only redraw when the background update actually brought something.
+  try { const r = await (await fetch('/api/library')).json(); if(r.catalog && r.catalog.new !== seenCatalogNew) load(); } catch(_) {}
+}, 10 * 60 * 1000);
 async function install(what){
   await fetch('/api/install', {method:'POST', body:JSON.stringify({what})});
   $('#drawer').classList.remove('closed'); installing = true; poll();
@@ -563,6 +576,11 @@ async function poll(){
 async function load(){
   const r = await (await fetch('/api/library')).json();
   samples = r.samples; ratings = r.ratings; collections = r.collections || {}; fillCollections(); showUsage(r.usage); showCaps(r.caps);
+  if(r.catalog){
+    $('#catBtn').title = `Katalog: ${r.catalog.total} Samples` + (r.catalog.checked ? `, zuletzt geprüft ${r.catalog.checked}` : '') + '. Klick holt sofort neue.';
+    if(seenCatalogNew !== null && r.catalog.new > seenCatalogNew) toast(`${r.catalog.new - seenCatalogNew} neue Samples im Katalog`);
+    seenCatalogNew = r.catalog.new;
+  }
   if(r.caps && r.caps.installing && !installing){ installing = true; poll(); }
   const keys = [...new Set(samples.map(s => s.key))].sort(); const sel = $('#key'), v = sel.value;
   sel.innerHTML = '<option value="">alle</option>' + keys.map(k => `<option>${esc(k)}</option>`).join(''); sel.value = v;

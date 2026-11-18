@@ -159,6 +159,7 @@ def main() -> int:
     server = serve.ThreadingHTTPServer(("127.0.0.1", port), serve.Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=serve.autopilot, daemon=True).start()
+    threading.Thread(target=serve.catalog_updater, daemon=True).start()
 
     app = QApplication(sys.argv)
     app.setApplicationName("SampleHunter")

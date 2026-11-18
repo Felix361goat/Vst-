@@ -29,6 +29,24 @@ KEEP = ["id", "kind", "name", "term", "title", "creator", "year", "source_url", 
         "features", "centroid", "tags", "peaks", "family", "stream", "source_start", "added"]
 
 
+def write_index(folder: str) -> None:
+    """index.json lists every catalogue file with its hash, so the app can
+    fetch exactly what changed."""
+    import hashlib
+    import time
+    files = []
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".json.gz"):
+            with open(os.path.join(folder, name), "rb") as fh:
+                body = fh.read()
+            with gzip.open(os.path.join(folder, name), "rt", encoding="utf-8") as fh:
+                count = len(json.load(fh).get("samples", []))
+            files.append({"name": name, "sha256": hashlib.sha256(body).hexdigest(), "count": count})
+    with open(os.path.join(folder, "index.json"), "w", encoding="utf-8") as fh:
+        json.dump({"updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "files": files,
+                   "total": sum(f["count"] for f in files)}, fh, indent=1)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("libraries", nargs="+")
@@ -87,6 +105,7 @@ def main() -> int:
     with gzip.open(args.out, "wt", encoding="utf-8") as fh:
         json.dump({"version": 1, "samples": out}, fh, ensure_ascii=False, separators=(",", ":"))
     print("%d Samples im Katalog (%s), %d KB" % (len(out), args.out, os.path.getsize(args.out) // 1024))
+    write_index(os.path.dirname(os.path.abspath(args.out)))
     for why, n in sorted(dropped.items(), key=lambda x: -x[1]):
         print("  aussortiert, %s: %d" % (why, n))
     return 0

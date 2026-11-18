@@ -101,6 +101,24 @@ def start_hunt(body: dict, append: bool = False) -> bool:
         return True
 
 
+CATALOG_STATE = {"new": 0, "checked": None}
+
+
+def catalog_updater() -> None:
+    """Check GitHub for new catalogue samples now and every 30 minutes."""
+    import time
+    while True:
+        try:
+            n = LIB.update_catalog()
+            CATALOG_STATE["new"] += n
+            CATALOG_STATE["checked"] = time.strftime("%H:%M")
+            if n:
+                print("Katalog: %d neue Samples" % n)
+        except Exception as exc:
+            print("Katalog-Update fehlgeschlagen:", exc)
+        time.sleep(1800)
+
+
 def autopilot() -> None:
     """Keeps digging while the app is open: a new round shortly after each one ends."""
     import time
@@ -186,7 +204,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/api/library":
             return self._json({"samples": LIB.all_samples(), "ratings": LIB.ratings(), "usage": STORE.usage(),
-                               "caps": caps(),
+                               "caps": caps(), "catalog": dict(CATALOG_STATE, total=len(LIB.catalog())),
                                "collections": LIB.collections(), "hunting": hunting(),
                                "auto": bool(_hunt.get("auto"))})
         if url.path == "/api/log":
@@ -305,6 +323,10 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/collection/delete":
             LIB.drop_collection(str(body.get("name") or ""))
             return self._json({"ok": True, "collections": LIB.collections()})
+        if url.path == "/api/catalog/update":
+            n = LIB.update_catalog()
+            CATALOG_STATE["new"] += n
+            return self._json({"new": n, "total": len(LIB.catalog())})
         if url.path == "/api/install":
             ok = start_install(str(body.get("what")))
             return self._json({"ok": ok, "caps": caps()})
@@ -385,6 +407,7 @@ def main():
         return
     url = "http://localhost:%d" % port
     threading.Thread(target=autopilot, daemon=True).start()
+    threading.Thread(target=catalog_updater, daemon=True).start()
     print("SampleHunter läuft auf", url)
     print("Fenster schließen oder Strg+C zum Beenden.")
     if "--no-browser" not in sys.argv:
