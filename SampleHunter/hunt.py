@@ -50,6 +50,8 @@ def main() -> int:
                     help="what to cut: loop (riffs on the beat), phrase (free one-shot lines), or both")
     ap.add_argument("--min-score", type=float, default=58.0, help="minimum Freak score, 0-100")
     ap.add_argument("--per-track", type=int, default=2, help="max samples cut from one recording")
+    ap.add_argument("--per-family", type=int, default=8,
+                    help="max samples from one collection or artist, for variety")
     ap.add_argument("--library", default=os.path.join(HERE, "library"))
     ap.add_argument("--max-minutes", type=float, default=0, help="stop after this long (0 = no limit)")
     args = ap.parse_args()
@@ -103,6 +105,12 @@ def main() -> int:
             time.sleep(5)
             continue
         fresh = [c for c in cands if c.key not in data["processed"]]
+        # Variety: no collection or artist gets to fill the library.
+        counts: dict[str, int] = {}
+        for smp in data["samples"]:
+            for fam in smp.get("family", []):
+                counts[fam] = counts.get(fam, 0) + 1
+        fresh = [c for c in fresh if all(counts.get(f, 0) < args.per_family for f in family(c))]
         label = {"commons": "Wikimedia", "78": "78er", "78-random": "78er-Kiste", "ia": "Archive", "ia-any": "Archive (Experiment)"}[src]
         log("%s · %s: %d neue Aufnahmen" % (label, term or "Zufall", len(fresh)))
         if not cands and term:
@@ -192,6 +200,14 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
     return added
 
 
+def family(c: sources.Candidate) -> list[str]:
+    """Keys that group recordings from one series or one artist."""
+    keys = ["id:" + re.sub(r"[-_ ]*\d+[a-z]?$", "", c.identifier.lower())[:40]]
+    if c.creator and len(c.creator) > 3 and not c.creator.lower().startswith(("unknown", "various")):
+        keys.append("by:" + c.creator.lower()[:40])
+    return keys
+
+
 def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window, src: str,
               offset: float = 0.0) -> dict:
     sid = hashlib.sha1(("%s|%s|%.2f" % (cand.key, f["name"], w.start)).encode()).hexdigest()[:12]
@@ -211,6 +227,7 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
     return {
         "id": sid,
         "kind": w.kind,
+        "family": family(cand),
         "name": name,
         "file": rel.replace(os.sep, "/"),
         "term": cand.term,
@@ -222,7 +239,7 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         "lossless": src.endswith((".flac", ".wav")),
         "source_start": round(w.start, 3),
         "license": cand.license,
-        "license_label": sources.LICENSE_LABELS[cand.license],
+        "license_label": cand.note or sources.LICENSE_LABELS[cand.license],
         "license_url": cand.license_url,
         "trust": cand.trust,
         "trust_label": sources.TRUST_LABELS[cand.trust],

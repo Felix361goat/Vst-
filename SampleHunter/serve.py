@@ -146,13 +146,66 @@ class Handler(SimpleHTTPRequestHandler):
         self._json({"error": "unknown"}, 404)
 
 
+def _app_browser() -> str | None:
+    """A Chromium browser that can open a page as its own app window."""
+    import shutil
+    names = ["msedge", "chrome", "google-chrome", "chromium", "chromium-browser", "brave"]
+    for n in names:
+        p = shutil.which(n)
+        if p:
+            return p
+    pf = [os.environ.get(k, "") for k in ("PROGRAMFILES(X86)", "PROGRAMFILES", "LOCALAPPDATA")]
+    candidates = [os.path.join(b, *rest) for b in pf if b for rest in (
+        ("Microsoft", "Edge", "Application", "msedge.exe"),
+        ("Google", "Chrome", "Application", "chrome.exe"),
+        ("BraveSoftware", "Brave-Browser", "Application", "brave.exe"))]
+    candidates += ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                   "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+                   "/Applications/Chromium.app/Contents/MacOS/Chromium"]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
+
+
+def open_window(url: str, server) -> None:
+    """Open SampleHunter in its own window. Closing it quits the program."""
+    exe = _app_browser()
+    if not exe:
+        webbrowser.open(url)        # no Chromium browser: a normal tab will do
+        return
+    profile = os.path.join(LIB.root, ".app-window")
+    proc = subprocess.Popen([exe, "--app=" + url, "--user-data-dir=" + profile,
+                             "--window-size=1440,900", "--no-first-run",
+                             "--no-default-browser-check", "--autoplay-policy=no-user-gesture-required"])
+
+    def watch():
+        proc.wait()
+        print("Fenster geschlossen – SampleHunter beendet.")
+        if hunting():
+            _hunt["proc"].terminate()
+        server.shutdown()
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def main():
     port = int(os.environ.get("PORT", "8765"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError:
+        # Already running: just open another window onto it.
+        print("SampleHunter läuft schon – öffne das Fenster.")
+        webbrowser.open("http://localhost:%d" % port)
+        return
     url = "http://localhost:%d" % port
-    print("SampleHunter läuft auf", url, "– Strg+C zum Beenden")
+    print("SampleHunter läuft auf", url)
+    print("Fenster schließen oder Strg+C zum Beenden.")
     if "--no-browser" not in sys.argv:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        if "--tab" in sys.argv:
+            threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        else:
+            threading.Timer(0.5, lambda: open_window(url, server)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

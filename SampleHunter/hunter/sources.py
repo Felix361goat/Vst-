@@ -122,6 +122,7 @@ class Candidate:
     page_url: str
     creator: str = ""
     files: list[dict] = field(default_factory=list)   # filled for Commons
+    note: str = ""         # overrides the licence label when it needs saying
 
     @property
     def key(self) -> str:
@@ -292,15 +293,16 @@ def search_ia_any(term: str, allow_nc: bool, rng: random.Random, rows: int = 50,
         if FAMOUS.search(hay) or OFFENSIVE.search(hay) or re.search(r"official|remix|vevo", hay, re.I):
             continue
         lic = classify_license(d.get("licenseurl")) if d.get("licenseurl") else LICENSE_UNKNOWN
+        note = ""
         if lic is None:                      # explicitly "no derivatives"
-            lic = LICENSE_UNKNOWN
+            lic, note = LICENSE_UNKNOWN, "Keine Bearbeitung erlaubt (ND) – nur privat"
         if lic == LICENSE_NC and not allow_nc:
-            lic = LICENSE_UNKNOWN
+            lic, note = LICENSE_UNKNOWN, "Nur nicht-kommerziell (NC) – nur privat"
         out.append(Candidate(
             source="ia", identifier=d["identifier"], title=title,
             year=_year(d.get("year") or d.get("date")), downloads=int(d.get("downloads") or 0),
             license=lic, license_url=d.get("licenseurl") or "", term=term,
-            trust="claimed" if lic != LICENSE_UNKNOWN else "unknown",
+            trust="claimed" if lic != LICENSE_UNKNOWN else "unknown", note=note,
             page_url="https://archive.org/details/" + d["identifier"], creator=_first(d.get("creator"))))
     return out
 

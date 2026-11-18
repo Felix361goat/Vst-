@@ -9,6 +9,15 @@ ein einzelnes gezupftes Instrument, synkopiert, nasal-hell, von irgendwo, wo
 sonst keiner sucht. Das Instrument und die Herkunft sind egal. Es zählt nur,
 ob die Stelle so funktioniert.
 
+Es gibt zwei Arten von Samples:
+
+- **Loops** (rot markiert): Riffs, auf dem Beat geschnitten, loopen bei der BPM im Namen.
+- **Phrasen** (blau markiert): freie Linien, gesungen oder gespielt, mit Verzierungen
+  und Glissandi, als One-Shot. So etwas wie die karnatische Sängerin, die seit
+  Jahrzehnten in Hip-Hop-Beats auftaucht.
+
+Es ist ein eigenes Programm mit eigenem Fenster, Claude braucht es nicht.
+
 ## Starten
 
 **Windows:** einmal `winget install Gyan.FFmpeg` und [Python 3](https://python.org)
@@ -17,7 +26,8 @@ installieren, dann `start-windows.bat` doppelklicken.
 **macOS:** einmal `brew install ffmpeg python`, dann `start-mac.command` doppelklicken.
 
 Beim ersten Start werden die Python-Pakete installiert (dauert ein paar Minuten),
-danach öffnet sich die Bibliothek unter <http://localhost:8765>. Unten auf **Los**
+danach öffnet sich SampleHunter in einem eigenen Fenster (über Edge oder Chrome
+im App-Modus, ohne Adressleiste). Fenster zu = Programm aus. Unten auf **Los**
 klicken, dann beginnt die Suche. Pro Aufnahme dauert das etwa 20–40 Sekunden.
 Neue Samples erscheinen live in der Liste.
 
@@ -28,7 +38,10 @@ python hunt.py --count 50                       # 50 neue Samples
 python hunt.py --terms "kora,banjo,gamelan"     # nur bestimmte Instrumente/Stile
 python hunt.py --allow-nc                       # auch CC BY-NC (nur nicht-kommerziell)
 python hunt.py --include-claimed                # auch Archive-Uploads mit ungeprüfter Lizenz
-python serve.py                                 # Bibliothek öffnen
+python hunt.py --experiment                     # auch obskure Uploads mit ungeklärter Lizenz
+python hunt.py --kinds phrase                   # nur Phrasen
+python serve.py                                 # Bibliothek öffnen (eigenes Fenster)
+python serve.py --tab                           # stattdessen als Browser-Tab
 ```
 
 ## Die Bibliothek
@@ -38,6 +51,8 @@ python serve.py                                 # Bibliothek öffnen
 | **Leertaste** | abspielen / stoppen |
 | **↑ ↓** | nächstes Sample (spielt direkt weiter, wenn schon etwas läuft) |
 | **L / D** | Like / Nicht mein Ding |
+| **S** / Wellen-Button | ähnliche Samples finden (Esc = zurück) |
+| Klick auf den Titel | alles aus derselben Aufnahme |
 | **/** | Suche |
 | Klick in die Wellenform | ab dieser Stelle abspielen |
 | **Sync** + BPM | spielt im Projekttempo, wie eine schneller gedrehte Platte; Tonhöhe geht mit |
@@ -64,8 +79,18 @@ du mehr davon willst.
    (Gamelan, Kora, Mbira …), Lizenzen von der Community geprüft.
 3. **Andere Archive-Uploads** mit freier Lizenz: nur mit `--include-claimed`,
    weil manche Uploader „Public Domain“ auf kommerzielle Platten schreiben.
+4. **Experiment-Modus** (`--experiment`, in der Oberfläche standardmäßig an):
+   obskure Archive-Uploads, egal welche Lizenz: Konzertmitschnitte, Kassetten,
+   alte Filmsong-Platten, Feldaufnahmen. Nur Aufnahmen mit wenigen Downloads,
+   und weltbekannte Namen (Lata Mangeshkar, Nusrat, Bollywood-Labels …) werden
+   übersprungen. Diese Samples tragen ein rotes Badge „Lizenz unklar“: zum
+   Rumprobieren gut, vor einem Release klären.
 
-Suchbegriffe sind über 130 Instrumente und Stile aus aller Welt (siehe
+Damit keine Sammlung die Bibliothek füllt, kommen aus einer Serie oder von
+einem Künstler höchstens acht Samples (`--per-family`). Lange Aufnahmen
+(Konzerte bis eine Stunde) werden an einer zufälligen Stelle analysiert.
+
+Suchbegriffe sind über 180 Instrumente, Stile und Gesangstraditionen aus aller Welt (siehe
 `hunter/sources.py`). Bevorzugt werden Aufnahmen, die kaum jemand
 heruntergeladen hat.
 
@@ -81,6 +106,10 @@ heruntergeladen hat.
 | Helligkeit | nasaler Mittenbereich um 1,8 kHz, wo Tumbi, Banjo und Kora sitzen |
 | Harmonisch/perkussiv | gezupft: Anschlag plus Ton |
 | Tonalität | Rauschen, Knistern und Sprache fallen raus |
+
+**Phrasen** werden anders bewertet: eine klare Stimme, die frei steht,
+Bewegung (Verzierungen, Glissandi), ein Ambitus von ein paar Tönen, gehaltene
+Töne dazwischen, sauberer Anfang und Ende, 1,5–8 Sekunden.
 
 **Dein Geschmack.** Jeder Like und Dislike fließt in die nächste Suche ein:
 Suchbegriffe, deren Samples du magst, werden öfter gezogen. Ab drei

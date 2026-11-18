@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SampleHunter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff4d6d'/%3E%3Cpath d='M6 16h3l2-6 3 12 3-9 2 5 2-2h5' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#0e0f12; --panel:#16181d; --row:#181a20; --row-h:#1f222a; --line:#262a33;
@@ -33,7 +34,7 @@ header{position:sticky;top:0;z-index:5;background:rgba(14,15,18,.92);backdrop-fi
 .sep{width:1px;height:20px;background:var(--line)}
 main{padding:8px 12px 120px}
 .empty{color:var(--dim);text-align:center;padding:80px 20px}
-.row{display:grid;grid-template-columns:40px minmax(160px,1.4fr) minmax(160px,2fr) 70px 64px 90px 150px 118px;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent}
+.row{display:grid;grid-template-columns:40px minmax(160px,1.4fr) minmax(160px,2fr) 64px 64px 90px 150px 156px;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent}
 .row:hover{background:var(--row-h)}
 .row.cur{background:var(--row);border-color:#3a2530}
 .row.disliked{opacity:.45}
@@ -46,6 +47,9 @@ main{padding:8px 12px 120px}
 .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
 .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer}
 .tag:hover{color:var(--text)}
+.name small.src{cursor:pointer} .name small.src:hover{color:var(--text);text-decoration:underline}
+.focus{display:flex;gap:10px;align-items:center;margin:6px 8px 10px;padding:8px 12px;border:1px solid #3a2530;background:#1d1418;border-radius:8px;font-size:13px}
+.focus b{color:var(--accent)} .focus button{margin-left:auto}
 canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .num{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px;text-align:right}
 .num b{color:var(--text);font-weight:600}
@@ -157,6 +161,7 @@ const ICON = {
   heart:'<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
   down:'<svg viewBox="0 0 24 24"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>',
   thumbDown:'<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>',
+  similar:'<svg viewBox="0 0 24 24"><path d="M2 9c3-4 5-4 8 0s5 4 8 0 3-2 4-2M2 16c3-4 5-4 8 0s5 4 8 0 3-2 4-2"/></svg>',
   link:'<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>',
   trash:'<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/></svg>',
 };
@@ -209,7 +214,7 @@ function rowHTML(s){
     <button class="play" title="Abspielen (Leertaste)">${ICON.play}</button>
     <div class="name" draggable="true" title="In Explorer/DAW ziehen (Chrome)">
       <b><span class="kind k-${kindOf(s)}">${kindOf(s) === 'phrase' ? 'PHRASE' : 'LOOP'}</span>${esc(s.name)}</b>
-      <small>${esc(s.title)}${s.creator? ' · '+esc(s.creator):''}${s.year? ' · '+s.year:''}</small>
+      <small class="src" data-act="source" title="Alles aus dieser Aufnahme zeigen">${esc(s.title)}${s.creator? ' · '+esc(s.creator):''}${s.year? ' · '+s.year:''}</small>
       <div class="tags">${s.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
     </div>
     <div class="c-wave"><canvas class="wave"></canvas></div>
@@ -222,6 +227,7 @@ function rowHTML(s){
     <div class="acts">
       <button class="ico ${r>0?'liked':''}" data-act="like" title="Like (L)">${ICON.heart}</button>
       <button class="ico ${r<0?'disl':''}" data-act="dislike" title="Nicht mein Ding (D)">${ICON.thumbDown}</button>
+      <button class="ico" data-act="similar" title="Ähnliche Samples finden (S)">${ICON.similar}</button>
       <a class="ico" href="/library/${encodeURI(s.file)}" download title="WAV herunterladen">${ICON.down}</a>
       <a class="ico" href="${esc(s.source_url)}" target="_blank" rel="noopener" title="Originalaufnahme auf archive.org (ab ${fmtTime(s.source_start)})">${ICON.link}</a>
     </div>
@@ -233,6 +239,14 @@ function filtered(){
   const q = $('#q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const bmin = +$('#bpmMin').value || 0, bmax = +$('#bpmMax').value || 1e9;
   const key = $('#key').value, ms = +$('#minScore').value || 0;
+  const ref = focus && byId(focus.id);
+  if(ref && focus.type === 'source') return samples.filter(s => s.source_url === ref.source_url).sort((a,b) => (a.source_start||0)-(b.source_start||0));
+  if(ref && focus.type === 'similar'){
+    const v = vec(ref);
+    return samples.filter(s => kindOf(s) === kindOf(ref) && state.lic.has(s.license) && !(state.hideDis && (ratings[s.id]||0) < 0))
+      .map(s => [s, dist(v, vec(s)) + (s.key === ref.key ? 0 : 0.15) + (s.source_url === ref.source_url && s.id !== ref.id ? 0.3 : 0)])
+      .sort((a,b) => a[1]-b[1]).slice(0, 40).map(x => x[0]);
+  }
   let out = samples.filter(s => {
     if(!state.lic.has(s.license)) return false;
     if(!state.kinds.has(kindOf(s))) return false;
@@ -251,13 +265,23 @@ function filtered(){
     bpm:(a,b)=>a.bpm-b.bpm, old:(a,b)=>(a.year||3000)-(b.year||3000)}[$('#sort').value];
   return out.sort(by);
 }
+let focus = null;
+function vec(s){
+  const f = s.features || {}; const v = Object.keys(f).sort().map(k => f[k]);
+  v.push(s.bpm ? Math.log2(s.bpm/100) : 0, 0.5*Math.log2(Math.max(s.centroid||1800, 50)/1800));
+  return v;
+}
+function dist(a, b){ let d = 0; for(let i=0;i<Math.min(a.length,b.length);i++) d += (a[i]-b[i])**2; return Math.sqrt(d); }
+function setFocus(type, id){ focus = type ? {type, id} : null; render(); window.scrollTo({top:0}); }
 function render(){
   view = filtered();
   $('#count').textContent = `${view.length} von ${samples.length} Samples`;
   const list = $('#list');
   if(!samples.length){ list.innerHTML = `<div class="empty"><h2>Noch leer</h2><p>Unten auf <b>Los</b> klicken – SampleHunter gräbt dann alte und unbekannte Aufnahmen aus<br>und schneidet die besten Riffs heraus. Dauert ca. 30 s pro Aufnahme.</p></div>`; return; }
   if(!view.length){ list.innerHTML = `<div class="empty">Nichts passt zu den Filtern.</div>`; return; }
-  list.innerHTML = `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo/Länge</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
+  const ref = focus && byId(focus.id);
+  const banner = ref ? `<div class="focus">${focus.type === 'similar' ? 'Klingt ähnlich wie' : 'Alles aus der Aufnahme'} <b>${esc(focus.type === 'similar' ? ref.name : ref.title)}</b><button class="btn" id="unfocus">✕ zurück zur Bibliothek</button></div>` : '';
+  list.innerHTML = banner + `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
   list.querySelectorAll('.row[data-id]').forEach(el => drawWave(el));
   highlight();
 }
@@ -290,6 +314,7 @@ async function setRating(id, v){
   if(el){ const tmp = document.createElement('div'); tmp.innerHTML = rowHTML(byId(id)); const nw = tmp.firstElementChild; el.replaceWith(nw); drawWave(nw); markRow(id); highlight(); }
 }
 $('#list').addEventListener('click', e => {
+  if(e.target.closest('#unfocus')){ setFocus(null); return; }
   const row = e.target.closest('.row[data-id]'); if(!row) return;
   const s = byId(row.dataset.id); cur = s.id; highlight();
   if(e.target.closest('.play')){ playingId === s.id ? stop() : play(s); return; }
@@ -297,6 +322,8 @@ $('#list').addEventListener('click', e => {
   const act = e.target.closest('[data-act]')?.dataset.act;
   if(act === 'like') setRating(s.id, 1);
   if(act === 'dislike') setRating(s.id, -1);
+  if(act === 'similar') setFocus('similar', s.id);
+  if(act === 'source') setFocus('source', s.id);
   if(e.target.classList.contains('tag')){ $('#q').value = e.target.textContent; render(); }
 });
 $('#list').addEventListener('dragstart', e => {
@@ -313,6 +340,8 @@ document.addEventListener('keydown', e => {
   else if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); const n = view[Math.max(0, Math.min(view.length-1, i + (e.key==='ArrowDown'?1:-1)))]; if(n){ cur = n.id; highlight(); document.querySelector(`.row[data-id="${n.id}"]`)?.scrollIntoView({block:'nearest'}); if(playingId) play(n); } }
   else if(e.key.toLowerCase() === 'l' && cur) setRating(cur, 1);
   else if(e.key.toLowerCase() === 'd' && cur) setRating(cur, -1);
+  else if(e.key.toLowerCase() === 's' && cur) setFocus('similar', cur);
+  else if(e.key === 'Escape' && focus) setFocus(null);
 });
 
 // ---------- filters ----------
