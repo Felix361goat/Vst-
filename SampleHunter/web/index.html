@@ -434,6 +434,7 @@ $('#list').addEventListener('mousedown', e => {
   if(e.button !== 0) return;
   const h = e.target.closest('.grip, canvas.wave'); const row = e.target.closest('.row[data-id]');
   press = h && row ? {x:e.clientX, y:e.clientY, id:row.dataset.id} : null;
+  if(press && window.SH_NATIVE) fetch(`/api/prepare?id=${press.id}&fmt=${fmt()}`);
 });
 document.addEventListener('mouseup', () => { press = null; });
 document.addEventListener('mousemove', e => {

@@ -183,6 +183,12 @@ class Handler(SimpleHTTPRequestHandler):
             E = np.array([x["emb"] for x in with_emb])
             order = np.argsort(-(E @ t))
             return self._json({"ids": [with_emb[i]["id"] for i in order[:60]]})
+        if url.path == "/api/prepare":
+            # A press on a sample may become a drag: start fetching it now.
+            q = urllib.parse.parse_qs(url.query)
+            sid, fmt = (q.get("id") or [""])[0], (q.get("fmt") or ["mp3"])[0]
+            threading.Thread(target=lambda: _safe(export_path, sid, fmt), daemon=True).start()
+            return self._json({"ok": True})
         if url.path == "/api/audio":
             s = LIB.find((urllib.parse.parse_qs(url.query).get("id") or [""])[0])
             if not s:
