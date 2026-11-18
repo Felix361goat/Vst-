@@ -107,9 +107,13 @@ class Taste:
 
     @staticmethod
     def _vec(s: dict) -> np.ndarray:
+        # Loops and phrases are measured differently; both fill eight slots,
+        # and the kind itself is a dimension, so they never pass for each other.
         f = s["features"]
-        v = [f.get(k, 0.0) for k in analyze.FEATURES]
-        v.append(np.log2(max(s.get("bpm", 100), 40) / 100.0))
+        phrase = s.get("kind") == "phrase"
+        names = analyze.PHRASE_FEATURES if phrase else analyze.FEATURES
+        v = [f.get(k, 0.0) for k in names] + [1.0 if phrase else 0.0]
+        v.append(np.log2(max(s.get("bpm") or 100, 40) / 100.0))
         v.append(np.log2(max(s.get("centroid", 1800), 50) / 1800.0))
         return np.array(v, dtype=float)
 

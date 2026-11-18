@@ -44,6 +44,10 @@ def main() -> int:
     ap.add_argument("--allow-nc", action="store_true", help="include CC BY-NC (non-commercial) material")
     ap.add_argument("--include-claimed", action="store_true",
                     help="also use Archive items whose licence only rests on the uploader's word")
+    ap.add_argument("--experiment", action="store_true",
+                    help="also dig obscure Archive uploads with unclear licence (to play with; clear before release)")
+    ap.add_argument("--kinds", default="loop,phrase",
+                    help="what to cut: loop (riffs on the beat), phrase (free one-shot lines), or both")
     ap.add_argument("--min-score", type=float, default=58.0, help="minimum Freak score, 0-100")
     ap.add_argument("--per-track", type=int, default=2, help="max samples cut from one recording")
     ap.add_argument("--library", default=os.path.join(HERE, "library"))
@@ -73,6 +77,8 @@ def main() -> int:
             options.append(("78-random", 0.25))
         if args.include_claimed:
             options.append(("ia", 0.30))
+        if args.experiment:
+            options.append(("ia-any", 0.60))
         src = rng.choices([o[0] for o in options], weights=[o[1] for o in options])[0]
         term = None
         if src != "78-random":
@@ -87,6 +93,8 @@ def main() -> int:
                 cands = sources.search_commons(term, args.allow_nc, rng)
             elif src == "ia":
                 cands = sources.search_ia_claimed(term, args.allow_nc, rng)
+            elif src == "ia-any":
+                cands = sources.search_ia_any(term, args.allow_nc, rng)
             else:
                 cands = sources.search_78(term, rng)
         except Exception as exc:  # network hiccups should not end the hunt
@@ -95,7 +103,7 @@ def main() -> int:
             time.sleep(5)
             continue
         fresh = [c for c in cands if c.key not in data["processed"]]
-        label = {"commons": "Wikimedia", "78": "78er", "78-random": "78er-Kiste", "ia": "Archive"}[src]
+        label = {"commons": "Wikimedia", "78": "78er", "78-random": "78er-Kiste", "ia": "Archive", "ia-any": "Archive (Experiment)"}[src]
         log("%s · %s: %d neue Aufnahmen" % (label, term or "Zufall", len(fresh)))
         if not cands and term:
             dry.add((src, term))
@@ -129,12 +137,17 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
         try:
             log("  ↓ %s — %s" % (cand.title[:60], f["name"][:50]))
             sources.download(f["url"], tmp)
-            windows = analyze.find_windows(tmp, max_windows=args.per_track, min_score=args.min_score - 10)
+            kinds = {k.strip() for k in args.kinds.split(",")}
+            windows = []
+            if "loop" in kinds:
+                windows += analyze.find_windows(tmp, max_windows=args.per_track, min_score=args.min_score - 10)
+            if "phrase" in kinds:
+                windows += analyze.find_phrases(tmp, max_phrases=args.per_track, min_score=args.min_score - 10)
             cut_from, offset = tmp, 0.0
             if windows and f.get("hq_url"):
                 hq = tmp + ".hq" + os.path.splitext(urllib.parse.unquote(f["hq_url"]))[1]
                 try:
-                    log("    Riff gefunden – hole verlustfreies Original")
+                    log("    Treffer – hole verlustfreies Original")
                     sources.download(f["hq_url"], hq)
                     offset = analyze.align(tmp, hq, windows[0].start)
                     cut_from = hq
@@ -150,12 +163,12 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
                 data["samples"].append(sample)
                 lib.save(data)
                 added += 1
-                log("  ✓ %s  Freak %.0f%s  %d BPM  %s" % (
+                log("  ✓ %s  Freak %.0f%s  %s  %s" % (
                     sample["name"], w.score,
                     (" (Geschmack %+.0f)" % sample["taste"]) if sample["taste"] else "",
-                    round(w.bpm), w.key))
+                    ("%d BPM" % round(w.bpm)) if w.kind == "loop" else "Phrase %.1f s" % w.duration, w.key))
             if not windows:
-                log("    nichts Loopbares gefunden")
+                log("    nichts Brauchbares gefunden")
         except urllib.error.HTTPError as exc:
             log("    Server sagt %d – später nochmal" % exc.code)
             if exc.code == 429:
@@ -181,7 +194,11 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
     sid = hashlib.sha1(("%s|%s|%.2f" % (cand.key, f["name"], w.start)).encode()).hexdigest()[:12]
     bpm = round(w.bpm)
     key = w.key.replace(" ", "").replace("#", "s")
-    name = "%s_%s_%dbpm_%s_%s" % (slug(cand.term, 16), slug(cand.title, 24), bpm, key, sid[:4])
+    title = slug(cand.title, 24)
+    if title == "x":                       # non-Latin title
+        title = slug(cand.identifier, 24)
+    shape = ("%dbpm" % bpm) if w.kind == "loop" else "phrase"
+    name = "%s_%s_%s_%s_%s" % (slug(cand.term, 16), title, shape, key, sid[:4])
     rel = os.path.join("samples", name + ".wav")
     peaks = analyze.export(src, w, os.path.join(lib.root, rel), offset=offset)
     vintage = bool(cand.year and cand.year < 1960)
@@ -190,6 +207,7 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         tags.append("selten")
     return {
         "id": sid,
+        "kind": w.kind,
         "name": name,
         "file": rel.replace(os.sep, "/"),
         "term": cand.term,

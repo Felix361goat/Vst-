@@ -132,6 +132,8 @@ class Handler(SimpleHTTPRequestHandler):
                     cmd.append("--allow-nc")
                 if body.get("include_claimed"):
                     cmd.append("--include-claimed")
+                if body.get("experiment"):
+                    cmd.append("--experiment")
                 log = open(LOG, "w", encoding="utf-8")
                 env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
                 _hunt["proc"] = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)

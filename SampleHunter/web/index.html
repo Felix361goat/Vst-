@@ -54,7 +54,9 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
 .lic{font-size:11px;line-height:1.25}
 .lic .badge{display:inline-block;border-radius:4px;padding:1px 6px;font-weight:600;font-size:11px}
-.b-pd{background:#163322;color:var(--good)} .b-by{background:#152638;color:var(--info)} .b-nc{background:#3a2c10;color:var(--warn)}
+.b-pd{background:#163322;color:var(--good)} .b-by{background:#152638;color:var(--info)} .b-nc{background:#3a2c10;color:var(--warn)} .b-un{background:#3a1520;color:#ff8fa3}
+.kind{font-size:10px;font-weight:700;letter-spacing:.5px;border-radius:3px;padding:0 4px;margin-right:6px;vertical-align:1px}
+.k-loop{background:#2a1c22;color:var(--accent)} .k-phrase{background:#1c2433;color:var(--info)}
 .lic small{display:block;color:var(--faint);margin-top:2px}
 .acts{display:flex;gap:4px;justify-content:flex-end}
 .ico{width:30px;height:30px;border-radius:7px;border:1px solid transparent;background:transparent;cursor:pointer;display:grid;place-items:center;color:var(--dim)}
@@ -102,6 +104,10 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <span class="chip on" data-lic="by">CC BY</span>
     <span class="chip on" data-lic="sa" title="Share-Alike: ein Track mit diesem Sample müsste selbst unter CC BY-SA stehen – für kommerzielle Releases meist ungeeignet">CC BY-SA</span>
     <span class="chip on" data-lic="nc">CC BY-NC</span>
+    <span class="chip on" data-lic="unklar" title="Obskure Uploads ohne geklärte Lizenz – zum Experimentieren, vor einem Release klären">Lizenz unklar</span>
+    <span class="sep"></span>
+    <span class="chip on" data-kind="loop" title="Riffs, taktgenau geschnitten">Loops</span>
+    <span class="chip on" data-kind="phrase" title="Freie Linien: Gesang, Sarangi, Shehnai … als One-Shot">Phrasen</span>
     <span class="sep"></span>
     <span class="chip" id="onlyLikes">♥ nur Likes</span>
     <span class="chip" id="hideDis">Dislikes ausblenden</span>
@@ -133,6 +139,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <b>Neue Samples suchen</b>
     <input class="hunt-in" id="huntCount" type="number" value="15" min="1" max="200" style="width:64px"> Stück
     <input class="hunt-in hunt-opt" id="huntTerms" placeholder="optional: kora, tumbi, steel guitar …" style="flex:1;min-width:180px">
+    <label class="stat hunt-opt" title="Auch obskure Uploads ohne geklärte Lizenz – keine weltbekannten Namen, bevorzugt kaum gehörte Aufnahmen"><input type="checkbox" id="huntExp" checked> Experiment: auch Lizenz unklar</label>
     <label class="stat hunt-opt"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
     <label class="stat hunt-opt" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
     <button class="btn primary" id="huntBtn">Los</button>
@@ -155,8 +162,8 @@ const ICON = {
 };
 
 let samples = [], ratings = {}, view = [], cur = null;
-const state = {lic:new Set(['pd','pd-us','by','sa','nc']), onlyLikes:false, hideDis:false, sync:false, loop:true};
-try { Object.assign(state, JSON.parse(localStorage.getItem('sh-state')||'{}'), {lic:new Set(JSON.parse(localStorage.getItem('sh-lic')||'["pd","pd-us","by","sa","nc"]'))}); } catch(e) {}
+const state = {lic:new Set(['pd','pd-us','by','sa','nc','unklar']), kinds:new Set(['loop','phrase']), onlyLikes:false, hideDis:false, sync:false, loop:true};
+try { Object.assign(state, JSON.parse(localStorage.getItem('sh-state')||'{}'), {lic:new Set(JSON.parse(localStorage.getItem('sh-lic')||'["pd","pd-us","by","sa","nc","unklar"]'))}); } catch(e) {}
 function persist(){ try{ localStorage.setItem('sh-state', JSON.stringify({onlyLikes:state.onlyLikes,hideDis:state.hideDis,sync:state.sync,loop:state.loop})); localStorage.setItem('sh-lic', JSON.stringify([...state.lic])); }catch(e){} }
 
 // ---------- audio ----------
@@ -170,7 +177,7 @@ async function buffer(s){
 }
 function rateFor(s){
   let r = Math.pow(2, (+$('#pitch').value||0)/12);
-  if(state.sync) r *= (+$('#projBpm').value||100) / s.bpm;
+  if(state.sync && s.bpm > 0) r *= (+$('#projBpm').value||100) / s.bpm;
   return r;
 }
 function stop(){ if(src){ try{src.stop()}catch(e){} src.disconnect(); src = null; } const was = playingId; playingId = null; if(was) markRow(was); }
@@ -178,7 +185,7 @@ async function play(s, offsetFrac = 0){
   audio(); if(ctx.state === 'suspended') await ctx.resume();
   const b = await buffer(s);
   stop();
-  src = ctx.createBufferSource(); src.buffer = b; src.loop = state.loop;
+  src = ctx.createBufferSource(); src.buffer = b; src.loop = state.loop && kindOf(s) === 'loop';
   rate = rateFor(s); src.playbackRate.value = rate; src.connect(gain);
   playOffset = offsetFrac * b.duration; playStart = ctx.currentTime;
   src.start(0, playOffset);
@@ -188,11 +195,12 @@ async function play(s, offsetFrac = 0){
 function position(s){
   if(playingId !== s.id || !src) return null;
   const d = src.buffer.duration, t = playOffset + (ctx.currentTime - playStart) * rate;
-  return state.loop ? (t % d) / d : Math.min(t / d, 1);
+  return src.loop ? (t % d) / d : Math.min(t / d, 1);
 }
 
 // ---------- rendering ----------
-function licClass(l){ return l === 'nc' ? 'b-nc' : (l === 'by' || l === 'sa') ? 'b-by' : 'b-pd'; }
+function licClass(l){ return l === 'unklar' ? 'b-un' : l === 'nc' ? 'b-nc' : (l === 'by' || l === 'sa') ? 'b-by' : 'b-pd'; }
+function kindOf(s){ return s.kind || 'loop'; }
 function esc(t){ return String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function rowHTML(s){
   const r = ratings[s.id]||0;
@@ -200,13 +208,13 @@ function rowHTML(s){
   return `<div class="row ${r<0?'disliked':''}" data-id="${s.id}">
     <button class="play" title="Abspielen (Leertaste)">${ICON.play}</button>
     <div class="name" draggable="true" title="In Explorer/DAW ziehen (Chrome)">
-      <b>${esc(s.name)}</b>
+      <b><span class="kind k-${kindOf(s)}">${kindOf(s) === 'phrase' ? 'PHRASE' : 'LOOP'}</span>${esc(s.name)}</b>
       <small>${esc(s.title)}${s.creator? ' · '+esc(s.creator):''}${s.year? ' · '+s.year:''}</small>
       <div class="tags">${s.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
     </div>
     <div class="c-wave"><canvas class="wave"></canvas></div>
     <div class="num c-meta"><b>${esc(s.key)}</b></div>
-    <div class="num c-meta"><b>${Math.round(s.bpm)}</b> bpm</div>
+    <div class="num c-meta">${kindOf(s) === 'phrase' ? `<b>${s.duration.toFixed(1)}</b> s` : `<b>${Math.round(s.bpm)}</b> bpm`}</div>
     <div class="score c-meta" title="Freak-Score ${s.score}${s.taste? ' / Geschmack '+(s.taste>0?'+':'')+s.taste:''}">
       <span>Freak <b style="color:var(--text)">${Math.round(s.score)}</b>${s.taste? ` <span style="color:${s.taste>0?'var(--good)':'var(--warn)'}">${s.taste>0?'+':''}${s.taste}</span>`:''}</span>
       <div class="meter"><i style="width:${Math.min(100,s.score)}%"></i></div></div>
@@ -227,10 +235,11 @@ function filtered(){
   const key = $('#key').value, ms = +$('#minScore').value || 0;
   let out = samples.filter(s => {
     if(!state.lic.has(s.license)) return false;
+    if(!state.kinds.has(kindOf(s))) return false;
     const r = ratings[s.id]||0;
     if(state.onlyLikes && r <= 0) return false;
     if(state.hideDis && r < 0) return false;
-    if(s.bpm < bmin || s.bpm > bmax) return false;
+    if(kindOf(s) === 'loop' && (s.bpm < bmin || s.bpm > bmax)) return false;
     if(key && s.key !== key) return false;
     if(s.score < ms) return false;
     if(q.length){ const hay = (s.name+' '+s.title+' '+s.creator+' '+s.key+' '+s.tags.join(' ')+' '+(s.year||'')).toLowerCase(); if(!q.every(w => hay.includes(w))) return false; }
@@ -248,7 +257,7 @@ function render(){
   const list = $('#list');
   if(!samples.length){ list.innerHTML = `<div class="empty"><h2>Noch leer</h2><p>Unten auf <b>Los</b> klicken – SampleHunter gräbt dann alte und unbekannte Aufnahmen aus<br>und schneidet die besten Riffs heraus. Dauert ca. 30 s pro Aufnahme.</p></div>`; return; }
   if(!view.length){ list.innerHTML = `<div class="empty">Nichts passt zu den Filtern.</div>`; return; }
-  list.innerHTML = `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
+  list.innerHTML = `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo/Länge</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
   list.querySelectorAll('.row[data-id]').forEach(el => drawWave(el));
   highlight();
 }
@@ -309,6 +318,7 @@ document.addEventListener('keydown', e => {
 // ---------- filters ----------
 document.querySelectorAll('[data-lic]').forEach(c => { c.classList.toggle('on', state.lic.has(c.dataset.lic)); c.onclick = () => { const l = c.dataset.lic; state.lic.has(l) ? state.lic.delete(l) : state.lic.add(l); c.classList.toggle('on'); persist(); render(); }; });
 function toggleChip(id, k, after){ const el = $(id); el.classList.toggle('on', state[k]); el.onclick = () => { state[k] = !state[k]; el.classList.toggle('on', state[k]); persist(); after(); }; }
+document.querySelectorAll('[data-kind]').forEach(c => { c.onclick = () => { const k = c.dataset.kind; state.kinds.has(k) ? state.kinds.delete(k) : state.kinds.add(k); c.classList.toggle('on'); render(); }; });
 toggleChip('#onlyLikes','onlyLikes',render); toggleChip('#hideDis','hideDis',render);
 const retune = () => { if(src && playingId){ const s = byId(playingId); const pos = position(s)||0; play(s, pos); } };
 toggleChip('#syncBtn','sync',retune); toggleChip('#loopBtn','loop',() => { if(src) src.loop = state.loop; });
@@ -318,7 +328,7 @@ $('#zipBtn').onclick = () => { const ids = Object.keys(ratings).filter(k => rati
 
 // ---------- hunting ----------
 $('#huntBtn').onclick = async () => {
-  const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked})});
+  const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked, experiment:$('#huntExp').checked})});
   if(!r.ok) alert('Es läuft schon eine Suche.'); $('#drawer').classList.remove('closed'); poll();
 };
 $('#stopBtn').onclick = () => fetch('/api/stop', {method:'POST'});

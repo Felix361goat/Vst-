@@ -69,13 +69,27 @@ STYLES = [
     "mariachi", "folk dance", "novelty", "ragtime", "field recording",
 ]
 
-ALL_TERMS = INSTRUMENTS + STYLES
+# Voices and other free melodic lines: what the phrase finder is for.
+VOCALS = [
+    "carnatic vocal", "carnatic", "kriti", "bhajan", "kirtan", "keerthanam",
+    "devotional", "ghazal", "thumri", "khayal", "dhrupad", "alap", "qawwali",
+    "sufi", "baul", "lavani", "rajasthani folk", "punjabi folk", "boliyan",
+    "tamil folk", "telugu folk", "kannada", "malayalam", "sinhala", "nepali folk",
+    "mawwal", "maqam", "taqsim", "avaz", "mugham", "makam", "uzun hava",
+    "byzantine chant", "znamenny", "georgian polyphony", "bulgarian voices",
+    "yodel", "throat singing", "khoomei", "joik", "sean-nos", "cante jondo",
+    "griot", "azmari", "tizita", "hausa", "yoruba", "isicathamiya", "mbube",
+    "lullaby", "work song", "field holler", "lament", "vocal improvisation",
+]
+
+ALL_TERMS = INSTRUMENTS + STYLES + VOCALS
 
 LICENSE_PD = "pd"          # public domain or CC0
 LICENSE_PD_US = "pd-us"    # US public domain by age
 LICENSE_BY = "by"          # CC BY: free, credit required
 LICENSE_SA = "sa"          # CC BY-SA: credit, and derivatives under BY-SA
 LICENSE_NC = "nc"          # CC BY-NC(-SA): non-commercial only
+LICENSE_UNKNOWN = "unklar"  # nobody said: fine to play with, clear before release
 
 LICENSE_LABELS = {
     LICENSE_PD: "Public Domain",
@@ -83,12 +97,14 @@ LICENSE_LABELS = {
     LICENSE_BY: "CC BY – Credit nötig",
     LICENSE_SA: "CC BY-SA – Credit + Share-Alike",
     LICENSE_NC: "CC BY-NC – nur nicht-kommerziell",
+    LICENSE_UNKNOWN: "Lizenz unklar – zum Experimentieren",
 }
 
 TRUST_LABELS = {
     "age": "geprüft: Alter der Aufnahme",
     "commons": "geprüft: Wikimedia Commons",
     "claimed": "Angabe des Uploaders – vor Release prüfen",
+    "unknown": "nicht geklärt – vor Release klären",
 }
 
 
@@ -187,6 +203,20 @@ OFFENSIVE = re.compile(r"\bcoons?\b|dark(e|ie)y|pickaninn|minstrel|\bnigg|\bchin
                        re.IGNORECASE)
 
 
+# Names whose recordings are known worldwide and expensive to clear. A sample
+# from them is neither a secret nor cheap, so they are skipped everywhere.
+FAMOUS = re.compile(
+    r"lata mangeshkar|asha bhosle|mohammed rafi|kishore kumar|mukesh|a\.? ?r\.? rahman|ilaiyaraaja|"
+    r"nusrat|fateh ali khan|abida parveen|ravi shankar|anoushka|bismillah|zakir hussain|ali akbar khan|"
+    r"subbulakshmi|bhimsen joshi|jagjit singh|mehdi hassan|ghulam ali|hariprasad|shivkumar|"
+    r"umm kulthum|oum kalthoum|fairuz|fayrouz|abdel halim|warda|cheb khaled|rachid taha|"
+    r"fela|ali farka|toumani|youssou|salif keita|cesaria|miriam makeba|mulatu|"
+    r"beatles|rolling stones|michael jackson|madonna|bob marley|elvis|led zeppelin|pink floyd|"
+    r"daler mehndi|panjabi mc|gurdas maan|diljit|sidhu moose|shreya ghoshal|arijit|sonu nigam|"
+    r"bollywood|tollywood|kollywood|t-series|zee music|saregama|sony music|universal music|vevo",
+    re.IGNORECASE)
+
+
 def _ia_query(q: str, rows: int, rng: random.Random, sort: str = "downloads asc") -> list[dict]:
     fields = ["identifier", "title", "date", "year", "downloads", "licenseurl",
               "collection", "creator"]
@@ -239,12 +269,38 @@ def search_ia_claimed(term: str, allow_nc: bool, rng: random.Random, rows: int =
         if lic is None or (lic == LICENSE_NC and not allow_nc):
             continue
         title = _first(d.get("title")) or d["identifier"]
-        if SUSPICIOUS.search(title + " " + d["identifier"]):
+        if SUSPICIOUS.search(title + " " + d["identifier"]) or FAMOUS.search(title + " " + _first(d.get("creator"))):
             continue
         out.append(Candidate(
             source="ia", identifier=d["identifier"], title=title,
             year=_year(d.get("year") or d.get("date")), downloads=int(d.get("downloads") or 0),
             license=lic, license_url=d.get("licenseurl") or "", term=term, trust="claimed",
+            page_url="https://archive.org/details/" + d["identifier"], creator=_first(d.get("creator"))))
+    return out
+
+
+def search_ia_any(term: str, allow_nc: bool, rng: random.Random, rows: int = 50,
+                  max_downloads: int = 3000) -> list[Candidate]:
+    """Experiment mode: any Archive audio, licensed or not, as long as it is
+    obscure (few downloads) and not by someone world-famous."""
+    q = ("mediatype:audio AND %s AND downloads:[0 TO %d] %s"
+         % (_where(term), max_downloads, _EXCLUDE))
+    out = []
+    for d in _ia_query(q, rows, rng):
+        title = _first(d.get("title")) or d["identifier"]
+        hay = " ".join([title, d["identifier"], _first(d.get("creator"))])
+        if FAMOUS.search(hay) or OFFENSIVE.search(hay) or re.search(r"official|remix|vevo", hay, re.I):
+            continue
+        lic = classify_license(d.get("licenseurl")) if d.get("licenseurl") else LICENSE_UNKNOWN
+        if lic is None:                      # explicitly "no derivatives"
+            lic = LICENSE_UNKNOWN
+        if lic == LICENSE_NC and not allow_nc:
+            lic = LICENSE_UNKNOWN
+        out.append(Candidate(
+            source="ia", identifier=d["identifier"], title=title,
+            year=_year(d.get("year") or d.get("date")), downloads=int(d.get("downloads") or 0),
+            license=lic, license_url=d.get("licenseurl") or "", term=term,
+            trust="claimed" if lic != LICENSE_UNKNOWN else "unknown",
             page_url="https://archive.org/details/" + d["identifier"], creator=_first(d.get("creator"))))
     return out
 
@@ -333,6 +389,8 @@ def search_commons(term: str, allow_nc: bool, rng: random.Random, rows: int = 25
         if lic is None or (lic == LICENSE_NC and not allow_nc):
             continue
         artist = re.sub(r"<[^>]+>", "", html.unescape(meta.get("Artist", {}).get("value", ""))).strip()
+        if FAMOUS.search(title + " " + artist):
+            continue
         url = info.get("url", "").split("?")[0]
         if not url:
             continue

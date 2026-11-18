@@ -44,6 +44,7 @@ class Window:
     score: float          # 0..100
     features: dict
     centroid: float
+    kind: str = "loop"    # "loop": cut on the beat; "phrase": a free one-shot line
 
 
 def decode(path: str, sr: int = SR, channels: int = 1, start: float = 0.0,
@@ -268,7 +269,8 @@ def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0
     fade = int(0.004 * sr)
     ramp = np.linspace(0, 1, fade, dtype=np.float32)[:, None]
     audio[:fade] *= ramp
-    audio[-fade:] *= ramp[::-1]
+    tail = fade if w.kind == "loop" else int(0.12 * sr)   # a phrase dies away
+    audio[-tail:] *= np.linspace(1, 0, tail, dtype=np.float32)[:, None] ** (1 if w.kind == "loop" else 2)
     peak = np.max(np.abs(audio)) + 1e-9
     audio *= 10 ** (-1 / 20) / peak
     sf.write(dest, audio, sr, subtype="PCM_24")
@@ -280,6 +282,18 @@ def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0
 
 def describe(w: Window, vintage: bool) -> list[str]:
     f = w.features
+    if w.kind == "phrase":
+        tags = ["Phrase", "%.0f s" % w.duration]
+        tags.append("hell" if w.centroid > 2200 else "warm" if w.centroid < 1100 else "mittig")
+        if f["melisma"] > 0.7:
+            tags.append("melismatisch")
+        if f["exposed"] > 0.75:
+            tags.append("solo/frei")
+        if f["range"] > 0.8:
+            tags.append("großer Ambitus")
+        if vintage:
+            tags.append("vintage")
+        return tags
     bars = w.beats / 4
     tags = ["%g Takt%s" % (bars, "" if bars == 1 else "e")]
     tags.append("hell" if w.centroid > 2200 else "warm" if w.centroid < 1100 else "mittig")
@@ -294,3 +308,125 @@ def describe(w: Window, vintage: bool) -> list[str]:
     if vintage:
         tags.append("vintage")
     return tags
+
+
+# --- phrases -------------------------------------------------------------------
+#
+# The other kind of sample: not a loop but one line, sung or played freely,
+# like the Carnatic vocal phrases producers have flipped for decades. What
+# makes one usable: a single clear pitched voice, exposed (little else going
+# on), that moves: ornaments, slides, a range of a few notes, between held
+# tones; and that starts and ends cleanly, inside 1.5–8 seconds.
+
+PHRASE_FEATURES = ["voiced", "melisma", "range", "steady", "clarity", "exposed",
+                   "tonal", "brightness"]
+PHRASE_WEIGHTS = np.array([0.20, 0.20, 0.12, 0.06, 0.12, 0.14, 0.10, 0.06])
+
+
+def find_phrases(path: str, max_phrases: int = 2, min_score: float = 55.0) -> list[Window]:
+    import librosa
+    from scipy.ndimage import uniform_filter1d
+
+    y = decode(path)
+    if len(y) < SR * 10:
+        return []
+    y = y / (np.max(np.abs(y)) + 1e-9)
+    fps = SR / HOP
+
+    S = np.abs(librosa.stft(y, n_fft=2048, hop_length=HOP))
+    H, P = librosa.decompose.hpss(S, margin=1.0)
+    chroma = librosa.feature.chroma_stft(S=H ** 2, sr=SR, hop_length=HOP)
+    rms = librosa.feature.rms(S=S, frame_length=2048)[0]
+    flat = librosa.feature.spectral_flatness(S=S)[0]
+    cent = librosa.feature.spectral_centroid(S=S, sr=SR)[0]
+    he = (H ** 2).sum(axis=0)
+    pe = (P ** 2).sum(axis=0)
+    T = min(chroma.shape[1], len(rms))
+    cn = chroma[:, :T] / (chroma[:, :T].sum(axis=0, keepdims=True) + 1e-9)
+
+    # Cheap per-frame "one clear voice" measure, to shortlist regions.
+    clar = cn.max(axis=0)
+    hr = he[:T] / (he[:T] + pe[:T] + 1e-9)
+    loud = rms[:T] > 0.35 * np.median(rms[:T])
+    lead = uniform_filter1d(clar * hr * (1 - np.minimum(flat[:T] / 0.25, 1)) * loud, int(0.5 * fps))
+    gate = lead > max(0.15, 0.6 * np.percentile(lead, 90))
+
+    regions = []
+    t = 0
+    while t < T:
+        if not gate[t]:
+            t += 1
+            continue
+        u = t
+        while u < T and gate[u]:
+            u += 1
+        regions.append((t, u))
+        t = u
+    # Split long regions at their quietest point, drop short ones.
+    out_regions = []
+    max_len, min_len = int(8 * fps), int(1.5 * fps)
+    stack = list(regions)
+    while stack:
+        a, b = stack.pop()
+        if b - a < min_len:
+            continue
+        if b - a > max_len:
+            lo = a + min_len + int(np.argmin(uniform_filter1d(rms[a + min_len:b - min_len], 5))) if b - a > 2 * min_len else a + max_len
+            stack += [(a, lo), (lo, b)]
+            continue
+        out_regions.append((a, b))
+    out_regions.sort(key=lambda r: -lead[r[0]:r[1]].mean())
+
+    cands: list[Window] = []
+    for a, b in out_regions[:8]:
+        seg = y[a * HOP:b * HOP]
+        f0, voiced, _ = librosa.pyin(seg, fmin=70, fmax=1100, sr=SR, frame_length=2048, hop_length=HOP)
+        vf = float(np.mean(voiced))
+        semis = 12 * np.log2(f0[voiced] / 440.0) if voiced.any() else np.array([])
+        if len(semis) < 10:
+            continue
+        rng = float(np.percentile(semis, 95) - np.percentile(semis, 5))
+        d = np.abs(np.diff(semis)) * fps
+        d = d[d < 40 * fps / 4]                      # octave jumps are tracking errors
+        move = float(np.median(d)) if len(d) else 0.0
+        mean_move = float(np.mean(d)) if len(d) else 0.0
+        steady_frac = float(np.mean(d < 1.5)) if len(d) else 0.0
+        sl = slice(a, b)
+
+        voiced_s = _clip((vf - 0.35) / 0.45)
+        melisma = _clip(mean_move / 14.0) * (0.6 + 0.4 * _clip(move / 3.0))
+        range_s = _clip(rng / 4.0) if rng < 12 else _clip(1 - (rng - 12) / 12)
+        steady = _clip(1 - abs(steady_frac - 0.45) / 0.45)
+        clarity = _clip((np.mean(clar[sl]) - 0.2) / 0.35)
+        exposed = _clip((np.mean(hr[sl]) - 0.55) / 0.35)
+        w_e = rms[sl] ** 2
+        tonal = _clip(1 - float((flat[sl] * w_e).sum() / (w_e.sum() + 1e-12)) / 0.25)
+        c_med = float(np.median(cent[sl]))
+        bright = float(np.exp(-(np.log2(max(c_med, 50) / 1500.0) ** 2) / (2 * 0.9 ** 2)))
+
+        feats = np.array([voiced_s, melisma, range_s, steady, clarity, exposed, tonal, bright])
+        score = float(PHRASE_WEIGHTS @ feats)
+        score *= 0.5 + 0.5 * voiced_s           # there has to be a line to hear
+        score *= 0.35 + 0.65 * _clip(0.6 * melisma + 0.4 * range_s)   # and it has to move
+        score = round(100 * min(score, 1.0), 1)
+
+        # Start just before the first voiced attack, end after the last.
+        vidx = np.flatnonzero(voiced)
+        start = (a + max(0, vidx[0] - 3)) / fps
+        end = min(T, a + vidx[-1] + int(0.25 * fps)) / fps
+        cands.append(Window(start=start, duration=end - start, beats=0, bpm=0.0,
+                            key=_key(cn[:, sl].mean(axis=1)), score=score,
+                            features={k: round(float(v), 3) for k, v in zip(PHRASE_FEATURES, feats)},
+                            centroid=c_med, kind="phrase"))
+
+    cands.sort(key=lambda w: w.score, reverse=True)
+    picked = []
+    for w in cands:
+        if w.score < min_score or len(picked) >= max_phrases:
+            break
+        if w.duration < 1.2:
+            continue
+        if any(abs(w.start - p.start) < 3 for p in picked):
+            continue
+        picked.append(w)
+    return picked
