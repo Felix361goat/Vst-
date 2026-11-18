@@ -160,8 +160,8 @@ def _year(value) -> int | None:
 
 def _first(v) -> str:
     if isinstance(v, list):
-        return ", ".join(str(x) for x in v[:3])
-    return str(v or "")
+        return html.unescape(", ".join(str(x) for x in v[:3]))
+    return html.unescape(str(v or ""))
 
 
 def classify_license(text: str | None) -> str | None:
