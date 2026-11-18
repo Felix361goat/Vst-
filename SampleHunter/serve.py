@@ -68,6 +68,28 @@ def autopilot() -> None:
                 start_hunt(params, append=True)
 
 
+def export_path(sample_id: str, fmt: str) -> str | None:
+    """The sample as a file in the wanted format, named for the DAW.
+    Converted copies are cached in library/_export."""
+    s = next((x for x in LIB.load()["samples"] if x["id"] == sample_id), None)
+    if not s:
+        return None
+    src = os.path.join(LIB.root, s["file"])
+    fmt = "wav" if fmt == "wav" else "mp3"
+    if src.lower().endswith("." + fmt):
+        return src
+    out_dir = os.path.join(LIB.root, "_export")
+    os.makedirs(out_dir, exist_ok=True)
+    dest = os.path.join(out_dir, s["name"] + "." + fmt)
+    if not os.path.exists(dest):
+        from hunter import analyze
+        if fmt == "wav":
+            analyze.to_wav(src, dest, s.get("duration"))
+        else:
+            analyze.write_audio(dest, analyze.decode(src, sr=44100, channels=2, duration=None), 44100)
+    return dest
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=os.path.join(HERE, "web"), **kw)
@@ -135,6 +157,20 @@ class Handler(SimpleHTTPRequestHandler):
             E = np.array([x["emb"] for x in with_emb])
             order = np.argsort(-(E @ t))
             return self._json({"ids": [with_emb[i]["id"] for i in order[:60]]})
+        if url.path == "/api/file":
+            q = urllib.parse.parse_qs(url.query)
+            path = export_path((q.get("id") or [""])[0], (q.get("fmt") or ["mp3"])[0])
+            if not path:
+                return self._json({"error": "unbekannt"}, 404)
+            with open(path, "rb") as fh:
+                body = fh.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav" if path.endswith(".wav") else "audio/mpeg")
+            self.send_header("Content-Disposition", 'attachment; filename="%s"' % os.path.basename(path))
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if url.path == "/api/zip":
             q = urllib.parse.parse_qs(url.query)
             ids = set((q.get("ids") or [""])[0].split(","))
@@ -142,9 +178,11 @@ class Handler(SimpleHTTPRequestHandler):
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
                 credits = []
+                fmt = (q.get("fmt") or ["mp3"])[0]
                 for s in data["samples"]:
                     if s["id"] in ids:
-                        z.write(os.path.join(LIB.root, s["file"]), os.path.basename(s["file"]))
+                        path = export_path(s["id"], fmt)
+                        z.write(path, os.path.basename(path))
                         credits.append("%s\n  %s%s (%s)\n  Quelle: %s\n  Lizenz: %s %s\n" % (
                             os.path.basename(s["file"]), s["title"],
                             (" – " + s["creator"]) if s.get("creator") else "",

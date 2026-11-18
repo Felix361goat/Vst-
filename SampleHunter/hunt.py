@@ -56,6 +56,8 @@ def main() -> int:
                     help="drop samples with more crackle/hiss/muffle than this, 0-100 (100 = keep all)")
     ap.add_argument("--min-weird", type=float, default=45.0,
                     help="with the AI ear: drop samples that sound too ordinary, 0-100 (0 = keep all)")
+    ap.add_argument("--format", choices=["mp3", "wav"], default="mp3",
+                    help="how samples are stored: mp3 (320 kbps, small) or wav (24-bit)")
     ap.add_argument("--no-ear", action="store_true", help="do not use the AI ear even if installed")
     ap.add_argument("--min-score", type=float, default=58.0, help="minimum score, 0-100")
     ap.add_argument("--per-track", type=int, default=2, help="max samples cut from one recording")
@@ -74,8 +76,9 @@ def main() -> int:
     found = 0
     misses = 0
 
-    global EAR
+    global EAR, FORMAT
     EAR = None
+    FORMAT = args.format
     if not args.no_ear and ear.available():
         log("KI-Ohr wird geladen …")
         try:
@@ -260,6 +263,13 @@ def family(c: sources.Candidate) -> list[str]:
     return keys
 
 
+FORMAT = "mp3"
+
+
+def args_format() -> str:
+    return FORMAT
+
+
 def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window, src: str,
               offset: float = 0.0) -> dict:
     sid = hashlib.sha1(("%s|%s|%.2f" % (cand.key, f["name"], w.start)).encode()).hexdigest()[:12]
@@ -270,7 +280,7 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         title = slug(cand.identifier, 24)
     shape = ("%dbpm" % bpm) if w.kind == "loop" else "phrase"
     name = "%s_%s_%s_%s_%s" % (slug(cand.term, 16), title, shape, key, sid[:4])
-    rel = os.path.join("samples", name + ".wav")
+    rel = os.path.join("samples", name + "." + args_format())
     peaks = analyze.export(src, w, os.path.join(lib.root, rel), offset=offset)
     vintage = bool(cand.year and cand.year < 1960)
     tags = [cand.term] + analyze.describe(w, vintage)

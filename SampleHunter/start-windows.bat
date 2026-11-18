@@ -19,4 +19,13 @@ if not exist .venv\ear-ok (
   .venv\Scripts\python -m pip install -r requirements-ear.txt && echo ok> .venv\ear-ok
   if not exist .venv\ear-ok echo KI-Ohr liess sich nicht installieren - SampleHunter laeuft trotzdem, nur ohne.
 )
-.venv\Scripts\python serve.py
+if not exist .venv\app-ok (
+  echo Installiere das App-Fenster ^(fuer Drag ^& Drop nach FL Studio, einmalig^) ...
+  .venv\Scripts\python -m pip install -r requirements-app.txt && echo ok> .venv\app-ok
+)
+if exist .venv\app-ok (
+  .venv\Scripts\python app.py
+) else (
+  echo App-Fenster nicht verfuegbar - starte im Browser ^(ohne Drag ^& Drop nach FL Studio^).
+  .venv\Scripts\python serve.py
+)

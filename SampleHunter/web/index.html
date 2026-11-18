@@ -57,6 +57,8 @@ main{padding:8px 12px 120px}
 .menu .new{color:var(--dim);border-top:1px solid var(--line);margin-top:4px}
 .ico.in-coll{color:var(--accent)} .focus button{margin-left:auto}
 canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
+.native canvas.wave, .native .grip{cursor:grab}
+.native canvas.wave:active, .native .grip:active{cursor:grabbing}
 .num{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px;text-align:right}
 .num b{color:var(--text);font-weight:600}
 .score{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--dim)}
@@ -110,7 +112,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <span class="stat" id="count"></span>
     <select class="btn" id="coll" title="Deine Sammlungen"></select>
     <button class="btn" id="collDel" title="Diese Sammlung löschen (die Samples bleiben)" hidden>Sammlung löschen</button>
-    <button class="btn" id="zipBtn" title="WAVs mit CREDITS.txt">Likes als ZIP</button>
+    <button class="btn" id="zipBtn" title="Alle Samples mit CREDITS.txt">Favoriten als ZIP</button>
   </div>
   <div class="filters">
     <span class="chip on" data-lic="pd">Public Domain</span>
@@ -123,7 +125,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <span class="chip on" data-kind="loop" title="Riffs, taktgenau geschnitten">Loops</span>
     <span class="chip on" data-kind="phrase" title="Freie Linien: Gesang, Sarangi, Shehnai … als One-Shot">Phrasen</span>
     <span class="sep"></span>
-    <span class="chip" id="onlyLikes">♥ nur Likes</span>
+    <span class="chip" id="onlyLikes" title="Nur deine Favoriten zeigen">♥ Favoriten</span>
     <span class="chip" id="hideDis">Dislikes ausblenden</span>
     <span class="sep"></span>
     <label>BPM <input type="number" id="bpmMin" placeholder="min"> – <input type="number" id="bpmMax" placeholder="max"></label>
@@ -144,6 +146,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
       <span class="chip" id="syncBtn">Sync</span><input type="number" id="projBpm" value="100" min="40" max="240"> BPM</label>
     <label>Pitch <input type="number" id="pitch" value="0" min="-24" max="24"> st</label>
     <span class="chip on" id="loopBtn">Loop</span>
+    <label title="In welchem Format Samples heruntergeladen und in FL Studio gezogen werden. MP3 ist klein; WAV loopt garantiert lückenlos.">Format <select id="fmt"><option value="mp3">MP3</option><option value="wav">WAV</option></select></label>
   </div>
 </header>
 
@@ -226,7 +229,7 @@ function rowHTML(s){
   const trust = s.trust_label || '';
   return `<div class="row ${r<0?'disliked':''}" data-id="${s.id}">
     <button class="play" title="Abspielen (Leertaste)">${ICON.play}</button>
-    <div class="name" draggable="true" title="In Explorer/DAW ziehen (Chrome)">
+    <div class="name grip" draggable="true" title="In FL Studio ziehen">
       <b><span class="kind k-${kindOf(s)}">${kindOf(s) === 'phrase' ? 'PHRASE' : 'LOOP'}</span>${esc(s.name)}</b>
       <small class="src" data-act="source" title="Alles aus dieser Aufnahme zeigen">${esc(s.title)}${s.creator? ' · '+esc(s.creator):''}${s.year? ' · '+s.year:''}</small>
       <div class="tags">${s.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
@@ -240,11 +243,11 @@ function rowHTML(s){
       ${s.weird != null ? `<span class="sub">weird ${Math.round(s.weird)} · grain ${Math.round(s.grain)}</span>` : ''}</div>
     <div class="lic c-meta"><span class="badge ${licClass(s.license)}">${esc(s.license_label)}</span><small>${trust}</small></div>
     <div class="acts">
-      <button class="ico ${r>0?'liked':''}" data-act="like" title="Like (L)">${ICON.heart}</button>
+      <button class="ico ${r>0?'liked':''}" data-act="like" title="Als Favorit speichern (L)">${ICON.heart}</button>
       <button class="ico ${r<0?'disl':''}" data-act="dislike" title="Nicht mein Ding (D)">${ICON.thumbDown}</button>
       <button class="ico" data-act="similar" title="Ähnliche Samples finden (S)">${ICON.similar}</button>
       <button class="ico ${Object.values(collections).some(ids => ids.includes(s.id)) ? 'in-coll' : ''}" data-act="collect" title="Zu einer Sammlung hinzufügen">${ICON.folder}</button>
-      <a class="ico" href="/library/${encodeURI(s.file)}" download title="WAV herunterladen">${ICON.down}</a>
+      <a class="ico" href="/api/file?id=${s.id}&fmt=${fmt()}" download title="Herunterladen (${fmt().toUpperCase()})">${ICON.down}</a>
       <a class="ico" href="${esc(s.source_url)}" target="_blank" rel="noopener" title="Originalaufnahme auf archive.org (ab ${fmtTime(s.source_start)})">${ICON.link}</a>
     </div>
   </div>`;
@@ -295,7 +298,7 @@ function fillCollections(){
     `<option value="__new">+ Neue Sammlung …</option>`;
   sel.value = coll;
   $('#collDel').hidden = !coll;
-  $('#zipBtn').textContent = coll ? 'Sammlung als ZIP' : 'Likes als ZIP';
+  $('#zipBtn').textContent = coll ? 'Sammlung als ZIP' : 'Favoriten als ZIP';
 }
 async function collect(id, name, on){
   const r = await (await fetch('/api/collect', {method:'POST', body:JSON.stringify({id, name, on})})).json();
@@ -378,6 +381,7 @@ $('#list').addEventListener('click', e => {
   const row = e.target.closest('.row[data-id]'); if(!row) return;
   const s = byId(row.dataset.id); cur = s.id; highlight();
   if(e.target.closest('.play')){ playingId === s.id ? stop() : play(s); return; }
+  if(dragged){ dragged = false; return; }
   if(e.target.closest('canvas')){ const r = e.target.getBoundingClientRect(); play(s, (e.clientX - r.left)/r.width); return; }
   const act = e.target.closest('[data-act]')?.dataset.act;
   if(act === 'like') setRating(s.id, 1);
@@ -387,12 +391,34 @@ $('#list').addEventListener('click', e => {
   if(act === 'source') setFocus('source', s.id);
   if(e.target.classList.contains('tag')){ $('#q').value = e.target.textContent; render(); }
 });
+// ---------- drag into FL Studio ----------
+// In the SampleHunter app window (app.py) a drag from the name or the waveform
+// becomes a real file drag, which FL Studio and every DAW accept. In a plain
+// browser, Chrome/Edge can at least drop the file into Explorer.
+function fmt(){ return $('#fmt').value; }
+let dragged = false, press = null;
+$('#list').addEventListener('mousedown', e => {
+  if(e.button !== 0) return;
+  const h = e.target.closest('.grip, canvas.wave'); const row = e.target.closest('.row[data-id]');
+  press = h && row ? {x:e.clientX, y:e.clientY, id:row.dataset.id} : null;
+});
+document.addEventListener('mouseup', () => { press = null; });
+document.addEventListener('mousemove', e => {
+  if(!press || !(e.buttons & 1) || !window.SH_NATIVE) return;
+  if(Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+  const id = press.id; press = null; dragged = true;
+  window.SH_NATIVE.drag(id, fmt());
+  setTimeout(() => { dragged = false; }, 400);
+});
 $('#list').addEventListener('dragstart', e => {
+  if(window.SH_NATIVE){ e.preventDefault(); return; }
   const row = e.target.closest('.row[data-id]'); if(!row) return; const s = byId(row.dataset.id);
-  const url = location.origin + '/library/' + encodeURI(s.file);
-  e.dataTransfer.setData('DownloadURL', `audio/wav:${s.name}.wav:${url}`);
+  const url = location.origin + '/api/file?id=' + s.id + '&fmt=' + fmt();
+  e.dataTransfer.setData('DownloadURL', `audio/${fmt() === 'wav' ? 'wav' : 'mpeg'}:${s.name}.${fmt()}:${url}`);
   e.dataTransfer.setData('text/uri-list', url);
 });
+try { $('#fmt').value = localStorage.getItem('sh-fmt') || 'mp3'; } catch(_) {}
+$('#fmt').addEventListener('change', () => { try { localStorage.setItem('sh-fmt', fmt()); } catch(_) {} render(); });
 document.addEventListener('keydown', e => {
   if(e.target.matches('input,select')){ if(e.key === 'Escape') e.target.blur(); return; }
   const i = view.findIndex(s => s.id === cur);
@@ -428,8 +454,8 @@ $('#listenBtn').onclick = listenSearch;
 $('#q').addEventListener('keydown', e => { if(e.key === 'Enter' && e.shiftKey) listenSearch(); });
 $('#zipBtn').onclick = () => {
   const ids = coll ? (collections[coll] || []) : Object.keys(ratings).filter(k => ratings[k] > 0);
-  if(!ids.length){ alert(coll ? 'Die Sammlung ist leer.' : 'Noch keine Likes.'); return; }
-  location.href = '/api/zip?ids=' + ids.join(',') + '&name=' + encodeURIComponent(coll || 'samplehunter-likes');
+  if(!ids.length){ alert(coll ? 'Die Sammlung ist leer.' : 'Noch keine Favoriten – mit ♥ speichern.'); return; }
+  location.href = '/api/zip?ids=' + ids.join(',') + '&fmt=' + fmt() + '&name=' + encodeURIComponent(coll || 'samplehunter-favoriten');
 };
 $('#coll').onchange = async e => {
   let v = e.target.value;

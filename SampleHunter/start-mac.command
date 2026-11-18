@@ -17,4 +17,13 @@ if [ ! -f .venv/ear-ok ]; then
   .venv/bin/pip install -r requirements-ear.txt && touch .venv/ear-ok \
     || echo "KI-Ohr ließ sich nicht installieren – SampleHunter läuft trotzdem, nur ohne."
 fi
-.venv/bin/python serve.py
+if [ ! -f .venv/app-ok ]; then
+  echo "Installiere das App-Fenster (für Drag & Drop in die DAW, einmalig) …"
+  .venv/bin/pip install -r requirements-app.txt && touch .venv/app-ok
+fi
+if [ -f .venv/app-ok ]; then
+  .venv/bin/python app.py
+else
+  echo "App-Fenster nicht verfügbar – starte im Browser (ohne Drag & Drop in die DAW)."
+  .venv/bin/python serve.py
+fi

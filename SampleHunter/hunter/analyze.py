@@ -272,10 +272,31 @@ def align(reference: str, other: str, at: float, span: float = 6.0) -> float:
     return (lag / SR) - (t0 - max(0.0, t0 - 0.25))
 
 
+def write_audio(dest: str, audio: np.ndarray, sr: int) -> None:
+    """WAV (24-bit) or MP3 (320 kbps, with the LAME gapless header) by extension."""
+    if dest.lower().endswith(".mp3"):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(sr), "-ac", "2",
+                        "-i", "-", "-c:a", "libmp3lame", "-b:a", "320k", dest],
+                       input=np.ascontiguousarray(audio, dtype=np.float32).tobytes(), check=True)
+    else:
+        import soundfile as sf
+        sf.write(dest, audio, sr, subtype="PCM_24")
+
+
+def to_wav(src: str, dest: str, duration: float | None = None) -> None:
+    """Decode a stored sample to a WAV of exactly its loop length (MP3 encoder
+    padding is cut off, so a loop stays a perfect loop)."""
+    audio = decode(src, sr=44100, channels=2, duration=duration)
+    if duration:
+        n = int(round(duration * 44100))
+        if len(audio) < n:
+            audio = np.vstack([audio, np.zeros((n - len(audio), 2), np.float32)])
+        audio = audio[:n]
+    write_audio(dest, audio, 44100)
+
+
 def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0) -> list[float]:
     """Cut the window from the source at full quality. Returns waveform peaks."""
-    import soundfile as sf
-
     audio = decode(path, sr=sr, channels=2, start=max(0.0, w.start + offset), duration=w.duration)
     length = int(round(w.duration * sr))
     if len(audio) < length:
@@ -289,7 +310,7 @@ def export(path: str, w: Window, dest: str, sr: int = 44100, offset: float = 0.0
     audio[-tail:] *= np.linspace(1, 0, tail, dtype=np.float32)[:, None] ** (1 if w.kind == "loop" else 2)
     peak = np.max(np.abs(audio)) + 1e-9
     audio *= 10 ** (-1 / 20) / peak
-    sf.write(dest, audio, sr, subtype="PCM_24")
+    write_audio(dest, audio, sr)
 
     mono = np.abs(audio).max(axis=1)
     bins = np.array_split(mono, 160)

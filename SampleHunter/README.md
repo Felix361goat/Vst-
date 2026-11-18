@@ -17,18 +17,25 @@ Es gibt zwei Arten von Samples:
   Jahrzehnten in Hip-Hop-Beats auftaucht.
 
 Es ist ein eigenes Programm mit eigenem Fenster, Claude braucht es nicht.
+Samples ziehst du direkt aus dem Fenster in FL Studio (oder jede andere DAW),
+gespeichert wird als MP3.
 
 ## Starten
 
-**Windows:** einmal `winget install Gyan.FFmpeg` und [Python 3](https://python.org)
-installieren, dann `start-windows.bat` doppelklicken.
+**Windows:** einmal in der Eingabeaufforderung
+
+```
+winget install Gyan.FFmpeg
+winget install Python.Python.3.12
+```
+
+dann `start-windows.bat` doppelklicken.
 
 **macOS:** einmal `brew install ffmpeg python`, dann `start-mac.command` doppelklicken.
 
 Beim ersten Start werden die Python-Pakete installiert (dauert ein paar Minuten,
 inklusive KI-Ohr ca. 1 GB; das Modell wird bei der ersten Suche einmal geladen),
-danach öffnet sich SampleHunter in einem eigenen Fenster (über Edge oder Chrome
-im App-Modus, ohne Adressleiste). Fenster zu = Programm aus. Unten auf **Los**
+danach öffnet sich SampleHunter als eigene App. Fenster zu = Programm aus. Unten auf **Los**
 klicken, dann beginnt die Suche. Pro Aufnahme dauert das etwa 20–40 Sekunden.
 Neue Samples erscheinen live in der Liste.
 
@@ -41,8 +48,8 @@ python hunt.py --allow-nc                       # auch CC BY-NC (nur nicht-komme
 python hunt.py --include-claimed                # auch Archive-Uploads mit ungeprüfter Lizenz
 python hunt.py --experiment                     # auch obskure Uploads mit ungeklärter Lizenz
 python hunt.py --kinds phrase                   # nur Phrasen
-python serve.py                                 # Bibliothek öffnen (eigenes Fenster)
-python serve.py --tab                           # stattdessen als Browser-Tab
+python app.py                                   # die App (mit Drag & Drop in die DAW)
+python serve.py                                 # ohne App-Paket: im Browser-Fenster
 ```
 
 ## Die Bibliothek
@@ -51,20 +58,22 @@ python serve.py --tab                           # stattdessen als Browser-Tab
 |---|---|
 | **Leertaste** | abspielen / stoppen |
 | **↑ ↓** | nächstes Sample (spielt direkt weiter, wenn schon etwas läuft) |
-| **L / D** | Like / Nicht mein Ding |
+| **♥ / L** | als Favorit speichern; „♥ Favoriten“ oben zeigt nur die |
+| **D** | nicht mein Ding |
 | **S** / Wellen-Button | ähnliche Samples finden (Esc = zurück) |
 | Klick auf den Titel | alles aus derselben Aufnahme |
 | **/** | Suche |
 | Klick in die Wellenform | ab dieser Stelle abspielen |
 | **Sync** + BPM | spielt im Projekttempo, wie eine schneller gedrehte Platte; Tonhöhe geht mit |
 | **Pitch** | in Halbtönen transponieren |
-| Name ziehen | in Explorer/Finder ziehen (Chrome/Edge) |
+| **Wellenform oder Name ziehen** | Sample direkt in FL Studio (Playlist, Channel Rack, Sampler …) oder in den Explorer ziehen |
+| **Format** MP3/WAV | in welchem Format gezogen und heruntergeladen wird (MP3 klein, WAV loopt garantiert lückenlos) |
 | Ordner-Button | Sample in eine Sammlung legen („Beat für X“, „Vocals“ …) |
 | Sammlungs-Menü oben | nur diese Sammlung zeigen; dann lädt der ZIP-Button sie komplett herunter |
-| **Likes als ZIP** | alle gelikten WAVs plus `CREDITS.txt` mit Quellen und Lizenzen |
+| **Favoriten als ZIP** | alle Favoriten plus `CREDITS.txt` mit Quellen und Lizenzen |
 | **Autopilot** (unten) | gräbt immer weiter, solange SampleHunter offen ist |
 
-Jedes Sample ist eine 24-Bit-WAV-Datei bei 44,1 kHz, normalisiert auf −1 dBFS,
+Gespeichert wird als MP3 mit 320 kbps (`--format wav` für 24-Bit-WAV), normalisiert auf −1 dBFS,
 auf dem Beat geschnitten und mit 4-ms-Fades. Sie loopt also bei der BPM, die
 im Namen steht. Der Link-Button führt zur Originalaufnahme mit Zeitangabe, falls
 du mehr davon willst.
@@ -162,7 +171,8 @@ auf die Quellseite.
 
 ```
 hunt.py            die Suche (Kommandozeile)
-serve.py           die Bibliothek im Browser
+app.py             die App: eigenes Fenster, Drag & Drop in die DAW
+serve.py           die Bibliothek (Server; auch allein im Browser nutzbar)
 hunter/sources.py  Quellen, Suchbegriffe, Lizenzregeln
 hunter/analyze.py  Riff-Erkennung und Freak-Score
 hunter/library.py  Bibliothek und Geschmacks-Lernen
