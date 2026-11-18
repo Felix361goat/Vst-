@@ -24,6 +24,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+from hunter.analyze import NO_WINDOW  # noqa: E402
 from hunter.cloud import Store  # noqa: E402
 from hunter.library import Library  # noqa: E402
 
@@ -78,7 +79,8 @@ def start_install(what: str) -> bool:
     log.flush()
     _install["what"] = what
     _install["proc"] = subprocess.Popen([sys.executable, "-m", "pip", "install", "--progress-bar", "off",
-                                         "-r", os.path.join(HERE, req)], stdout=log, stderr=subprocess.STDOUT)
+                                         "-r", os.path.join(HERE, req)], stdout=log, stderr=subprocess.STDOUT,
+                                        **NO_WINDOW)
     return True
 
 
@@ -97,7 +99,7 @@ def start_hunt(body: dict, append: bool = False) -> bool:
                 cmd.append(flag)
         log = open(LOG, "a" if append else "w", encoding="utf-8")
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
-        _hunt["proc"] = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+        _hunt["proc"] = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, **NO_WINDOW)
         return True
 
 
@@ -232,6 +234,9 @@ class Handler(SimpleHTTPRequestHandler):
             E = np.array([x["emb"] for x in with_emb])
             order = np.argsort(-(E @ t))
             return self._json({"ids": [with_emb[i]["id"] for i in order[:60]]})
+        if url.path == "/api/update/check":
+            from hunter import update
+            return self._json(update.check())
         if url.path == "/api/prepare":
             # A press on a sample may become a drag: start fetching it now.
             q = urllib.parse.parse_qs(url.query)
@@ -323,6 +328,15 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/collection/delete":
             LIB.drop_collection(str(body.get("name") or ""))
             return self._json({"ok": True, "collections": LIB.collections()})
+        if url.path == "/api/update/apply":
+            from hunter import update
+            try:
+                sha = update.apply()
+            except Exception as exc:
+                return self._json({"ok": False, "error": str(exc)}, 500)
+            self._json({"ok": True, "version": sha})
+            threading.Timer(0.5, update.restart).start()
+            return
         if url.path == "/api/catalog/update":
             n = LIB.update_catalog()
             CATALOG_STATE["new"] += n
@@ -397,6 +411,8 @@ def open_window(url: str, server) -> None:
 
 
 def main():
+    import time
+    time.sleep(float(os.environ.get("HUNTER_WAIT", "0")))   # after a self-update restart
     port = int(os.environ.get("PORT", "8765"))
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)

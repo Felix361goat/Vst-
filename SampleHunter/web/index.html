@@ -116,6 +116,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tag … oder einen Klang beschreiben und 🔊 drücken  (/)">
     <button class="btn" id="listenBtn" title="Sucht nach Klang statt nach Namen, z. B. „eerie nasal riff“, „buzzing reed drone“, „metallic bells“ (englisch klappt am besten). Braucht das KI-Ohr.">🔊 Nach Klang</button>
     <span class="stat" id="count"></span>
+    <button class="btn primary" id="updBtn" hidden title="">⬆ Update</button>
     <button class="btn" id="catBtn" title="Neue Samples aus dem Katalog holen (passiert sonst automatisch beim Start und alle 30 Minuten)">↻ Neue Samples</button>
     <span class="stat" id="usage" title="Was SampleHunter auf deiner Festplatte belegt. Die Bibliothek selbst liegt in der Cloud; gespeichert werden nur angehörte Samples (Cache, räumt sich selbst auf) und deine Favoriten."></span>
     <select class="btn" id="coll" title="Deine Sammlungen"></select>
@@ -511,6 +512,20 @@ $('#collDel').onclick = async () => {
 
 // ---------- hunting ----------
 let caps = {hunt:true, ear:true}, huntAfterInstall = false, seenCatalogNew = null;
+async function checkUpdate(){
+  try {
+    const u = await (await fetch('/api/update/check')).json();
+    $('#updBtn').hidden = !u.available;
+    if(u.available) $('#updBtn').title = 'Neue Version von SampleHunter: ' + (u.message || '') + ' – Klick installiert sie und startet neu. Deine Bibliothek bleibt.';
+  } catch(_) {}
+}
+$('#updBtn').onclick = async () => {
+  $('#updBtn').textContent = '⬆ lädt …'; $('#updBtn').disabled = true;
+  const r = await (await fetch('/api/update/apply', {method:'POST'})).json().catch(() => ({ok:false}));
+  if(r.ok){ toast('Aktualisiert – SampleHunter startet neu …'); setTimeout(() => location.reload(), 8000); }
+  else { alert('Update fehlgeschlagen: ' + (r.error || '')); $('#updBtn').textContent = '⬆ Update'; $('#updBtn').disabled = false; }
+};
+checkUpdate(); setInterval(checkUpdate, 60 * 60 * 1000);
 $('#catBtn').onclick = async () => {
   $('#catBtn').textContent = '↻ prüft …';
   try {

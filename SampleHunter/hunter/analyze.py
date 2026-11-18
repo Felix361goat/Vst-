@@ -16,6 +16,7 @@ beat grid, so a sample loops at the BPM it is labelled with.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 
@@ -49,6 +50,10 @@ class Window:
 
 _FFMPEG: list = []
 
+# On Windows a program started from the app window must not flash up a
+# console window of its own for every ffmpeg call.
+NO_WINDOW = {"creationflags": 0x08000000} if os.name == "nt" else {}
+
 
 def ffmpeg() -> str:
     """The ffmpeg binary: one installed on the system, else the copy that
@@ -70,7 +75,8 @@ def duration_of(path: str) -> float | None:
     """Length in seconds, read from ffmpeg's own report (no ffprobe needed)."""
     import re
     try:
-        err = subprocess.run([ffmpeg(), "-hide_banner", "-i", path], capture_output=True, text=True).stderr
+        err = subprocess.run([ffmpeg(), "-hide_banner", "-i", path], capture_output=True, text=True,
+                             **NO_WINDOW).stderr
     except OSError:
         return None
     m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", err)
@@ -86,7 +92,7 @@ def decode(path: str, sr: int = SR, channels: int = 1, start: float = 0.0,
     if duration:
         cmd += ["-t", "%.6f" % duration]
     cmd += ["-ac", str(channels), "-ar", str(sr), "-f", "f32le", "-"]
-    raw = subprocess.run(cmd, capture_output=True, check=True).stdout
+    raw = subprocess.run(cmd, capture_output=True, check=True, **NO_WINDOW).stdout
     data = np.frombuffer(raw, dtype=np.float32)
     if channels > 1:
         data = data.reshape(-1, channels)
@@ -304,7 +310,7 @@ def write_audio(dest: str, audio: np.ndarray, sr: int) -> None:
     codec = ["-c:a", "libmp3lame", "-b:a", "320k"] if dest.lower().endswith(".mp3") else ["-c:a", "pcm_s24le"]
     subprocess.run([ffmpeg(), "-v", "error", "-y", "-f", "f32le", "-ar", str(sr), "-ac", "2",
                     "-i", "-", *codec, dest],
-                   input=np.ascontiguousarray(audio, dtype=np.float32).tobytes(), check=True)
+                   input=np.ascontiguousarray(audio, dtype=np.float32).tobytes(), check=True, **NO_WINDOW)
 
 
 def to_wav(src: str, dest: str, duration: float | None = None) -> None:

@@ -21,7 +21,14 @@ if not exist .venv\app-ok (
   .venv\Scripts\python -m pip install -r requirements-app.txt && echo ok> .venv\app-ok
 )
 if exist .venv\app-ok (
-  .venv\Scripts\python app.py
+  rem Desktop-Symbol anlegen: startet die App ohne Terminal.
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut($d+'\SampleHunter.lnk'); $s.TargetPath='%~dp0.venv\Scripts\pythonw.exe'; $s.Arguments='app.py'; $s.WorkingDirectory='%~dp0'; if(Test-Path '%~dp0samplehunter.ico'){$s.IconLocation='%~dp0samplehunter.ico'}; $s.Description='SampleHunter'; $s.Save()" >nul 2>nul
+  echo.
+  echo Fertig. SampleHunter startet jetzt. Ab sofort einfach das Symbol
+  echo "SampleHunter" auf dem Desktop doppelklicken - ohne Terminal.
+  start "" ".venv\Scripts\pythonw.exe" app.py
+  timeout /t 4 >nul
+  exit /b 0
 ) else (
   echo App-Fenster nicht verfuegbar - starte im Browser ^(ohne Drag ^& Drop nach FL Studio^).
   .venv\Scripts\python serve.py

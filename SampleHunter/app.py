@@ -155,6 +155,8 @@ class Window(QMainWindow):
 
 
 def main() -> int:
+    import time
+    time.sleep(float(os.environ.get("HUNTER_WAIT", "0")))   # after a self-update restart
     port = free_port(int(os.environ.get("PORT", "8765")))
     server = serve.ThreadingHTTPServer(("127.0.0.1", port), serve.Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -163,6 +165,10 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName("SampleHunter")
+    # An .ico for the desktop shortcut the Windows starter creates.
+    ico = os.path.join(HERE, "samplehunter.ico")
+    if not os.path.exists(ico):
+        _icon().pixmap(64, 64).save(ico)
     win = Window("http://localhost:%d" % port)
     win.show()
     code = app.exec()
