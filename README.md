@@ -21,6 +21,11 @@ license. Any audio file can be loaded into either oscillator as well.
 **Presets.** Just under three hundred factory patches across twenty-one
 categories. Every one is unit-tested for level, health and silence on release.
 
+**SampleHunter.** A companion tool in [`SampleHunter/`](SampleHunter/README.md)
+digs through public-domain 78s and Wikimedia Commons for obscure recordings,
+finds the one riff in each that loops, cuts it on the beat and files it in a
+browsable, Splice-style library. Its WAVs load straight into either oscillator.
+
 See [`docs/SERUM-FEATURE-MAP.md`](docs/SERUM-FEATURE-MAP.md) for what is built
 against what Serum does, and
 [`docs/COMPETITIVE-REVIEW.md`](docs/COMPETITIVE-REVIEW.md) for the comparison

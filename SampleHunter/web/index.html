@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SampleHunter</title>
+<style>
+:root{
+  --bg:#0e0f12; --panel:#16181d; --row:#181a20; --row-h:#1f222a; --line:#262a33;
+  --text:#e9eaee; --dim:#8a8f9c; --faint:#5b606c;
+  --accent:#ff4d6d; --accent2:#ffb86b; --good:#4ade80; --warn:#fbbf24; --info:#60a5fa;
+  --wave:#3a3f4b; --wave-on:#ff4d6d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit}
+header{position:sticky;top:0;z-index:5;background:rgba(14,15,18,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{display:flex;gap:12px;align-items:center;padding:12px 20px;flex-wrap:wrap}
+.logo{font-weight:800;letter-spacing:.5px;font-size:18px;white-space:nowrap}
+.logo span{color:var(--accent)}
+.search{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#3a3f4b}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+.filters{display:flex;gap:10px;align-items:center;padding:0 20px 12px;flex-wrap:wrap;color:var(--dim);font-size:13px}
+.filters label{display:flex;gap:6px;align-items:center}
+.filters input[type=number]{width:62px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.filters select{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer;user-select:none;background:transparent}
+.chip.on{background:#2a1c22;border-color:var(--accent);color:var(--text)}
+.sep{width:1px;height:20px;background:var(--line)}
+main{padding:8px 12px 120px}
+.empty{color:var(--dim);text-align:center;padding:80px 20px}
+.row{display:grid;grid-template-columns:40px minmax(160px,1.4fr) minmax(160px,2fr) 70px 64px 90px 150px 118px;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent}
+.row:hover{background:var(--row-h)}
+.row.cur{background:var(--row);border-color:#3a2530}
+.row.disliked{opacity:.45}
+.play{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center}
+.row.playing .play{background:var(--accent);border-color:var(--accent)}
+.play svg{width:14px;height:14px;fill:currentColor}
+.name{overflow:hidden}
+.name b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.name small{display:block;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.tag{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 5px;cursor:pointer}
+.tag:hover{color:var(--text)}
+canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
+.num{font-variant-numeric:tabular-nums;color:var(--dim);font-size:13px;text-align:right}
+.num b{color:var(--text);font-weight:600}
+.score{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--dim)}
+.meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.lic{font-size:11px;line-height:1.25}
+.lic .badge{display:inline-block;border-radius:4px;padding:1px 6px;font-weight:600;font-size:11px}
+.b-pd{background:#163322;color:var(--good)} .b-by{background:#152638;color:var(--info)} .b-nc{background:#3a2c10;color:var(--warn)}
+.lic small{display:block;color:var(--faint);margin-top:2px}
+.acts{display:flex;gap:4px;justify-content:flex-end}
+.ico{width:30px;height:30px;border-radius:7px;border:1px solid transparent;background:transparent;cursor:pointer;display:grid;place-items:center;color:var(--dim)}
+.ico:hover{border-color:var(--line);color:var(--text)}
+.ico svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.liked{color:var(--accent)} .ico.liked svg{fill:var(--accent)}
+.ico.disl{color:var(--warn)}
+.head{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.6px;padding:6px 8px}
+.head:hover{background:none}
+.drawer{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:6}
+.drawer .bar{padding:10px 20px}
+.drawer pre{margin:0;padding:0 20px 12px;max-height:180px;overflow:auto;color:var(--dim);font-size:12px;white-space:pre-wrap}
+.drawer.closed pre{display:none}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);display:inline-block}
+.dot.live{background:var(--good);box-shadow:0 0 8px var(--good);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.hunt-in{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.stat{color:var(--dim);font-size:13px}
+@media (max-width:1100px){
+  .row{grid-template-columns:40px 1fr 110px;grid-template-areas:"p n a" "w w w" "m m m"}
+  .row>.c-wave{grid-column:1/-1}
+  .row>.c-meta{display:none}
+  .head{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="logo">SAMPLE<span>HUNTER</span></div>
+    <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tonart, Tag …  (/)">
+    <span class="stat" id="count"></span>
+    <button class="btn" id="zipBtn" title="Alle gelikten Samples mit CREDITS.txt">Likes als ZIP</button>
+  </div>
+  <div class="filters">
+    <span class="chip on" data-lic="pd">Public Domain</span>
+    <span class="chip on" data-lic="pd-us">PD USA (alt)</span>
+    <span class="chip on" data-lic="by">CC BY</span>
+    <span class="chip on" data-lic="sa" title="Share-Alike: ein Track mit diesem Sample müsste selbst unter CC BY-SA stehen – für kommerzielle Releases meist ungeeignet">CC BY-SA</span>
+    <span class="chip on" data-lic="nc">CC BY-NC</span>
+    <span class="sep"></span>
+    <span class="chip" id="onlyLikes">♥ nur Likes</span>
+    <span class="chip" id="hideDis">Dislikes ausblenden</span>
+    <span class="sep"></span>
+    <label>BPM <input type="number" id="bpmMin" placeholder="min"> – <input type="number" id="bpmMax" placeholder="max"></label>
+    <label>Tonart <select id="key"><option value="">alle</option></select></label>
+    <label>Freak ≥ <input type="number" id="minScore" value="0" min="0" max="100"></label>
+    <label>Sortierung <select id="sort">
+      <option value="score">Freak-Score</option>
+      <option value="taste">Freak + Geschmack</option>
+      <option value="new">Neueste</option>
+      <option value="rare">Seltenste</option>
+      <option value="bpm">BPM</option>
+      <option value="old">Älteste Aufnahme</option>
+    </select></label>
+    <span class="sep"></span>
+    <label title="Spielt Samples im Projekttempo ab – wie eine schneller gedrehte Platte, Tonhöhe ändert sich mit">
+      <span class="chip" id="syncBtn">Sync</span><input type="number" id="projBpm" value="100" min="40" max="240"> BPM</label>
+    <label>Pitch <input type="number" id="pitch" value="0" min="-24" max="24"> st</label>
+    <span class="chip on" id="loopBtn">Loop</span>
+  </div>
+</header>
+
+<main id="list"></main>
+
+<div class="drawer closed" id="drawer">
+  <div class="bar">
+    <span class="dot" id="dot"></span>
+    <b>Neue Samples suchen</b>
+    <input class="hunt-in" id="huntCount" type="number" value="15" min="1" max="200" style="width:64px"> Stück
+    <input class="hunt-in" id="huntTerms" placeholder="optional: kora, tumbi, steel guitar …" style="flex:1;min-width:180px">
+    <label class="stat"><input type="checkbox" id="huntNc"> auch nicht-kommerzielle (NC)</label>
+    <label class="stat" title="Archive-Uploads, deren Lizenz nur auf der Angabe des Uploaders beruht"><input type="checkbox" id="huntClaimed"> auch ungeprüfte Uploads</label>
+    <button class="btn primary" id="huntBtn">Los</button>
+    <button class="btn" id="stopBtn">Stop</button>
+    <button class="btn" id="logBtn">Log</button>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const ICON = {
+  play:'<svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>',
+  pause:'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>',
+  heart:'<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+  down:'<svg viewBox="0 0 24 24"><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></svg>',
+  thumbDown:'<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.7a2 2 0 0 0-2 1.7l-1.4 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>',
+  link:'<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>',
+  trash:'<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/></svg>',
+};
+
+let samples = [], ratings = {}, view = [], cur = null;
+const state = {lic:new Set(['pd','pd-us','by','sa','nc']), onlyLikes:false, hideDis:false, sync:false, loop:true};
+try { Object.assign(state, JSON.parse(localStorage.getItem('sh-state')||'{}'), {lic:new Set(JSON.parse(localStorage.getItem('sh-lic')||'["pd","pd-us","by","sa","nc"]'))}); } catch(e) {}
+function persist(){ try{ localStorage.setItem('sh-state', JSON.stringify({onlyLikes:state.onlyLikes,hideDis:state.hideDis,sync:state.sync,loop:state.loop})); localStorage.setItem('sh-lic', JSON.stringify([...state.lic])); }catch(e){} }
+
+// ---------- audio ----------
+let ctx, gain, src = null, playStart = 0, playOffset = 0, playingId = null, rate = 1;
+const buffers = new Map();
+function audio(){ if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); gain = ctx.createGain(); gain.gain.value = .9; gain.connect(ctx.destination);} return ctx; }
+async function buffer(s){
+  if(buffers.has(s.id)) return buffers.get(s.id);
+  const r = await fetch('/library/' + s.file); const b = await audio().decodeAudioData(await r.arrayBuffer());
+  buffers.set(s.id, b); return b;
+}
+function rateFor(s){
+  let r = Math.pow(2, (+$('#pitch').value||0)/12);
+  if(state.sync) r *= (+$('#projBpm').value||100) / s.bpm;
+  return r;
+}
+function stop(){ if(src){ try{src.stop()}catch(e){} src.disconnect(); src = null; } const was = playingId; playingId = null; if(was) markRow(was); }
+async function play(s, offsetFrac = 0){
+  audio(); if(ctx.state === 'suspended') await ctx.resume();
+  const b = await buffer(s);
+  stop();
+  src = ctx.createBufferSource(); src.buffer = b; src.loop = state.loop;
+  rate = rateFor(s); src.playbackRate.value = rate; src.connect(gain);
+  playOffset = offsetFrac * b.duration; playStart = ctx.currentTime;
+  src.start(0, playOffset);
+  const me = src; src.onended = () => { if(src === me){ src = null; const w = playingId; playingId = null; if(w) markRow(w);} };
+  playingId = s.id; cur = s.id; markRow(s.id); highlight();
+}
+function position(s){
+  if(playingId !== s.id || !src) return null;
+  const d = src.buffer.duration, t = playOffset + (ctx.currentTime - playStart) * rate;
+  return state.loop ? (t % d) / d : Math.min(t / d, 1);
+}
+
+// ---------- rendering ----------
+function licClass(l){ return l === 'nc' ? 'b-nc' : (l === 'by' || l === 'sa') ? 'b-by' : 'b-pd'; }
+function esc(t){ return String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function rowHTML(s){
+  const r = ratings[s.id]||0;
+  const trust = s.trust_label || '';
+  return `<div class="row ${r<0?'disliked':''}" data-id="${s.id}">
+    <button class="play" title="Abspielen (Leertaste)">${ICON.play}</button>
+    <div class="name" draggable="true" title="In Explorer/DAW ziehen (Chrome)">
+      <b>${esc(s.name)}</b>
+      <small>${esc(s.title)}${s.creator? ' · '+esc(s.creator):''}${s.year? ' · '+s.year:''}</small>
+      <div class="tags">${s.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    </div>
+    <div class="c-wave"><canvas class="wave"></canvas></div>
+    <div class="num c-meta"><b>${esc(s.key)}</b></div>
+    <div class="num c-meta"><b>${Math.round(s.bpm)}</b> bpm</div>
+    <div class="score c-meta" title="Freak-Score ${s.score}${s.taste? ' / Geschmack '+(s.taste>0?'+':'')+s.taste:''}">
+      <span>Freak <b style="color:var(--text)">${Math.round(s.score)}</b>${s.taste? ` <span style="color:${s.taste>0?'var(--good)':'var(--warn)'}">${s.taste>0?'+':''}${s.taste}</span>`:''}</span>
+      <div class="meter"><i style="width:${Math.min(100,s.score)}%"></i></div></div>
+    <div class="lic c-meta"><span class="badge ${licClass(s.license)}">${esc(s.license_label)}</span><small>${trust}</small></div>
+    <div class="acts">
+      <button class="ico ${r>0?'liked':''}" data-act="like" title="Like (L)">${ICON.heart}</button>
+      <button class="ico ${r<0?'disl':''}" data-act="dislike" title="Nicht mein Ding (D)">${ICON.thumbDown}</button>
+      <a class="ico" href="/library/${encodeURI(s.file)}" download title="WAV herunterladen">${ICON.down}</a>
+      <a class="ico" href="${esc(s.source_url)}" target="_blank" rel="noopener" title="Originalaufnahme auf archive.org (ab ${fmtTime(s.source_start)})">${ICON.link}</a>
+    </div>
+  </div>`;
+}
+function fmtTime(t){ t = Math.floor(t||0); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); }
+
+function filtered(){
+  const q = $('#q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const bmin = +$('#bpmMin').value || 0, bmax = +$('#bpmMax').value || 1e9;
+  const key = $('#key').value, ms = +$('#minScore').value || 0;
+  let out = samples.filter(s => {
+    if(!state.lic.has(s.license)) return false;
+    const r = ratings[s.id]||0;
+    if(state.onlyLikes && r <= 0) return false;
+    if(state.hideDis && r < 0) return false;
+    if(s.bpm < bmin || s.bpm > bmax) return false;
+    if(key && s.key !== key) return false;
+    if(s.score < ms) return false;
+    if(q.length){ const hay = (s.name+' '+s.title+' '+s.creator+' '+s.key+' '+s.tags.join(' ')+' '+(s.year||'')).toLowerCase(); if(!q.every(w => hay.includes(w))) return false; }
+    return true;
+  });
+  const by = {
+    score:(a,b)=>b.score-a.score, taste:(a,b)=>(b.score+(b.taste||0))-(a.score+(a.taste||0)),
+    new:(a,b)=>b.added.localeCompare(a.added), rare:(a,b)=>a.downloads-b.downloads,
+    bpm:(a,b)=>a.bpm-b.bpm, old:(a,b)=>(a.year||3000)-(b.year||3000)}[$('#sort').value];
+  return out.sort(by);
+}
+function render(){
+  view = filtered();
+  $('#count').textContent = `${view.length} von ${samples.length} Samples`;
+  const list = $('#list');
+  if(!samples.length){ list.innerHTML = `<div class="empty"><h2>Noch leer</h2><p>Unten auf <b>Los</b> klicken – SampleHunter gräbt dann alte und unbekannte Aufnahmen aus<br>und schneidet die besten Riffs heraus. Dauert ca. 30 s pro Aufnahme.</p></div>`; return; }
+  if(!view.length){ list.innerHTML = `<div class="empty">Nichts passt zu den Filtern.</div>`; return; }
+  list.innerHTML = `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
+  list.querySelectorAll('.row[data-id]').forEach(el => drawWave(el));
+  highlight();
+}
+function byId(id){ return samples.find(s => s.id === id); }
+function drawWave(el){
+  const s = byId(el.dataset.id); const c = el.querySelector('canvas'); if(!c) return;
+  const w = c.clientWidth, h = c.clientHeight, dpr = devicePixelRatio||1;
+  if(c.width !== w*dpr){ c.width = w*dpr; c.height = h*dpr; }
+  const g = c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const pos = position(s), n = s.peaks.length, bw = w/n, css = getComputedStyle(document.documentElement);
+  const off = css.getPropertyValue('--wave'), on = css.getPropertyValue('--wave-on');
+  for(let i=0;i<n;i++){ const v = Math.max(.04, s.peaks[i]) * (h/2-1);
+    g.fillStyle = (pos !== null && i/n <= pos) ? on : off;
+    g.fillRect(i*bw, h/2-v, Math.max(1,bw-1), v*2); }
+  if(pos !== null){ g.fillStyle = '#fff'; g.fillRect(pos*w, 0, 1.5, h); }
+}
+function markRow(id){
+  const el = document.querySelector(`.row[data-id="${id}"]`); if(!el) return;
+  const on = playingId === id; el.classList.toggle('playing', on);
+  el.querySelector('.play').innerHTML = on ? ICON.pause : ICON.play; drawWave(el);
+}
+function highlight(){ document.querySelectorAll('.row.cur').forEach(e=>e.classList.remove('cur')); const el = cur && document.querySelector(`.row[data-id="${cur}"]`); if(el) el.classList.add('cur'); }
+(function tick(){ if(playingId){ const el = document.querySelector(`.row[data-id="${playingId}"]`); if(el) drawWave(el); } requestAnimationFrame(tick); })();
+
+// ---------- actions ----------
+async function setRating(id, v){
+  ratings[id] = (ratings[id] === v) ? 0 : v; if(!ratings[id]) delete ratings[id];
+  await fetch('/api/rate', {method:'POST', body:JSON.stringify({id, value:ratings[id]||0})});
+  const el = document.querySelector(`.row[data-id="${id}"]`);
+  if(el){ const tmp = document.createElement('div'); tmp.innerHTML = rowHTML(byId(id)); const nw = tmp.firstElementChild; el.replaceWith(nw); drawWave(nw); markRow(id); highlight(); }
+}
+$('#list').addEventListener('click', e => {
+  const row = e.target.closest('.row[data-id]'); if(!row) return;
+  const s = byId(row.dataset.id); cur = s.id; highlight();
+  if(e.target.closest('.play')){ playingId === s.id ? stop() : play(s); return; }
+  if(e.target.closest('canvas')){ const r = e.target.getBoundingClientRect(); play(s, (e.clientX - r.left)/r.width); return; }
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if(act === 'like') setRating(s.id, 1);
+  if(act === 'dislike') setRating(s.id, -1);
+  if(e.target.classList.contains('tag')){ $('#q').value = e.target.textContent; render(); }
+});
+$('#list').addEventListener('dragstart', e => {
+  const row = e.target.closest('.row[data-id]'); if(!row) return; const s = byId(row.dataset.id);
+  const url = location.origin + '/library/' + encodeURI(s.file);
+  e.dataTransfer.setData('DownloadURL', `audio/wav:${s.name}.wav:${url}`);
+  e.dataTransfer.setData('text/uri-list', url);
+});
+document.addEventListener('keydown', e => {
+  if(e.target.matches('input,select')){ if(e.key === 'Escape') e.target.blur(); return; }
+  const i = view.findIndex(s => s.id === cur);
+  if(e.key === '/'){ e.preventDefault(); $('#q').focus(); }
+  else if(e.key === ' '){ e.preventDefault(); const s = byId(cur) || view[0]; if(s) playingId === s.id ? stop() : play(s); }
+  else if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); const n = view[Math.max(0, Math.min(view.length-1, i + (e.key==='ArrowDown'?1:-1)))]; if(n){ cur = n.id; highlight(); document.querySelector(`.row[data-id="${n.id}"]`)?.scrollIntoView({block:'nearest'}); if(playingId) play(n); } }
+  else if(e.key.toLowerCase() === 'l' && cur) setRating(cur, 1);
+  else if(e.key.toLowerCase() === 'd' && cur) setRating(cur, -1);
+});
+
+// ---------- filters ----------
+document.querySelectorAll('[data-lic]').forEach(c => { c.classList.toggle('on', state.lic.has(c.dataset.lic)); c.onclick = () => { const l = c.dataset.lic; state.lic.has(l) ? state.lic.delete(l) : state.lic.add(l); c.classList.toggle('on'); persist(); render(); }; });
+function toggleChip(id, k, after){ const el = $(id); el.classList.toggle('on', state[k]); el.onclick = () => { state[k] = !state[k]; el.classList.toggle('on', state[k]); persist(); after(); }; }
+toggleChip('#onlyLikes','onlyLikes',render); toggleChip('#hideDis','hideDis',render);
+const retune = () => { if(src && playingId){ const s = byId(playingId); const pos = position(s)||0; play(s, pos); } };
+toggleChip('#syncBtn','sync',retune); toggleChip('#loopBtn','loop',() => { if(src) src.loop = state.loop; });
+['#q','#bpmMin','#bpmMax','#key','#minScore','#sort'].forEach(s => $(s).addEventListener('input', render));
+['#projBpm','#pitch'].forEach(s => $(s).addEventListener('change', retune));
+$('#zipBtn').onclick = () => { const ids = Object.keys(ratings).filter(k => ratings[k] > 0); if(!ids.length){ alert('Noch keine Likes.'); return; } location.href = '/api/zip?ids=' + ids.join(','); };
+
+// ---------- hunting ----------
+$('#huntBtn').onclick = async () => {
+  const r = await fetch('/api/hunt', {method:'POST', body:JSON.stringify({count:+$('#huntCount').value, terms:$('#huntTerms').value, allow_nc:$('#huntNc').checked, include_claimed:$('#huntClaimed').checked})});
+  if(!r.ok) alert('Es läuft schon eine Suche.'); $('#drawer').classList.remove('closed'); poll();
+};
+$('#stopBtn').onclick = () => fetch('/api/stop', {method:'POST'});
+$('#logBtn').onclick = () => $('#drawer').classList.toggle('closed');
+let lastLines = 0, wasHunting = false;
+async function poll(){
+  try{
+    const r = await (await fetch('/api/log')).json();
+    $('#dot').classList.toggle('live', r.hunting); $('#log').textContent = r.lines.join('\n'); $('#log').scrollTop = 1e9;
+    const added = r.lines.filter(l => l.includes('✓')).length;
+    if(added !== lastLines || (wasHunting && !r.hunting)){ lastLines = added; await load(); }
+    wasHunting = r.hunting;
+    if(r.hunting) setTimeout(poll, 2000);
+  }catch(e){ setTimeout(poll, 4000); }
+}
+async function load(){
+  const r = await (await fetch('/api/library')).json();
+  samples = r.samples; ratings = r.ratings;
+  const keys = [...new Set(samples.map(s => s.key))].sort(); const sel = $('#key'), v = sel.value;
+  sel.innerHTML = '<option value="">alle</option>' + keys.map(k => `<option>${esc(k)}</option>`).join(''); sel.value = v;
+  render();
+  if(r.hunting && !wasHunting){ wasHunting = true; poll(); }
+}
+addEventListener('resize', () => document.querySelectorAll('.row[data-id]').forEach(drawWave));
+load();
+</script>
+</body>
+</html>
