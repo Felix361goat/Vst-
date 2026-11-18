@@ -25,7 +25,8 @@ installieren, dann `start-windows.bat` doppelklicken.
 
 **macOS:** einmal `brew install ffmpeg python`, dann `start-mac.command` doppelklicken.
 
-Beim ersten Start werden die Python-Pakete installiert (dauert ein paar Minuten),
+Beim ersten Start werden die Python-Pakete installiert (dauert ein paar Minuten,
+inklusive KI-Ohr ca. 1 GB; das Modell wird bei der ersten Suche einmal geladen),
 danach öffnet sich SampleHunter in einem eigenen Fenster (über Edge oder Chrome
 im App-Modus, ohne Adressleiste). Fenster zu = Programm aus. Unten auf **Los**
 klicken, dann beginnt die Suche. Pro Aufnahme dauert das etwa 20–40 Sekunden.
@@ -72,7 +73,7 @@ du mehr davon willst.
 
 **Quellen.** Drei, sortiert danach, wie sehr man der Lizenz trauen kann:
 
-1. **78er-Schellackplatten** von vor 1926 (Internet Archive, Great 78 Project,
+1. **78er-Schellackplatten** von vor 1926 (nur mit `--vintage`, weil sie knistern) (Internet Archive, Great 78 Project,
    Library of Congress). In den USA sind Aufnahmen gemeinfrei, die vor mehr als
    100 Jahren erschienen sind. Für Kompositionen gilt das nach 95 Jahren. Die
    Grenze verschiebt sich jeden Januar automatisch um ein Jahr. Hawaii-Gitarre,
@@ -93,7 +94,9 @@ Damit keine Sammlung die Bibliothek füllt, kommen aus einer Serie oder von
 einem Künstler höchstens acht Samples (`--per-family`). Lange Aufnahmen
 (Konzerte bis eine Stunde) werden an einer zufälligen Stelle analysiert.
 
-Suchbegriffe sind über 180 Instrumente, Stile und Gesangstraditionen aus aller Welt (siehe
+Suchbegriffe sind rund 270 Instrumente, Stile und Gesangstraditionen aus aller
+Welt, die schrägen (Ektara, Gopichand, Morchang, Khaen, Mundbogen, Zar-Ritual,
+Obertongesang …) werden doppelt so oft gezogen (siehe
 `hunter/sources.py`). Bevorzugt werden Aufnahmen, die kaum jemand
 heruntergeladen hat.
 
@@ -109,6 +112,22 @@ heruntergeladen hat.
 | Helligkeit | nasaler Mittenbereich um 1,8 kHz, wo Tumbi, Banjo und Kora sitzen |
 | Harmonisch/perkussiv | gezupft: Anschlag plus Ton |
 | Tonalität | Rauschen, Knistern und Sprache fallen raus |
+
+**Das KI-Ohr.** Ein Audio-Sprachmodell (CLAP) hört sich jeden Kandidaten an:
+
+- **Grain**: klingt es nach Knistern, Rauschen, dumpfer alter Platte oder
+  ausgeleierter Kassette? Über 55 fliegt es raus (`--max-grain`).
+- **Weirdness**: klingt es eher nach „hypnotisches Riff auf einem
+  ungewöhnlichen Instrument, nasal, schnarrend, metallisch, ritueller Trance“
+  oder eher nach „normaler Folk mit Gitarre, Blaskapelle, Tanzorchester,
+  Kirchenchor, Pop“? Zählt zur Hälfte in den Score.
+- **Klang-Fingerabdruck**: damit funktionieren „Ähnliche finden“, das
+  Geschmacks-Lernen und die **Suche nach Klang**: beschreib oben einen Sound
+  („eerie nasal riff“, „buzzing reed drone“, „metallic bells“, Englisch klappt
+  am besten) und drück 🔊.
+
+Ohne KI-Ohr (z. B. wenn torch nicht installiert werden kann) läuft alles
+weiter, nur mit der Signal-Analyse.
 
 **Phrasen** werden anders bewertet: eine klare Stimme, die frei steht,
 Bewegung (Verzierungen, Glissandi), ein Ambitus von ein paar Tönen, gehaltene

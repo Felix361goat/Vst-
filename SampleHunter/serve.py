@@ -117,6 +117,24 @@ class Handler(SimpleHTTPRequestHandler):
             except FileNotFoundError:
                 lines = []
             return self._json({"hunting": hunting(), "auto": bool(_hunt.get("auto")), "lines": lines})
+        if url.path == "/api/listen":
+            # Search the library by describing a sound.
+            q = (urllib.parse.parse_qs(url.query).get("q") or [""])[0].strip()
+            data = LIB.load()
+            with_emb = [x for x in data["samples"] if x.get("emb")]
+            if not q or not with_emb:
+                return self._json({"ids": [], "error": None if q else "leer"})
+            try:
+                from hunter import ear
+                if not ear.available():
+                    return self._json({"ids": [], "error": "KI-Ohr nicht installiert"})
+                t = ear.text_embedding(q)
+            except Exception as exc:
+                return self._json({"ids": [], "error": str(exc)})
+            import numpy as np
+            E = np.array([x["emb"] for x in with_emb])
+            order = np.argsort(-(E @ t))
+            return self._json({"ids": [with_emb[i]["id"] for i in order[:60]]})
         if url.path == "/api/zip":
             q = urllib.parse.parse_qs(url.query)
             ids = set((q.get("ids") or [""])[0].split(","))

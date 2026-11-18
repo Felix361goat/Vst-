@@ -1,0 +1,4 @@
+# The AI ear (weirdness, crackle detection, search by sound). Optional but
+# recommended; on first use it downloads its model (~600 MB) once.
+torch>=2.2
+transformers>=4.40

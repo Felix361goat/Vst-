@@ -24,7 +24,9 @@ import urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from hunter import analyze, sources  # noqa: E402
+from hunter import analyze, ear, sources  # noqa: E402
+
+EAR = None   # the AI ear module, when it loaded
 from hunter.library import Library, Taste  # noqa: E402
 
 
@@ -48,7 +50,12 @@ def main() -> int:
                     help="also dig obscure Archive uploads with unclear licence (to play with; clear before release)")
     ap.add_argument("--kinds", default="loop,phrase",
                     help="what to cut: loop (riffs on the beat), phrase (free one-shot lines), or both")
-    ap.add_argument("--min-score", type=float, default=58.0, help="minimum Freak score, 0-100")
+    ap.add_argument("--vintage", action="store_true",
+                    help="also dig pre-1950 material (78s): legally clean, but crackly")
+    ap.add_argument("--max-grain", type=float, default=55.0,
+                    help="drop samples with more crackle/hiss/muffle than this, 0-100 (100 = keep all)")
+    ap.add_argument("--no-ear", action="store_true", help="do not use the AI ear even if installed")
+    ap.add_argument("--min-score", type=float, default=58.0, help="minimum score, 0-100")
     ap.add_argument("--per-track", type=int, default=2, help="max samples cut from one recording")
     ap.add_argument("--per-family", type=int, default=8,
                     help="max samples from one collection or artist, for variety")
@@ -65,6 +72,17 @@ def main() -> int:
     found = 0
     misses = 0
 
+    global EAR
+    EAR = None
+    if not args.no_ear and ear.available():
+        log("KI-Ohr wird geladen …")
+        try:
+            ear._load()
+            EAR = ear
+        except Exception as exc:
+            log("KI-Ohr nicht verfügbar (%s) – bewerte ohne" % exc)
+    elif not args.no_ear:
+        log("KI-Ohr nicht installiert – bewerte nur mit Signal-Analyse (siehe README)")
     log("Suche %d neue Samples …" % args.count)
     while found < args.count and misses < 60:
         if deadline and time.time() > deadline:
@@ -74,9 +92,11 @@ def main() -> int:
         taste = Taste(data, lib.ratings())
 
         # Where to dig this round.
-        options = [("commons", 0.40), ("78", 0.35)]
-        if not args.terms:
-            options.append(("78-random", 0.25))
+        options = [("commons", 0.40)]
+        if args.vintage:
+            options.append(("78", 0.30))
+            if not args.terms:
+                options.append(("78-random", 0.15))
         if args.include_claimed:
             options.append(("ia", 0.30))
         if args.experiment:
@@ -88,7 +108,8 @@ def main() -> int:
             if not pool:
                 misses += 1
                 continue
-            term = rng.choices(pool, weights=[taste.term_weight[t] for t in pool])[0]
+            term = rng.choices(pool, weights=[taste.term_weight[t] * (2.0 if t in sources.WEIRD_TERMS else 1.0)
+                                              for t in pool])[0]
 
         try:
             if src == "commons":
@@ -105,6 +126,8 @@ def main() -> int:
             time.sleep(5)
             continue
         fresh = [c for c in cands if c.key not in data["processed"]]
+        if not args.vintage:
+            fresh = [c for c in fresh if not (c.year and c.year < 1950)]
         # Variety: no collection or artist gets to fill the library.
         counts: dict[str, int] = {}
         for smp in data["samples"]:
@@ -154,6 +177,7 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
             if "phrase" in kinds:
                 windows += analyze.find_phrases(tmp, max_phrases=args.per_track,
                                                 min_score=args.min_score - 10, offset=start)
+            windows = judge(tmp, windows, args)
             cut_from, offset = tmp, 0.0
             if windows and f.get("hq_url"):
                 hq = tmp + ".hq" + os.path.splitext(urllib.parse.unquote(f["hq_url"]))[1]
@@ -174,8 +198,9 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
                 data["samples"].append(sample)
                 lib.save(data)
                 added += 1
-                log("  ✓ %s  Freak %.0f%s  %s  %s" % (
+                log("  ✓ %s  Score %.0f%s%s  %s  %s" % (
                     sample["name"], w.score,
+                    (" (weird %.0f)" % sample["weird"]) if sample.get("weird") is not None else "",
                     (" (Geschmack %+.0f)" % sample["taste"]) if sample["taste"] else "",
                     ("%d BPM" % round(w.bpm)) if w.kind == "loop" else "Phrase %.1f s" % w.duration, w.key))
             if not windows:
@@ -198,6 +223,28 @@ def process(lib: Library, cand: sources.Candidate, args, taste: Taste) -> int:
         data["processed"][cand.key] = int(time.time())
         lib.save(data)
     return added
+
+
+def judge(path: str, windows: list, args) -> list:
+    """Listen to each candidate: drop grainy ones, fold weirdness into the score."""
+    if not windows:
+        return windows
+    if EAR is not None:
+        clips = [analyze.decode(path, sr=ear.SR, start=w.start, duration=min(w.duration, 10.0))
+                 for w in windows]
+        verdicts = EAR.listen(clips)
+    else:
+        verdicts = [{"grain": analyze.grain_dsp(path, w), "weird": None, "emb": None} for w in windows]
+    kept = []
+    for w, v in zip(windows, verdicts):
+        w.extra = {"freak": w.score, "grain": v["grain"], "weird": v["weird"], "emb": v["emb"]}
+        if v["grain"] > args.max_grain:
+            log("    verworfen: zu viel Rauschen/Knistern (Grain %.0f)" % v["grain"])
+            continue
+        if v["weird"] is not None:
+            w.score = round(0.5 * w.score + 0.5 * v["weird"], 1)
+        kept.append(w)
+    return kept
 
 
 def family(c: sources.Candidate) -> list[str]:
@@ -250,6 +297,7 @@ def to_sample(lib: Library, cand: sources.Candidate, f: dict, w: analyze.Window,
         "duration": round(w.duration, 3),
         "key": w.key,
         "score": w.score,
+        **getattr(w, "extra", {}),
         "features": w.features,
         "centroid": round(w.centroid, 1),
         "tags": tags,

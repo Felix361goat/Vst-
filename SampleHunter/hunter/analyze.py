@@ -447,3 +447,17 @@ def find_phrases(path: str, max_phrases: int = 2, min_score: float = 55.0,
             continue
         picked.append(w)
     return picked
+
+
+def grain_dsp(path: str, w: Window) -> float:
+    """Crackle/muffle estimate without the AI ear: old records and worn tapes
+    lose their top end, so the frequency below which 95 % of the energy sits
+    is low. 0 = clean, 100 = very lo-fi."""
+    import librosa
+    y = decode(path, sr=44100, start=w.start, duration=min(w.duration, 10.0))
+    if len(y) < 2048:
+        return 0.0
+    roll = librosa.feature.spectral_rolloff(y=y, sr=44100, roll_percent=0.95)[0]
+    rms = librosa.feature.rms(y=y)[0][:len(roll)]
+    loud = roll[rms > np.median(rms)] if (rms > np.median(rms)).any() else roll
+    return round(float(np.clip((9000 - np.median(loud)) / 6000, 0, 1) * 100), 1)

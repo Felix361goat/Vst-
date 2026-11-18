@@ -63,6 +63,7 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 .meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
 .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
 .lic{font-size:11px;line-height:1.25}
+.score .sub{font-size:10.5px;color:var(--faint)}
 .lic .badge{display:inline-block;border-radius:4px;padding:1px 6px;font-weight:600;font-size:11px}
 .b-pd{background:#163322;color:var(--good)} .b-by{background:#152638;color:var(--info)} .b-nc{background:#3a2c10;color:var(--warn)} .b-un{background:#3a1520;color:#ff8fa3}
 .kind{font-size:10px;font-weight:700;letter-spacing:.5px;border-radius:3px;padding:0 4px;margin-right:6px;vertical-align:1px}
@@ -104,7 +105,8 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
 <header>
   <div class="bar">
     <div class="logo">SAMPLE<span>HUNTER</span></div>
-    <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tonart, Tag …  (/)">
+    <input id="q" class="search" placeholder="Suchen: Instrument, Titel, Tag … oder einen Klang beschreiben und 🔊 drücken  (/)">
+    <button class="btn" id="listenBtn" title="Sucht nach Klang statt nach Namen, z. B. „eerie nasal riff“, „buzzing reed drone“, „metallic bells“ (englisch klappt am besten). Braucht das KI-Ohr.">🔊 Nach Klang</button>
     <span class="stat" id="count"></span>
     <select class="btn" id="coll" title="Deine Sammlungen"></select>
     <button class="btn" id="collDel" title="Diese Sammlung löschen (die Samples bleiben)" hidden>Sammlung löschen</button>
@@ -128,8 +130,10 @@ canvas.wave{width:100%;height:42px;cursor:pointer;display:block}
     <label>Tonart <select id="key"><option value="">alle</option></select></label>
     <label>Freak ≥ <input type="number" id="minScore" value="0" min="0" max="100"></label>
     <label>Sortierung <select id="sort">
-      <option value="score">Freak-Score</option>
-      <option value="taste">Freak + Geschmack</option>
+      <option value="score">Score</option>
+      <option value="taste">Score + Geschmack</option>
+      <option value="weird">Weirdness</option>
+      <option value="clean">Sauberster Klang</option>
       <option value="new">Neueste</option>
       <option value="rare">Seltenste</option>
       <option value="bpm">BPM</option>
@@ -230,9 +234,10 @@ function rowHTML(s){
     <div class="c-wave"><canvas class="wave"></canvas></div>
     <div class="num c-meta"><b>${esc(s.key)}</b></div>
     <div class="num c-meta">${kindOf(s) === 'phrase' ? `<b>${s.duration.toFixed(1)}</b> s` : `<b>${Math.round(s.bpm)}</b> bpm`}</div>
-    <div class="score c-meta" title="Freak-Score ${s.score}${s.taste? ' / Geschmack '+(s.taste>0?'+':'')+s.taste:''}">
-      <span>Freak <b style="color:var(--text)">${Math.round(s.score)}</b>${s.taste? ` <span style="color:${s.taste>0?'var(--good)':'var(--warn)'}">${s.taste>0?'+':''}${s.taste}</span>`:''}</span>
-      <div class="meter"><i style="width:${Math.min(100,s.score)}%"></i></div></div>
+    <div class="score c-meta" title="Score ${s.score}: Riff-Analyse ${Math.round(s.freak ?? s.score)}${s.weird != null ? ' + Weirdness '+Math.round(s.weird) : ''}${s.grain != null ? ' · Rauschen/Knistern '+Math.round(s.grain) : ''}${s.taste? ' · Geschmack '+(s.taste>0?'+':'')+s.taste:''}">
+      <span>Score <b style="color:var(--text)">${Math.round(s.score)}</b>${s.taste? ` <span style="color:${s.taste>0?'var(--good)':'var(--warn)'}">${s.taste>0?'+':''}${s.taste}</span>`:''}</span>
+      <div class="meter"><i style="width:${Math.min(100,s.score)}%"></i></div>
+      ${s.weird != null ? `<span class="sub">weird ${Math.round(s.weird)} · grain ${Math.round(s.grain)}</span>` : ''}</div>
     <div class="lic c-meta"><span class="badge ${licClass(s.license)}">${esc(s.license_label)}</span><small>${trust}</small></div>
     <div class="acts">
       <button class="ico ${r>0?'liked':''}" data-act="like" title="Like (L)">${ICON.heart}</button>
@@ -250,12 +255,13 @@ function filtered(){
   const q = $('#q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const bmin = +$('#bpmMin').value || 0, bmax = +$('#bpmMax').value || 1e9;
   const key = $('#key').value, ms = +$('#minScore').value || 0;
+  if(focus && focus.type === 'text'){ const pos = new Map(focus.ids.map((id,i) => [id,i])); return samples.filter(s => pos.has(s.id) && state.lic.has(s.license) && state.kinds.has(kindOf(s))).sort((a,b) => pos.get(a.id)-pos.get(b.id)); }
   const ref = focus && byId(focus.id);
   if(ref && focus.type === 'source') return samples.filter(s => s.source_url === ref.source_url).sort((a,b) => (a.source_start||0)-(b.source_start||0));
   if(ref && focus.type === 'similar'){
-    const v = vec(ref);
-    return samples.filter(s => kindOf(s) === kindOf(ref) && state.lic.has(s.license) && !(state.hideDis && (ratings[s.id]||0) < 0))
-      .map(s => [s, dist(v, vec(s)) + (s.key === ref.key ? 0 : 0.15) + (s.source_url === ref.source_url && s.id !== ref.id ? 0.3 : 0)])
+    const useEmb = !!ref.emb, v = useEmb ? ref.emb : vec(ref);
+    return samples.filter(s => kindOf(s) === kindOf(ref) && state.lic.has(s.license) && !(state.hideDis && (ratings[s.id]||0) < 0) && (!useEmb || s.emb))
+      .map(s => [s, (useEmb ? 1 - dot(v, s.emb) : dist(v, vec(s))) + (s.key === ref.key ? 0 : 0.15) + (s.source_url === ref.source_url && s.id !== ref.id ? 0.3 : 0)])
       .sort((a,b) => a[1]-b[1]).slice(0, 40).map(x => x[0]);
   }
   const inColl = coll ? new Set(collections[coll] || []) : null;
@@ -274,7 +280,8 @@ function filtered(){
   });
   const by = {
     score:(a,b)=>b.score-a.score, taste:(a,b)=>(b.score+(b.taste||0))-(a.score+(a.taste||0)),
-    new:(a,b)=>b.added.localeCompare(a.added), rare:(a,b)=>a.downloads-b.downloads,
+    new:(a,b)=>b.added.localeCompare(a.added),
+    weird:(a,b)=>(b.weird ?? -1)-(a.weird ?? -1), clean:(a,b)=>(a.grain ?? 101)-(b.grain ?? 101), rare:(a,b)=>a.downloads-b.downloads,
     bpm:(a,b)=>a.bpm-b.bpm, old:(a,b)=>(a.year||3000)-(b.year||3000)}[$('#sort').value];
   return out.sort(by);
 }
@@ -322,6 +329,7 @@ function vec(s){
   v.push(s.bpm ? Math.log2(s.bpm/100) : 0, 0.5*Math.log2(Math.max(s.centroid||1800, 50)/1800));
   return v;
 }
+function dot(a, b){ let d = 0; for(let i=0;i<a.length;i++) d += a[i]*b[i]; return d; }
 function dist(a, b){ let d = 0; for(let i=0;i<Math.min(a.length,b.length);i++) d += (a[i]-b[i])**2; return Math.sqrt(d); }
 function setFocus(type, id){ focus = type ? {type, id} : null; render(); window.scrollTo({top:0}); }
 function render(){
@@ -331,7 +339,8 @@ function render(){
   if(!samples.length){ list.innerHTML = `<div class="empty"><h2>Noch leer</h2><p>Unten auf <b>Los</b> klicken – SampleHunter gräbt dann alte und unbekannte Aufnahmen aus<br>und schneidet die besten Riffs heraus. Dauert ca. 30 s pro Aufnahme.</p></div>`; return; }
   if(!view.length){ list.innerHTML = `<div class="empty">Nichts passt zu den Filtern.</div>`; return; }
   const ref = focus && byId(focus.id);
-  const banner = ref ? `<div class="focus">${focus.type === 'similar' ? 'Klingt ähnlich wie' : 'Alles aus der Aufnahme'} <b>${esc(focus.type === 'similar' ? ref.name : ref.title)}</b><button class="btn" id="unfocus">✕ zurück zur Bibliothek</button></div>` : '';
+  const banner = focus && focus.type === 'text' ? `<div class="focus">Klingt nach <b>„${esc(focus.q)}“</b><button class="btn" id="unfocus">✕ zurück zur Bibliothek</button></div>`
+    : ref ? `<div class="focus">${focus.type === 'similar' ? 'Klingt ähnlich wie' : 'Alles aus der Aufnahme'} <b>${esc(focus.type === 'similar' ? ref.name : ref.title)}</b><button class="btn" id="unfocus">✕ zurück zur Bibliothek</button></div>` : '';
   list.innerHTML = banner + `<div class="row head"><span></span><span>Sample</span><span>Wellenform</span><span class="num c-meta">Tonart</span><span class="num c-meta">Tempo</span><span class="c-meta">Score</span><span class="c-meta">Lizenz</span><span></span></div>` + view.map(rowHTML).join('');
   list.querySelectorAll('.row[data-id]').forEach(el => drawWave(el));
   highlight();
@@ -405,6 +414,18 @@ const retune = () => { if(src && playingId){ const s = byId(playingId); const po
 toggleChip('#syncBtn','sync',retune); toggleChip('#loopBtn','loop',() => { if(src) src.loop = state.loop; });
 ['#q','#bpmMin','#bpmMax','#key','#minScore','#sort'].forEach(s => $(s).addEventListener('input', render));
 ['#projBpm','#pitch'].forEach(s => $(s).addEventListener('change', retune));
+async function listenSearch(){
+  const q = $('#q').value.trim(); if(!q) return;
+  $('#listenBtn').textContent = '🔊 hört …';
+  try{
+    const r = await (await fetch('/api/listen?q=' + encodeURIComponent(q))).json();
+    if(r.error){ alert(r.error === 'KI-Ohr nicht installiert' ? 'Die Klangsuche braucht das KI-Ohr (siehe README).' : 'Klangsuche: ' + r.error); return; }
+    if(!r.ids.length){ alert('Noch keine Samples mit KI-Ohr-Analyse in der Bibliothek.'); return; }
+    $('#q').value = ''; focus = {type:'text', ids:r.ids, q}; render(); window.scrollTo({top:0});
+  } finally { $('#listenBtn').textContent = '🔊 Nach Klang'; }
+}
+$('#listenBtn').onclick = listenSearch;
+$('#q').addEventListener('keydown', e => { if(e.key === 'Enter' && e.shiftKey) listenSearch(); });
 $('#zipBtn').onclick = () => {
   const ids = coll ? (collections[coll] || []) : Object.keys(ratings).filter(k => ratings[k] > 0);
   if(!ids.length){ alert(coll ? 'Die Sammlung ist leer.' : 'Noch keine Likes.'); return; }

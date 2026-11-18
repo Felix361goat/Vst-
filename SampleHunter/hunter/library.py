@@ -128,6 +128,15 @@ class Taste:
                 self.term_weight[s["term"]] = max(0.2, self.term_weight[s["term"]] - 0.4)
                 disliked.append(self._vec(s))
         self.n_ratings = len(liked) + len(disliked)
+        # The AI ear's embeddings, where samples have them: a far better
+        # picture of "sounds like what I liked" than eight hand-made numbers.
+        emb = lambda ids: [by_id[i]["emb"] for i in ids if by_id.get(i, {}).get("emb")]  # noqa: E731
+        liked_ids = [i for i, v in ratings.items() if v > 0]
+        disliked_ids = [i for i, v in ratings.items() if v < 0]
+        all_emb = [s["emb"] for s in data["samples"] if s.get("emb")]
+        self.e_center = np.mean(all_emb, axis=0) if len(all_emb) >= 5 else None
+        self.e_like = np.mean(emb(liked_ids), axis=0) if emb(liked_ids) else None
+        self.e_dislike = np.mean(emb(disliked_ids), axis=0) if emb(disliked_ids) else None
         self.center = np.mean(everything, axis=0) if everything else None
         self.like = np.mean(liked, axis=0) if liked else None
         self.dislike = np.mean(disliked, axis=0) if disliked else None
@@ -145,9 +154,19 @@ class Taste:
         return np.array(v, dtype=float)
 
     def bonus(self, sample: dict) -> float:
-        """-10..+10 points: how close a new sample is to what you liked."""
+        """-15..+15 points: how close a new sample is to what you liked."""
         if self.n_ratings < 3 or self.center is None:
             return 0.0
+        if sample.get("emb") and self.e_center is not None and self.e_like is not None:
+            v = np.asarray(sample["emb"]) - self.e_center
+
+            def esim(ref):
+                if ref is None:
+                    return 0.0
+                r = ref - self.e_center
+                d = np.linalg.norm(v) * np.linalg.norm(r)
+                return float(v @ r / d) if d > 1e-9 else 0.0
+            return round(15.0 * np.clip(1.5 * (esim(self.e_like) - 0.6 * esim(self.e_dislike)), -1, 1), 1)
         v = self._vec(sample) - self.center
 
         def sim(ref):

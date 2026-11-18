@@ -62,11 +62,11 @@ STYLES = [
     "bhangra", "punjabi", "qawwali", "carnatic", "hindustani", "rebetiko",
     "klezmer", "tarab", "chaabi", "gnawa", "highlife", "palm wine", "juju",
     "taarab", "ethiopian", "mento", "calypso", "son cubano", "danzon",
-    "cumbia", "tango", "fado", "flamenco", "hawaiian", "polka", "csardas",
+    "cumbia", "fado", "flamenco", "hawaiian", "csardas",
     "romani", "gypsy", "tatar", "uyghur", "persian", "armenian", "turkish",
     "arabic", "egyptian", "greek", "chinese", "cantonese", "javanese",
     "balinese", "thai", "burmese", "japanese", "korean", "andean",
-    "mariachi", "folk dance", "novelty", "ragtime", "field recording",
+    "mariachi", "field recording",
 ]
 
 # Voices and other free melodic lines: what the phrase finder is for.
@@ -82,7 +82,29 @@ VOCALS = [
     "lullaby", "work song", "field holler", "lament", "vocal improvisation",
 ]
 
-ALL_TERMS = INSTRUMENTS + STYLES + VOCALS
+# The strange end: instruments and practices with sounds nobody expects, often
+# single-voice and buzzing, nasal or metallic, like the tumbi itself (a
+# one-string Punjabi lute; its cousins ektara and gopichand are in here too).
+# Picked twice as often as the rest.
+WEIRD_TERMS = [
+    "ektara", "gopichand", "toombi", "morchang", "algoza", "pungi", "been",
+    "ravanahatha", "kamaicha", "sarinda", "esraj", "dilruba", "pena",
+    "khaen", "phin", "sape", "kubing", "kudyapi", "hasapi", "sasando",
+    "morin khuur", "igil", "tovshuur", "jaw harp", "mouth bow", "musical bow",
+    "earth bow", "slit drum", "lithophone", "waterphone", "nyckelharpa",
+    "sintir", "guembri", "imzad", "krar", "begena", "masenqo", "goje",
+    "molo", "kontigi", "valiha", "marovany", "inanga", "endongo", "akadinda",
+    "amadinda", "ennanga", "bobre", "cuica", "marimbula", "pifano",
+    "arghul", "mizmar", "suona", "sheng", "hichiriki", "sho", "piri",
+    "taepyeongso", "zurla", "launeddas", "tenora", "gralla", "bombarde",
+    "ondes martenot", "tape loop", "musique concrete", "early electronic",
+    "zar ritual", "bori", "gnawa lila", "kecak", "jaipongan", "tarling",
+    "dangdut koplo", "molam", "mor lam", "hocket", "pygmy", "aka pygmies",
+    "khoomei", "overtone singing", "kargyraa", "zikr", "dhikr", "possession",
+    "trance music", "ceremony", "spirit", "shaman",
+]
+
+ALL_TERMS = list(dict.fromkeys(INSTRUMENTS + STYLES + VOCALS + WEIRD_TERMS))
 
 LICENSE_PD = "pd"          # public domain or CC0
 LICENSE_PD_US = "pd-us"    # US public domain by age
