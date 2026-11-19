@@ -70,3 +70,24 @@ Etwa 230 offizielle Websites von UK/US-Artists und UK/US-inspirierten Deutschrap
 2. **Die Produzenten der Artists anschreiben** statt der Artists selbst. Namen aus den Spotify- oder Genius-Credits nehmen. Produzenten haben ihre Mail oft öffentlich (BeatStars, Linktree, YouTube) und brauchen Co-Producer oder Loops.
 3. **Bezahlte Kontakt-Datenbanken** mit verifizierten Management-Mails: bookingagentinfo.com, thehandbook.com.
 4. **Pitching-Plattformen** mit Labels, A&Rs und Managern, die Einsendungen annehmen: Groover, SubmitHub.
+
+## 9. Artists mit US/UK-Einfluss und ihre Produzenten (Stand 19.11.2026)
+
+Öffentliche Mails von Produzenten (aus SoundCloud- oder BeatStars-Profilen; geprüft, dass Stadt bzw. Credits passen):
+
+| Produzent | Arbeitet mit / Sound | Mail | Quelle |
+|---|---|---|---|
+| The Cratez | Pashanim & Ufo361 („Allein Allein“), Trap mit US-Placements | thecratez@gmail.com | SoundCloud + BeatStars |
+| Exetra Beatz | Deutschrap/Trap | info@exetrabeatz.com | BeatStars |
+| M1OnTheBeat | UK Drill (London) | m1onthebeatupdates@gmail.com | SoundCloud |
+| Gotcha (GotchaTheProducer) | UK Drill (London) | gotchagotdembeats@gmail.com | SoundCloud |
+| Nyge | UK (London) | nsounds1@gmail.com | SoundCloud |
+
+Credits ohne gefundene Mail (Anschreiben über Insta/BeatStars):
+- **Sosa La M:** Nilly, jaynbeats, madein2k, Yeeshy, sebo
+- **Gola Gianni:** FLAMEE, 432 Beats, Adiamo, Silas, ATP Beatz (Golapack 2); Mix/Master: Odrizz
+- **Thizzy52:** nousey (SoundCloud: nousey-beats), DLS, Dinski, 4l3x, madein2k
+- **Haqat & Cazal:** Tyme, Mika Willemsen, Mika Goedrijk, Tizzy
+- **Weitere Artists mit US-Sound:** Sahil (Yeat/Osamason-Sound), Stito (Drill), Bangerfabrique (UK Drill/Trap), Reezy (produziert selbst), Symba/Pashanim (Playboysmafia), Scorpion Gang, Souly, Dante YN, OG LU, Yung Pepp
+
+Verworfen, weil es Namensvettern sind: 432beats (Argentinien), sebobeats (Florida), atpbeats (Kapstadt), dlsbeats (Malibu).
