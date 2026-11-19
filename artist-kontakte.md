@@ -59,3 +59,14 @@ Hinweis: UK-Rapper (Central Cee, Dave, Headie One, Potter Payper usw.) haben ihr
 2. **YouTube**: Kanal → „Mehr“/Info → „E-Mail-Adresse anzeigen“ (Captcha nötig).
 3. **Spotify**: Artist-Profil → „Über“, dort steht oft das Management.
 4. **Credits** (Spotify oder Genius) eines Tracks des Artists: Produzenten und A&R sind oft leichter zu erreichen als der Artist selbst.
+
+## 7. Ergebnis der Suche nach UK/US-Artists (19.11.2026)
+
+Etwa 230 offizielle Websites von UK/US-Artists und UK/US-inspirierten Deutschrappern durchsucht. Ergebnis: Dort stehen keine Management-Mails, nur Label-Standardadressen wie info@umusic.com (Dave, Digga D, Nines, Clavish, Skrapz, Destroy Lonely). Diese Mails lohnen sich nicht.
+
+## 8. Wege mit realistischer Trefferchance für Beats
+
+1. **Type Beats hochladen** (YouTube und BeatStars, Titel wie „Gola Gianni Type Beat“, „Central Cee Type Beat“, „UK Drill Type Beat“). Auf diesem Weg finden viele Artists aus dieser Szene ihre Beats tatsächlich.
+2. **Die Produzenten der Artists anschreiben** statt der Artists selbst. Namen aus den Spotify- oder Genius-Credits nehmen. Produzenten haben ihre Mail oft öffentlich (BeatStars, Linktree, YouTube) und brauchen Co-Producer oder Loops.
+3. **Bezahlte Kontakt-Datenbanken** mit verifizierten Management-Mails: bookingagentinfo.com, thehandbook.com.
+4. **Pitching-Plattformen** mit Labels, A&Rs und Managern, die Einsendungen annehmen: Groover, SubmitHub.
