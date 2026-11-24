@@ -1,0 +1,2 @@
+# Optional: genauere BPM-/Tonart-Erkennung (groesser, dauert laenger bei der Installation)
+librosa>=0.10
