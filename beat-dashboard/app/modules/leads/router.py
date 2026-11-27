@@ -464,9 +464,11 @@ async def enrich_leads(body: EnrichIn):
 
 
 class ArtistFind(BaseModel):
-    sources: list[str] = Field(default_factory=lambda: ["musicbrainz", "wikidata"])
+    sources: list[str] = Field(default_factory=lambda: ["deezer"])
     regions: list[str] = Field(default_factory=lambda: ["wien", "moedling"])
     youtube_queries: list[str] = Field(default_factory=list)
+    playlists: list[str] = Field(default_factory=list)   # own Deezer playlist links
+    find_instagram: bool = True
 
 
 async def _find_artists(job, body: ArtistFind):
@@ -474,7 +476,9 @@ async def _find_artists(job, body: ArtistFind):
     errors = []
     for src in body.sources:
         try:
-            if src == "musicbrainz":
+            if src == "deezer":
+                found = await artists.deezer_playlists(job, body.playlists)
+            elif src == "musicbrainz":
                 found = await artists.musicbrainz(job, body.regions)
             elif src == "wikidata":
                 found = await artists.wikidata(job)
@@ -489,8 +493,57 @@ async def _find_artists(job, body: ArtistFind):
             for lead in found:
                 counts[upsert(c, lead)] += 1
                 counts["with_instagram"] += bool(lead.get("instagram"))
+    if body.find_instagram and not job.cancelled:
+        with db.tx() as c:
+            todo = [dict(r) for r in c.execute(
+                "SELECT id, name FROM leads WHERE kind='artist' AND archived=0 AND COALESCE(instagram,'')='' "
+                "AND json_extract(extra,'$.ig_lookup') IS NULL ORDER BY score DESC LIMIT 150")]
+        found = await artists.find_instagram(job, todo)
+        with db.tx() as c:
+            for r in todo:
+                ig = found.get(r["id"])
+                c.execute("UPDATE leads SET instagram=COALESCE(?, instagram), extra=json_set(extra,'$.ig_lookup',?) WHERE id=?",
+                          (ig, date.today().isoformat(), r["id"]))
+        counts["instagram_found"] = len(found)
+        rescore()
     counts["errors"] = errors
     return counts
+
+
+async def _cleanup_artists(job):
+    """Archive artist leads that are not rappers (old MusicBrainz/Wikidata noise). Leads you already worked on stay."""
+    from .services import radar as _radar
+    with db.tx() as c:
+        rows = [dict(r) for r in c.execute(
+            "SELECT id, name, extra FROM leads WHERE kind='artist' AND archived=0 AND COALESCE(contact_count,0)=0 "
+            "AND status IN ('neu','warmup') AND COALESCE(json_extract(extra,'$.rap_verified'),0)=0")]
+    kept = archived = 0
+    for n, r in enumerate(rows):
+        if job.cancelled:
+            break
+        job.update(done=n, total=len(rows), message=f"Prüfe {r['name']}")
+        extra = json.loads(r["extra"] or "{}")
+        dz = extra.get("deezer_id")
+        if dz is None:
+            hit = await _radar.find_deezer_id(r["name"])
+            dz = hit["id"] if hit else 0
+        chk = await artists.rap_check(dz) if dz else {"rap_releases": 0, "fans": 0, "link": None}
+        with db.tx() as c:
+            if chk["rap_releases"] > 0:
+                kept += 1
+                c.execute("UPDATE leads SET extra=json_set(extra,'$.rap_verified',json('true'),'$.deezer_id',?,'$.deezer_fans',?,'$.deezer',?) WHERE id=?",
+                          (dz, chk["fans"], chk.get("link"), r["id"]))
+            else:
+                archived += 1
+                c.execute("UPDATE leads SET archived=1 WHERE id=?", (r["id"],))
+                _log(c, r["id"], "note", "Archiviert: kein Rap-Release gefunden (Aufräumen)")
+    rescore()
+    return {"kept": kept, "archived": archived}
+
+
+@router.post("/artists/cleanup")
+async def cleanup_artists():
+    return {"job": jobs.start("Artist-Liste aufräumen", _cleanup_artists)}
 
 
 @router.post("/find/artists")

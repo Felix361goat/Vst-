@@ -75,11 +75,29 @@ def score(lead: dict) -> int:
     flags = lead.get("flags") or {}
     pts = 0
     if kind == "artist":
+        extra = lead.get("extra") or {}
+        if isinstance(extra, str):
+            import json as _j
+            try:
+                extra = _j.loads(extra)
+            except ValueError:
+                extra = {}
         f = lead.get("followers")
+        fans = extra.get("deezer_fans")
         if f is not None:
             pts += 20 if 2000 <= f <= 30000 else 12 if 30000 < f <= 100000 else 8 if 500 <= f < 2000 else 0
+        elif fans is not None:
+            # Deezer fans are ~1-5 % of Instagram followers: 50-5000 fans = small/mid artist who pays for videos
+            pts += 20 if 50 <= fans <= 5000 else 12 if 5000 < fans <= 20000 else 6 if fans < 50 else 2 if fans <= 50000 else -20
         else:
             pts += 8  # unknown -> neutral
+        if extra.get("rap_verified"):
+            pts += 10
+        latest = extra.get("latest_release") or ""
+        if latest and not flags.get("recent_release"):
+            from datetime import date as _d, timedelta as _td
+            if latest >= (_d.today() - _td(days=90)).isoformat():
+                pts += 10  # active right now
         ml = lead.get("monthly_listeners")
         if ml is not None:
             pts += 15 if 1000 <= ml <= 50000 else 8 if ml > 50000 else 3

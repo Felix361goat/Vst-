@@ -223,3 +223,131 @@ async def youtube_channels(job, queries: list[str] | None = None, max_searches: 
             })
     job.update(done=len(queries) + 1, total=len(queries) + 1)
     return out
+
+
+# =====================================================================================
+# Deezer rap playlists: the main source for real Austrian rap artists (free, no key).
+# Human-curated playlists like "Austro Rap", "Wien Rap", "Deutschrap aus Österreich".
+# =====================================================================================
+DZ = "https://api.deezer.com"
+PLAYLIST_QUERIES = ["austro rap", "wien rap", "wiener rap", "austrian rap", "deutschrap österreich", "österreich rap",
+                    "austria hip hop", "ösi rap", "austro hip hop", "wien hip hop", "vienna rap"]
+RAP_TITLE = re.compile(r"rap|hip ?hop|deutschrap|trap|drill", re.I)
+LOCAL_TITLE = re.compile(r"austr|österr|oesterr|wien|vienna|ösi|austro|mödling|niederösterreich", re.I)
+DZ_RAP_GENRE = 116      # Deezer genre "Rap/Hip Hop"
+TOO_BIG_FANS = 50_000   # labels / stars - not realistic clients
+
+
+async def _dz(path: str, params: dict | None = None, ttl: int = 3 * 24 * 3600):
+    key = cache.make_key("deezer", path, params or {})
+    hit = cache.get(key)
+    if hit is not None:
+        return hit
+    for attempt in range(3):
+        try:
+            r = await client().get(DZ + path, params=params, timeout=20)
+            data = r.json()
+        except Exception:
+            data = None
+        if isinstance(data, dict) and (data.get("error") or {}).get("code") == 4:  # quota: 50 req / 5 s
+            await asyncio.sleep(2 + attempt * 2)
+            continue
+        if isinstance(data, dict) and not data.get("error"):
+            cache.put(key, "deezer", data, ttl)
+            return data
+        return None
+    return None
+
+
+async def rap_check(deezer_id: int) -> dict:
+    """Is this Deezer artist really a rapper? -> releases in genre Rap/Hip Hop."""
+    info = await _dz(f"/artist/{deezer_id}") or {}
+    albums = (await _dz(f"/artist/{deezer_id}/albums", {"limit": 8}) or {}).get("data", [])
+    genres = [a.get("genre_id") for a in albums]
+    return {"fans": info.get("nb_fan", 0), "rap_releases": genres.count(DZ_RAP_GENRE), "releases": len(genres),
+            "link": info.get("link"), "picture": info.get("picture_medium"),
+            "latest": max((a.get("release_date") or "" for a in albums), default="")}
+
+
+def _playlist_id(s: str) -> str | None:
+    m = re.search(r"deezer\.com/(?:[a-z]{2}/)?playlist/(\d+)", s) or re.fullmatch(r"\s*(\d{5,})\s*", s)
+    return m.group(1) if m else None
+
+
+async def deezer_playlists(job, extra_playlists: list[str] | None = None, min_playlists_without_genre: int = 5) -> list[dict]:
+    job.update(message="Rap-Playlists auf Deezer suchen …")
+    playlists: dict[str, str] = {}
+    for q in PLAYLIST_QUERIES:
+        data = await _dz("/search/playlist", {"q": q, "limit": 25}) or {}
+        for p in data.get("data", []):
+            if RAP_TITLE.search(p["title"]) and LOCAL_TITLE.search(p["title"]):
+                playlists[str(p["id"])] = p["title"]
+    for s in extra_playlists or []:
+        pid = _playlist_id(s)
+        if pid:
+            playlists[pid] = "eigene Playlist"
+    counts: dict[int, int] = {}
+    names: dict[int, str] = {}
+    seen_in: dict[int, set] = {}
+    for i, (pid, title) in enumerate(playlists.items()):
+        job.update(done=i, total=len(playlists), message=f"Playlist: {title}")
+        data = await _dz(f"/playlist/{pid}/tracks", {"limit": 300}) or {}
+        for t in data.get("data", []):
+            for a in [t.get("artist")] + (t.get("contributors") or []):
+                if not a or not a.get("id"):
+                    continue
+                counts[a["id"]] = counts.get(a["id"], 0) + 1
+                names[a["id"]] = a["name"]
+                seen_in.setdefault(a["id"], set()).add(title)
+    ranked = sorted(counts, key=lambda a: -counts[a])[:250]
+    out = []
+    for n, aid in enumerate(ranked):
+        if job.cancelled:
+            break
+        job.update(done=n, total=len(ranked), message=f"Rap-Check: {names[aid]}")
+        chk = await rap_check(aid)
+        is_rap = chk["rap_releases"] > 0 or len(seen_in[aid]) >= min_playlists_without_genre
+        if not is_rap or chk["releases"] == 0:
+            continue
+        out.append({
+            "kind": "artist", "name": names[aid], "source": "deezer", "source_id": str(aid),
+            "district": "Österreich", "category": "Rap" + (" · zu groß (Label/Star)" if chk["fans"] > TOO_BIG_FANS else ""),
+            "extra": {"deezer_id": aid, "deezer": chk["link"], "deezer_fans": chk["fans"], "picture": chk["picture"],
+                      "latest_release": chk["latest"], "playlists": sorted(seen_in[aid])[:6], "rap_verified": True},
+        })
+    return out
+
+
+async def find_instagram(job, leads: list[dict]) -> dict[int, str]:
+    """Best effort: Instagram handle via MusicBrainz (url relations) or Wikidata for artists without one."""
+    found: dict[int, str] = {}
+    wd_map: dict[str, str] = {}
+    try:
+        for e in await wikidata(job):
+            if e.get("instagram"):
+                wd_map[_key(e["name"])] = e["instagram"]
+    except Exception:
+        pass
+    for n, lead in enumerate(leads):
+        if job.cancelled:
+            break
+        job.update(done=n, total=len(leads), message=f"Instagram suchen: {lead['name']}")
+        k = _key(lead["name"])
+        if k in wd_map:
+            found[lead["id"]] = wd_map[k]
+            continue
+        q = f'artist:"{lead["name"]}" AND (country:AT OR area:Austria OR area:Vienna OR area:Wien OR tag:"austrian hip hop" OR {TAGS})'
+        data = await _mb("artist", {"query": q, "limit": 5})
+        for a in (data or {}).get("artists", []):
+            if _key(a["name"]) != k or a.get("score", 0) < 90:
+                continue
+            d = await _mb(f"artist/{a['id']}", {"inc": "url-rels"})
+            ig = _links((d or {}).get("relations", [])).get("instagram")
+            if ig:
+                found[lead["id"]] = ig
+                break
+    return found
+
+
+def _key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (name or "").lower().replace("$", "s"))

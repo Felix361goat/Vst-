@@ -420,17 +420,25 @@ function tabFind(el) {
   M.areas.forEach(a => (groups[a.group] ||= []).push(a));
   const savedAreas = new Set(store('leads.areas') || ['moedling:Mödling']);
   el.innerHTML = kind === 'artist' ? html`
-    <div class="card"><h3>Rapper & Artists aus Wien / Mödling finden</h3>
-      <p class="small muted">Instagram hat keine offene Suche – das Dashboard sammelt öffentliche Profile aus Musik-Datenbanken und YouTube-Kanälen und übernimmt die dort verlinkten Instagram-Namen.</p>
+    <div class="card"><h3>Rapper aus Österreich finden</h3>
+      <p class="small muted">Hauptquelle: von Menschen kuratierte Rap-Playlists auf Deezer („Austro Rap“, „Wien Rap“, „Deutschrap aus Österreich“ …). Jeder Artist wird geprüft: nur wer Releases im Genre <b>Rap/Hip Hop</b> hat, kommt rein. Stars über 50k Fans werden als „zu groß“ markiert. Instagram-Namen werden automatisch nachgeschlagen, wo öffentlich verlinkt.</p>
       <div class="row" style="gap:18px;margin:10px 0">
-        <label class="switch"><input type="checkbox" data-src="musicbrainz" checked> MusicBrainz <span class="small muted">(gratis)</span></label>
-        <label class="switch"><input type="checkbox" data-src="wikidata" checked> Wikidata <span class="small muted">(gratis, eher bekannte Acts)</span></label>
-        <label class="switch"><input type="checkbox" data-src="youtube" ${raw(M.has_youtube ? '' : 'disabled')}> YouTube-Kanäle <span class="small muted">${M.has_youtube ? '(Newcomer! ~8 Suchen)' : '(braucht YouTube-Key)'}</span></label>
+        <label class="switch"><input type="checkbox" data-src="deezer" checked> Deezer-Rap-Playlists <span class="small muted">(gratis, empfohlen)</span></label>
+        <label class="switch"><input type="checkbox" data-src="youtube" ${raw(M.has_youtube ? '' : 'disabled')}> YouTube-Kanäle <span class="small muted">${M.has_youtube ? '(Newcomer mit IG in der Kanalbeschreibung)' : '(braucht YouTube-Key)'}</span></label>
       </div>
-      <div class="row" style="gap:18px"><label class="switch"><input type="checkbox" data-reg="wien" checked> Wien</label><label class="switch"><input type="checkbox" data-reg="moedling" checked> Bezirk Mödling</label><label class="switch"><input type="checkbox" data-reg="oesterreich"> Ganz Österreich</label></div>
-      <details><summary>YouTube-Suchbegriffe anpassen</summary><textarea id="ytq" style="min-height:90px">wien rap\nrap aus wien\nwiener rap musikvideo\nmödling rap\nwien drill\ndeutschrap wien\nfavoriten rap\nösterreich rap neu</textarea></details>
-      <div class="row" style="margin-top:12px"><button class="btn primary" id="run-a">Artists suchen</button><span class="small muted">MusicBrainz braucht ~1 Sek. pro Artist – läuft im Hintergrund.</span></div>
+      <details><summary>Eigene Deezer-Playlists hinzufügen (z.B. eine Wien-Underground-Playlist)</summary><textarea id="pl" style="min-height:70px" placeholder="https://www.deezer.com/at/playlist/1234567890"></textarea></details>
+      <details><summary>YouTube-Suchbegriffe anpassen</summary><textarea id="ytq" style="min-height:90px">wien rap
+rap aus wien
+wiener rap musikvideo
+mödling rap
+wien drill
+deutschrap wien
+favoriten rap
+österreich rap neu</textarea></details>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="run-a">Rapper suchen</button><span class="small muted">Dauert 2–4 Minuten (Rap-Check pro Artist), läuft im Hintergrund.</span></div>
       <div id="job"></div></div>
+    <div class="card"><h3>Liste aufräumen</h3><p class="small muted">Prüft alle Artists, die noch nicht verifiziert und noch nicht angeschrieben sind, und archiviert alle ohne Rap-Releases (z.B. Schlager, Lofi, Techno aus alten Suchen). Leads, mit denen du schon gearbeitet hast, bleiben unangetastet.</p>
+      <button class="btn" id="run-clean">Nicht-Rapper archivieren</button><div id="job3"></div></div>
     ${raw(pasteCard())}
     <div class="card"><h3>Wo du die meisten Newcomer findest</h3><ul class="small">
       <li>Hashtags: #wienrap #austrorap #wienerrap #viennarap #1100wien #ösirap #mödling – Profile hier per Copy & Paste einfügen.</li>
@@ -456,9 +464,11 @@ function tabFind(el) {
       <li>Netzwerk: Webdesigner, Interior-Designer, Kaffeeröster & Großhändler empfehlen dich weiter.</li></ul></div>`;
   el.querySelectorAll('[data-area]').forEach(cb => cb.addEventListener('change', () => store('leads.areas', [...el.querySelectorAll('[data-area]:checked')].map(x => x.dataset.area))));
   el.querySelector('#run-a')?.addEventListener('click', async () => {
-    const body = { sources: [...el.querySelectorAll('[data-src]:checked')].map(x => x.dataset.src), regions: [...el.querySelectorAll('[data-reg]:checked')].map(x => x.dataset.reg), youtube_queries: el.querySelector('#ytq').value.split('\n').map(s => s.trim()).filter(Boolean) };
+    const lines = id => el.querySelector(id).value.split('\n').map(s => s.trim()).filter(Boolean);
+    const body = { sources: [...el.querySelectorAll('[data-src]:checked')].map(x => x.dataset.src), youtube_queries: lines('#ytq'), playlists: lines('#pl') };
     runJob(el.querySelector('#job'), '/api/leads/find/artists', body);
   });
+  el.querySelector('#run-clean')?.addEventListener('click', () => runJob(el.querySelector('#job3'), '/api/leads/artists/cleanup', {}));
   el.querySelector('#run-r')?.addEventListener('click', () => {
     const areas = [...el.querySelectorAll('[data-area]:checked')].map(x => x.dataset.area);
     if (areas.includes('wien') && !confirm('Ganz Wien sind ~6.000 Lokale. Lieber einzelne Bezirke wählen? (OK = trotzdem alle)')) return;
@@ -503,9 +513,11 @@ async function runJob(box, url, body) {
       if (j.status !== 'running') {
         if (j.status === 'error') { box.innerHTML = html`<div class="card error small">${j.error}</div>`; return; }
         const r = j.result || {};
-        const parts = [`<b>${r.new ?? 0} neue Leads</b>`, `${r.updated ?? 0} ergänzt`];
+        let parts = [`<b>${r.new ?? 0} neue Leads</b>`, `${r.updated ?? 0} ergänzt`];
         if (r.with_instagram != null) parts.push(`${r.with_instagram} mit Instagram`);
-        if (r.new_openings) parts.push(`🆕 ${r.new_openings} vermutliche Neueröffnungen`);
+        if (r.new_openings) parts.push(`${r.new_openings} vermutliche Neueröffnungen`);
+        if (r.instagram_found != null) parts.push(`${r.instagram_found} Instagram-Namen gefunden`);
+        if (r.archived != null) parts = [`<b>${r.archived} Nicht-Rapper archiviert</b>`, `${r.kept} als Rapper bestätigt`];
         for (const k of ['email', 'instagram', 'phone']) if (r['found_' + k] != null) parts.push(`${r['found_' + k]}× ${k} gefunden`);
         box.innerHTML = html`<div class="card hint small">Fertig: ${raw(parts.join(' · '))}${raw((r.errors || []).length ? html`<div class="neg">${r.errors.join(' | ')}</div>` : '')}
           <div class="row" style="margin-top:8px"><button class="btn sm primary" id="to-list">Zur Liste</button></div></div>`;
