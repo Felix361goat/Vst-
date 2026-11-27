@@ -55,14 +55,16 @@ async def scan(job=None) -> dict:
     async def one(lead):
         nonlocal matched
         async with sem:
+            if job and job.cancelled:
+                return
             extra = json.loads(lead["extra"] or "{}")
             dz = extra.get("deezer_id")
             if dz is None:
                 hit = await find_deezer_id(lead["name"])
                 dz = hit["id"] if hit else 0
-                extra.update(deezer_id=dz, deezer_fans=hit and hit["fans"], deezer=hit and hit["link"])
-                with db.tx() as c:
-                    c.execute("UPDATE leads SET extra=? WHERE id=?", (json.dumps(extra, ensure_ascii=False), lead["id"]))
+                with db.tx() as c:  # json_set touches only these keys - edits made meanwhile survive
+                    c.execute("UPDATE leads SET extra=json_set(COALESCE(extra,'{}'), '$.deezer_id', ?, '$.deezer_fans', ?, '$.deezer', ?) WHERE id=?",
+                              (dz, hit and hit["fans"], hit and hit["link"], lead["id"]))
             if not dz:
                 return
             matched += 1
@@ -79,15 +81,13 @@ async def scan(job=None) -> dict:
                     fresh = (a.get("release_date") or "") >= cutoff
                     if is_new and fresh:
                         found.append({"lead_id": lead["id"], "name": lead["name"], "title": a.get("title"), "date": a.get("release_date")})
-                        flags = json.loads(lead["flags"] or "{}")
-                        flags["recent_release"] = True
                         from .pipeline import score
+                        c.execute("UPDATE leads SET flags=json_set(COALESCE(flags,'{}'), '$.recent_release', json('true')), next_action_date=?, "
+                                  "updated_at=datetime('now','localtime') WHERE id=? AND status NOT IN ('gebucht','geliefert','retainer','kein_interesse')",
+                                  (date.today().isoformat(), lead["id"]))
                         full = dict(c.execute("SELECT * FROM leads WHERE id=?", (lead["id"],)).fetchone())
-                        full.update(flags=flags, extra=extra)
+                        full["flags"], full["extra"] = json.loads(full["flags"] or "{}"), json.loads(full["extra"] or "{}")
                         c.execute("UPDATE leads SET score=? WHERE id=?", (score(full), lead["id"]))
-                        c.execute("UPDATE leads SET flags=?, next_action_date=?, updated_at=datetime('now','localtime') WHERE id=? "
-                                  "AND status NOT IN ('gebucht','geliefert','kein_interesse')",
-                                  (json.dumps(flags), date.today().isoformat(), lead["id"]))
                         c.execute("INSERT INTO lead_activities(lead_id, type, channel, text) VALUES(?,?,?,?)",
                                   (lead["id"], "release", "deezer", f"🎵 Neuer Release: „{a.get('title')}“ ({a.get('record_type')}, {a.get('release_date')})"))
                     elif is_new and first_scan:

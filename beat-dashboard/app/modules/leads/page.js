@@ -237,23 +237,32 @@ async function tabList(el) {
       <td class="small">${l.last_contact_at ? rel(l.last_contact_at) : '–'}</td><td class="small">${rel(l.next_action_date)}</td>
       <td style="white-space:nowrap;text-align:right">${raw(quickButtons(l))}</td></tr>`).join('');
     const head = html`<tr><th><input type="checkbox" id="sel-all"></th><th>Name (${d.total})</th><th>Instagram</th>${raw(kind !== 'artist' ? '<th>E-Mail</th><th>Telefon</th>' : '<th>Follower</th>')}<th>Gebiet</th><th>Status</th><th>Score</th><th>Letzter Kontakt</th><th>Nächste Aktion</th><th></th></tr>`;
-    tbl.innerHTML = append ? tbl.innerHTML + rows : head + (rows || `<tr><td colspan="11" class="empty">Keine Treffer.</td></tr>`);
+    // new rows go into their own <tbody>, so existing rows (and their listeners/checkboxes) stay untouched
+    const body = document.createElement('tbody');
+    body.innerHTML = rows || (append ? '' : `<tr><td colspan="11" class="empty">Keine Treffer.</td></tr>`);
+    if (!append) {
+      tbl.innerHTML = `<thead>${head}</thead>`;
+      tbl.querySelector('#sel-all').addEventListener('change', e => { tbl.querySelectorAll('[data-sel]').forEach(cb => { cb.checked = e.target.checked; cb.dispatchEvent(new Event('change')); }); });
+    }
+    tbl.append(body);
+    d.items.forEach(l => names.set(l.id, l.name));
     el.querySelector('#more').style.display = offset + 100 < d.total ? '' : 'none';
-    wireRows(tbl);
-    tbl.querySelectorAll('[data-sel]').forEach(cb => cb.addEventListener('change', () => { cb.checked ? sel.add(Number(cb.dataset.sel)) : sel.delete(Number(cb.dataset.sel)); bulkbar(); }));
-    tbl.querySelector('#sel-all')?.addEventListener('change', e => { tbl.querySelectorAll('[data-sel]').forEach(cb => { cb.checked = e.target.checked; cb.dispatchEvent(new Event('change')); }); });
+    wireRows(body);
+    body.querySelectorAll('[data-sel]').forEach(cb => cb.addEventListener('change', () => { cb.checked ? sel.add(Number(cb.dataset.sel)) : sel.delete(Number(cb.dataset.sel)); bulkbar(); }));
   };
+  const names = new Map();
   const bulkbar = () => { el.querySelector('#bulkbar').style.display = sel.size ? '' : 'none'; el.querySelector('#bulk-n').textContent = `${sel.size} ausgewählt`; };
-  const apply = () => { store('leads.filter.' + kind, f); offset = 0; load(); };
+  const apply = () => { store('leads.filter.' + kind, f); offset = 0; sel.clear(); bulkbar(); load(); };
   let t;
   el.querySelector('#f-q').addEventListener('input', e => { f.q = e.target.value; clearTimeout(t); t = setTimeout(apply, 300); });
   for (const k of ['status', 'district', 'has', 'sort']) el.querySelector('#f-' + k).addEventListener('change', e => { f[k] = e.target.value; apply(); });
   el.querySelector('#more').addEventListener('click', () => { offset += 100; load(true); });
   el.querySelector('#add').addEventListener('click', () => newLeadDialog());
-  el.querySelector('#bulk-status').addEventListener('change', async e => { if (!e.target.value) return; await api('/api/leads/bulk', { method: 'POST', body: { ids: [...sel], action: 'status', value: e.target.value } }); sel.clear(); bulkbar(); load(); });
+  el.querySelector('#bulk-status').addEventListener('change', async e => { if (!e.target.value) return; await api('/api/leads/bulk', { method: 'POST', body: { ids: [...sel], action: 'status', value: e.target.value } }); sel.clear(); bulkbar(); offset = 0; load(); });
   el.querySelectorAll('[data-bulk]').forEach(b => b.addEventListener('click', async () => {
-    if (b.dataset.bulk === 'delete' && !confirm(`${sel.size} Leads endgültig löschen?`)) return;
-    await api('/api/leads/bulk', { method: 'POST', body: { ids: [...sel], action: b.dataset.bulk } }); sel.clear(); bulkbar(); load();
+    const list = [...sel].map(i => names.get(i) || '#' + i);
+    if (b.dataset.bulk === 'delete' && !confirm(`${sel.size} Leads endgültig löschen?\n\n${list.slice(0, 15).join('\n')}${list.length > 15 ? `\n… und ${list.length - 15} weitere` : ''}`)) return;
+    await api('/api/leads/bulk', { method: 'POST', body: { ids: [...sel], action: b.dataset.bulk } }); sel.clear(); bulkbar(); offset = 0; load();
   }));
   load();
 }

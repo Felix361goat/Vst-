@@ -157,7 +157,8 @@ def list_leads(kind: str = "", status: str = "", q: str = "", district: str = ""
         if h in ("instagram", "email", "phone", "website"):
             where.append(f"COALESCE({h},'')<>''")
     if due:
-        where.append("next_action_date IS NOT NULL AND next_action_date<=?"); args.append(date.today().isoformat())
+        where.append(f"next_action_date IS NOT NULL AND next_action_date<=? AND status NOT IN ({','.join('?' * len(pipeline.CLOSED))})")
+        args += [date.today().isoformat(), *sorted(pipeline.CLOSED)]
     order = {"score": "starred DESC, score DESC, id DESC", "name": "name COLLATE NOCASE", "next": "next_action_date IS NULL, next_action_date",
              "created": "id DESC", "updated": "updated_at DESC", "district": "district, name"}.get(sort, "score DESC")
     sql_where = " AND ".join(where)
@@ -218,6 +219,10 @@ def patch_lead(lid: int, body: LeadPatch):
     with db.tx() as c:
         lead = _get(c, lid)
         vals = {k: v for k, v in body.values.items() if k in FIELDS}
+        if "name" in vals and not str(vals["name"] or "").strip():
+            raise HTTPException(400, "Name darf nicht leer sein")
+        if "kind" in vals and vals["kind"] not in pipeline.STAGES:
+            raise HTTPException(400, "Unbekannter Typ")
         if "instagram" in vals:
             vals["instagram"] = pipeline.normalize_instagram(vals["instagram"])
         if "phone" in vals:
@@ -307,14 +312,20 @@ class BulkIn(BaseModel):
 def bulk(body: BulkIn):
     if not body.ids:
         return {"ok": True, "n": 0}
-    ph = ",".join("?" * len(body.ids))
     with db.tx() as c:
+        ids = [r[0] for r in c.execute(f"SELECT id FROM leads WHERE id IN ({','.join('?' * len(body.ids))})", body.ids)]
+        body.ids = ids
+        if not ids:
+            return {"ok": True, "n": 0}
+        ph = ",".join("?" * len(ids))
         if body.action == "delete":
             c.execute(f"DELETE FROM leads WHERE id IN ({ph})", body.ids)
         elif body.action in ("archive", "unarchive"):
             c.execute(f"UPDATE leads SET archived=? WHERE id IN ({ph})", (int(body.action == "archive"), *body.ids))
         elif body.action == "status" and body.value:
-            c.execute(f"UPDATE leads SET status=?, updated_at=datetime('now','localtime') WHERE id IN ({ph})", (body.value, *body.ids))
+            clear = body.value in pipeline.CLOSED
+            c.execute(f"UPDATE leads SET status=?, next_action_date=CASE WHEN ? THEN NULL ELSE next_action_date END, "
+                      f"updated_at=datetime('now','localtime') WHERE id IN ({ph})", (body.value, int(clear), *body.ids))
             for i in body.ids:
                 _log(c, i, "status", f"Status → {body.value} (Mehrfachauswahl)")
         elif body.action == "star":
@@ -359,6 +370,8 @@ async def _find_restaurants(job, body: RestaurantFind):
     job.update(total=len(body.areas))
     new_ids = []
     for i, a in enumerate(body.areas):
+        if job.cancelled:
+            break
         job.update(done=i, message=f"OpenStreetMap: {a.split(':')[-1]} …")
         try:
             found = await osm.query(a, body.types)
@@ -526,8 +539,12 @@ def export_csv(kind: str = ""):
     buf.write("﻿")  # Excel-friendly UTF-8
     w = csv.writer(buf, delimiter=";")
     w.writerow(CSV_COLS)
+    def safe(v):
+        if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+            return "'" + v  # stop Excel from executing text from scraped data as a formula
+        return v
     for r in rows:
-        w.writerow([r[k] for k in CSV_COLS])
+        w.writerow([safe(r[k]) for k in CSV_COLS])
     buf.seek(0)
     name = f"leads-{kind or 'alle'}-{date.today().isoformat()}.csv"
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
@@ -537,7 +554,11 @@ def export_csv(kind: str = ""):
 @router.post("/import/csv")
 async def import_csv(file: UploadFile = File(...), kind: str = "artist"):
     raw = (await file.read()).decode("utf-8-sig", errors="replace")
-    dialect = csv.Sniffer().sniff(raw[:2000], delimiters=";,\t")
+    try:
+        dialect = csv.Sniffer().sniff(raw[:2000], delimiters=";,\t")
+    except csv.Error:  # single-column lists (e.g. plain username exports)
+        dialect = csv.excel
+        dialect.delimiter = ";" if ";" in raw[:2000] else ","
     counts = {"new": 0, "updated": 0, "same": 0, "blocked": 0}
     with db.tx() as c:
         for row in csv.DictReader(io.StringIO(raw), dialect=dialect):

@@ -5,7 +5,7 @@ let META = null;
 const eur = v => (Number(v) || 0).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' });
 const STATUS = {
   entwurf: ['Entwurf', 'gray'], gesendet: ['Gesendet', 'blue'], angenommen: ['Angenommen', 'green'], abgelehnt: ['Abgelehnt', 'red'],
-  bezahlt: ['Bezahlt', 'green'], storniert: ['Storniert', 'red'],
+  bezahlt: ['Bezahlt', 'green'], storniert: ['Storniert', 'red'], storno: ['Stornorechnung', 'gray'],
 };
 const st = s => { const [l, c] = STATUS[s] || [s, 'gray']; return html`<span class="badge ${c}">${l}</span>`; };
 
@@ -65,7 +65,7 @@ async function tabDocs(el) {
   el.innerHTML = html`
     <div class="row" style="margin:14px 0"><button class="btn primary" id="new-a">＋ Angebot</button><button class="btn" id="new-r">＋ Rechnung</button></div>
     <div class="card">${raw(docs.length ? html`<table class="tbl"><tr><th>Nummer</th><th>Art</th><th>Kunde</th><th>Titel</th><th>Datum</th><th>Betrag</th><th>Status</th></tr>
-      ${docs.map(d => raw(html`<tr style="cursor:pointer" data-open="${d.id}"><td><b>${d.number || '–'}</b></td><td>${d.type === 'angebot' ? 'Angebot' : 'Rechnung'}</td>
+      ${docs.map(d => raw(html`<tr style="cursor:pointer" data-open="${d.id}"><td><b>${d.number || '–'}</b></td><td>${{ angebot: 'Angebot', rechnung: 'Rechnung', storno: 'Storno' }[d.type]}</td>
         <td>${d.client_name || '–'}</td><td class="small">${d.title || ''}</td><td class="small">${d.issue_date}</td><td>${eur(d.total)}</td><td>${raw(st(d.status))}</td></tr>`))}</table>`
       : '<div class="empty"><div class="e">🧾</div>Noch keine Dokumente. Tipp: Im Lead öffnest du mit „Angebot erstellen“ direkt ein vorausgefülltes Angebot.</div>')}</div>`;
   const reload = () => tabDocs(el);
@@ -83,10 +83,10 @@ async function openDoc(id, onClose) {
   bg.addEventListener('click', close);
   const render = async () => {
     const d = await api('/api/money/documents/' + id);
-    const locked = d.type === 'rechnung' && d.number && d.status !== 'entwurf';
+    const locked = d.type !== 'angebot' && !!d.number;
     const dis = locked ? 'disabled' : '';
     dr.innerHTML = html`
-      <div class="row"><h2 style="margin:0">${d.type === 'angebot' ? 'Angebot' : 'Rechnung'} ${d.number || '(Entwurf)'}</h2>${raw(st(d.status))}<span class="spacer"></span><button class="btn sm icon" id="x">✕</button></div>
+      <div class="row"><h2 style="margin:0">${{ angebot: 'Angebot', rechnung: 'Rechnung', storno: 'Stornorechnung' }[d.type]} ${d.number || '(Entwurf)'}</h2>${raw(st(d.status))}<span class="spacer"></span><button class="btn sm icon" id="x">✕</button></div>
       ${raw(locked ? '<p class="small muted">Versendete Rechnungen sind gesperrt (Nachvollziehbarkeit). Bei Fehlern: stornieren und neu ausstellen.</p>' : '')}
       <div class="card flat form"><div class="fields">
         <label><span>Kunde</span><input data-k="client_name" value="${d.client_name || ''}" ${raw(dis)}></label>
@@ -116,12 +116,12 @@ async function openDoc(id, onClose) {
         <a class="btn" href="/api/money/documents/${d.id}/print" target="_blank" rel="noopener">Vorschau / PDF ↗︎</a>
         ${raw(d.status === 'entwurf' ? '<button class="btn" data-st="gesendet">Als gesendet markieren</button>' : '')}
         ${raw(d.type === 'angebot' && ['gesendet', 'entwurf'].includes(d.status) ? '<button class="btn green" data-st="angenommen">Angenommen 🎉</button><button class="btn red" data-st="abgelehnt">Abgelehnt</button>' : '')}
-        ${raw(d.type === 'angebot' && d.status !== 'abgelehnt' ? '<button class="btn" id="to-inv">→ Rechnung erstellen</button>' : '')}
+        ${raw(d.type === 'angebot' && d.status !== 'abgelehnt' ? (d.invoice_id ? html`<button class="btn" id="to-inv">→ Zur Rechnung</button>` : '<button class="btn" id="to-inv">→ Rechnung erstellen</button>') : '')}
         ${raw(d.type === 'rechnung' && d.status === 'gesendet' ? '<button class="btn green" data-st="bezahlt">Bezahlt</button>' : '')}
         ${raw(d.type === 'rechnung' && d.number && d.status !== 'storniert' ? '<button class="btn red" data-st="storniert">Stornieren</button>' : '')}
         <span class="spacer"></span>${raw(!(d.type === 'rechnung' && d.number) ? '<button class="btn sm ghost" id="del">Löschen</button>' : '')}
       </div>
-      <p class="small muted" style="margin-top:12px">Nummer wird beim Senden vergeben (lückenlos: A-/R-Jahr-001). Bezahlte Rechnungen landen automatisch in den Einnahmen. ${d.lead_id ? 'Mit Lead verknüpft – Status wird im CRM mitgeführt.' : ''}</p>`;
+      <p class="small muted" style="margin-top:12px">Nummer und Rechnungsdatum werden beim Senden vergeben (lückenlos: A-/R-Jahr-001). Bezahlte Rechnungen landen automatisch in den Einnahmen. ${d.lead_id ? 'Mit Lead verknüpft – Status wird im CRM mitgeführt.' : ''}</p>`;
     dr.querySelector('#x').addEventListener('click', close);
     const collect = () => {
       const body = { type: d.type, lead_id: d.lead_id };
@@ -129,7 +129,7 @@ async function openDoc(id, onClose) {
       body.items = [...dr.querySelectorAll('#items tr[data-i]')].map(tr => ({ desc: tr.querySelector('[data-f=desc]').value, qty: Number(tr.querySelector('[data-f=qty]').value), price: Number(tr.querySelector('[data-f=price]').value) }));
       return body;
     };
-    const save = async (extra = {}) => { const b = collect(); Object.assign(b, extra); await api('/api/money/documents/' + id, { method: 'PUT', body: b }); };
+    const save = async (extra = {}) => { if (locked) return; const b = collect(); Object.assign(b, extra); for (const k of ['issue_date', 'due_date', 'valid_until']) if (b[k] === '') b[k] = null; await api('/api/money/documents/' + id, { method: 'PUT', body: b }); };
     dr.querySelector('#save')?.addEventListener('click', async () => { await save(); toast('Gespeichert', 'ok'); render(); });
     dr.querySelector('#preset')?.addEventListener('change', async e => { const p = META.presets[e.target.value]; const b = collect(); b.items.push({ desc: p.desc, qty: 1, price: p.price }); await api('/api/money/documents/' + id, { method: 'PUT', body: b }); render(); });
     dr.querySelector('#add-item')?.addEventListener('click', async () => { const b = collect(); b.items.push({ desc: '', qty: 1, price: 0 }); await api('/api/money/documents/' + id, { method: 'PUT', body: b }); render(); });
@@ -138,8 +138,8 @@ async function openDoc(id, onClose) {
     dr.querySelectorAll('[data-rights]').forEach(b => b.addEventListener('click', () => { dr.querySelector('[data-k=rights]').value = META.rights[b.dataset.rights]; }));
     dr.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', async () => {
       if (!locked && d.status === 'entwurf') await save();
-      if (b.dataset.st === 'storniert' && !confirm('Rechnung stornieren?')) return;
-      await api(`/api/money/documents/${id}/status`, { method: 'POST', body: { status: b.dataset.st } }); toast('Status aktualisiert', 'ok'); render();
+      if (b.dataset.st === 'storniert' && !confirm('Rechnung stornieren? Es wird eine Stornorechnung mit eigener Nummer erstellt.')) return;
+      try { const r = await api(`/api/money/documents/${id}/status`, { method: 'POST', body: { status: b.dataset.st } }); toast(r.storno_id ? 'Storniert – Stornorechnung erstellt' : 'Status aktualisiert', 'ok'); render(); } catch (e) { toast(e.message, 'err'); }
     }));
     dr.querySelector('#to-inv')?.addEventListener('click', async () => { await save(); const inv = await api(`/api/money/documents/${id}/to-invoice`, { method: 'POST' }); id = inv.id; toast('Rechnung erstellt', 'ok'); render(); });
     dr.querySelector('#del')?.addEventListener('click', async () => { if (confirm('Dokument löschen?')) { await api('/api/money/documents/' + id, { method: 'DELETE' }); close(); } });

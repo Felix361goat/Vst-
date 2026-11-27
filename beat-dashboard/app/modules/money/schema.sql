@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS documents(
     title TEXT, items TEXT DEFAULT '[]', intro TEXT, notes TEXT, rights TEXT,
     issue_date TEXT, delivery TEXT, due_date TEXT, valid_until TEXT,
     status TEXT DEFAULT 'entwurf',      -- entwurf | gesendet | angenommen | abgelehnt | bezahlt | storniert
-    total REAL DEFAULT 0, paid_at TEXT,
+    total REAL DEFAULT 0, paid_at TEXT, tax_note TEXT,
     created_at TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS doc_number ON documents(number) WHERE number IS NOT NULL;

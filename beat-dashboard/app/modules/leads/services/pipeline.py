@@ -175,7 +175,7 @@ MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August
 
 
 def render(body: str, lead: dict, me: dict, extra: dict | None = None) -> str:
-    first = (lead.get("name") or "").split()[0] if lead.get("kind") == "artist" else lead.get("name", "")
+    first = ((lead.get("name") or "").split() or [""])[0] if lead.get("kind") == "artist" else lead.get("name", "")
     nxt = MONTHS[date.today().month % 12]
     values = {
         "name": lead.get("name", ""), "vorname": first, "bezirk": lead.get("district") or "",

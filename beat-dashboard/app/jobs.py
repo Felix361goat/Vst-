@@ -12,6 +12,7 @@ import uuid
 
 log = logging.getLogger("beat-dashboard.jobs")
 _JOBS: dict[str, "Job"] = {}
+_TASKS: set = set()  # strong refs - the event loop only keeps weak ones
 
 
 class Job:
@@ -53,9 +54,12 @@ def start(title: str, fn, *args, **kwargs) -> str:
             log.exception("Job %s failed", title)
             job.status, job.error = "error", f"{e.__class__.__name__}: {e}"
 
-    asyncio.get_running_loop().create_task(runner())
-    # keep the list short
-    for old in sorted(_JOBS.values(), key=lambda j: j.started)[:-30]:
+    task = asyncio.get_running_loop().create_task(runner())
+    _TASKS.add(task)
+    task.add_done_callback(_TASKS.discard)
+    # keep the list short - but never forget a job that is still running
+    finished = [j for j in sorted(_JOBS.values(), key=lambda j: j.started) if j.status != "running"]
+    for old in finished[:-30]:
         _JOBS.pop(old.id, None)
     return job.id
 

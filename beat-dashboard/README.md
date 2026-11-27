@@ -118,7 +118,7 @@ In den Einstellungen trägst du deinen Namen, deinen Ort, deine Telefonnummer un
   - Mit Kleinunternehmer-Hinweis (§ 6 Abs. 1 Z 27 UStG).
   - Mit **Zahlungs-QR-Code**, den der Kunde mit der Banking-App scannt (EPC/SEPA).
 - **Einnahmen & Ausgaben:**
-  - Bezahlte Rechnungen werden automatisch gebucht. Beat-Verkäufe, Equipment usw. trägst du manuell ein.
+  - Bezahlte Rechnungen werden automatisch gebucht. Eine Stornierung erzeugt eine **Stornorechnung** mit eigener Nummer. Beat-Verkäufe, Equipment usw. trägst du manuell ein.
   - Die Monatsübersicht zeigt den Stand zur **Kleinunternehmergrenze** (55.000 €).
 - **Verknüpfung mit dem CRM:** Angebot gesendet, angenommen und bezahlt werden im Lead mitgeführt (Status, Deal-Wert, Verlauf).
 
@@ -133,6 +133,15 @@ Pflichtangaben (Name, Anschrift, IBAN) trägst du unter Einstellungen ein. Das i
   - Bei Regenrisiko erscheint eine Warnung.
 - **Call Sheet** zum Drucken oder Teilen: Zeiten, Location mit Karte, Kontakte, Shotlist, Equipment.
 - Bei Status **„Geliefert“** setzt das CRM automatisch eine Erinnerung nach 3 Tagen: nach Testimonial, Google-Bewertung und Empfehlung fragen.
+
+## ✨ Portfolio-Seiten
+
+Es gibt zwei fokussierte One-Pager: **„Musikvideos & Reels“** für Artists und **„Food & Gastro Content“** für Restaurants.
+
+1. Projekte eintragen: YouTube-Videos werden eingebettet, Instagram/TikTok erscheinen als Link. Dazu ein **Ergebnis** wie „120k Views in 2 Wochen“, das überzeugt am meisten.
+2. Mit „Vorschau“ ansehen, dann **„Als HTML-Datei exportieren“**.
+3. Die Datei in `index.html` umbenennen und auf [Netlify Drop](https://app.netlify.com/drop) ziehen. Das ist gratis, und du bekommst einen Link.
+4. Den Link unter Einstellungen als **Portfolio-Link** eintragen. Er steckt dann automatisch in allen Nachrichten-Vorlagen (`{portfolio}`).
 
 ## 📱 Am Handy nutzen
 
@@ -218,6 +227,13 @@ beat-dashboard/
 ```
 
 API-Dokumentation zum Ausprobieren: http://127.0.0.1:8765/docs
+
+## 🔒 Sicherheit
+
+- Das Dashboard lauscht standardmäßig nur auf diesem PC (127.0.0.1).
+- **Andere Websites werden blockiert:** Anfragen von fremden Seiten (CSRF) und fremde Hostnamen (DNS-Rebinding) erhalten keinen Zugriff.
+- **Handy-Zugriff** nur mit PIN (mind. 6 Zeichen). Nach 5 Fehlversuchen ist das Gerät 15 Minuten gesperrt.
+- Die Website-Suche ruft keine Adressen im Heimnetz auf.
 
 ## ⚠️ Hinweise
 

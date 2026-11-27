@@ -8,5 +8,5 @@ def lan_enabled() -> bool:
 
 
 if __name__ == "__main__":
-    host = "0.0.0.0" if lan_enabled() and settings.get("ACCESS_PIN") else "127.0.0.1"
+    host = "0.0.0.0" if lan_enabled() and len(settings.get("ACCESS_PIN") or "") >= 6 else "127.0.0.1"
     uvicorn.run("app.main:app", host=host, port=int(settings.get("PORT") or 8765))

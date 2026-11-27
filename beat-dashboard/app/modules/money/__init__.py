@@ -1,4 +1,4 @@
-from .router import router
+from .router import router, startup
 
 MODULE = {
     "id": "money",
@@ -9,6 +9,7 @@ MODULE = {
     "router": router,
     "page": "page.js",
     "schema": "schema.sql",
+    "startup": startup,
     "settings": [
         {"key": "BIZ_NAME", "label": "Firmen-/Künstlername auf Rechnungen", "secret": False, "help": "z.B. Felix Muster – Video & Content"},
         {"key": "BIZ_ADDRESS", "label": "Deine Anschrift", "secret": False, "help": "Straße Nr, PLZ Ort (Pflichtangabe auf Rechnungen)"},

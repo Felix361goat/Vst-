@@ -7,7 +7,7 @@ from html import escape
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ... import db
 from ...config import settings
@@ -50,10 +50,35 @@ def _row(r) -> dict:
 
 
 def _next_number(c, type_: str, year: int) -> str:
-    prefix = ("R" if type_ == "rechnung" else "A") + f"-{year}-"
-    last = c.execute("SELECT number FROM documents WHERE number LIKE ? ORDER BY number DESC LIMIT 1", (prefix + "%",)).fetchone()
-    n = int(last[0].rsplit("-", 1)[1]) + 1 if last else 1
-    return f"{prefix}{n:03d}"
+    """Gapless per year. Numeric MAX (not text sort) so R-2026-1000 follows R-2026-999. Call inside BEGIN IMMEDIATE."""
+    prefix = ("R" if type_ in ("rechnung", "storno") else "A") + f"-{year}-"
+    last = c.execute("SELECT MAX(CAST(substr(number, ?) AS INTEGER)) FROM documents WHERE number LIKE ?",
+                     (len(prefix) + 1, prefix + "%")).fetchone()[0]
+    return f"{prefix}{(last or 0) + 1:03d}"
+
+
+TRANSITIONS = {
+    "angebot": {"entwurf": {"gesendet", "angenommen", "abgelehnt"}, "gesendet": {"angenommen", "abgelehnt"},
+                "abgelehnt": {"gesendet"}, "angenommen": set()},
+    "rechnung": {"entwurf": {"gesendet"}, "gesendet": {"bezahlt", "storniert"}, "bezahlt": {"storniert"}, "storniert": set()},
+    "storno": {},
+}
+
+
+def _tax_note() -> str:
+    return ("Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)." if ku()
+            else "Alle Beträge inkl. 20 % USt.")
+
+
+def _iso_or_none(v):
+    if v in (None, ""):
+        return None
+    if isinstance(v, date):
+        return v.isoformat()
+    try:
+        return date.fromisoformat(str(v)).isoformat()
+    except ValueError:
+        raise ValueError("Datum im Format JJJJ-MM-TT erwartet")
 
 
 class DocIn(BaseModel):
@@ -71,6 +96,18 @@ class DocIn(BaseModel):
     delivery: str = ""
     due_date: str | None = None
     valid_until: str | None = None
+
+    @field_validator("issue_date", "due_date", "valid_until", mode="before")
+    @classmethod
+    def _dates(cls, v):
+        return _iso_or_none(v)
+
+    @field_validator("type")
+    @classmethod
+    def _type(cls, v):
+        if v not in ("angebot", "rechnung"):
+            raise ValueError("type = angebot | rechnung")
+        return v
 
 
 @router.get("/meta")
@@ -113,15 +150,18 @@ def create_doc(d: DocIn):
 def get_doc(did: int):
     with db.tx() as c:
         r = c.execute("SELECT * FROM documents WHERE id=?", (did,)).fetchone()
+        inv = c.execute("SELECT id, number FROM documents WHERE source_id=? AND type='rechnung'", (did,)).fetchone() if r else None
     if not r:
         raise HTTPException(404)
-    return _row(r)
+    d = _row(r)
+    d["invoice_id"] = inv[0] if inv else None
+    return d
 
 
 @router.put("/documents/{did}")
 def update_doc(did: int, d: DocIn):
     doc = get_doc(did)
-    if doc["number"] and doc["type"] == "rechnung" and doc["status"] != "entwurf":
+    if doc["number"] and doc["type"] in ("rechnung", "storno"):
         raise HTTPException(409, "Versendete Rechnungen nicht mehr ändern – stattdessen stornieren und neu ausstellen.")
     with db.tx() as c:
         c.execute("UPDATE documents SET client_name=?, client_address=?, client_email=?, title=?, items=?, intro=?, notes=?, rights=?, "
@@ -134,7 +174,7 @@ def update_doc(did: int, d: DocIn):
 @router.delete("/documents/{did}")
 def delete_doc(did: int):
     doc = get_doc(did)
-    if doc["type"] == "rechnung" and doc["number"]:
+    if doc["type"] in ("rechnung", "storno") and doc["number"]:
         raise HTTPException(409, "Rechnungen mit Nummer dürfen nicht gelöscht werden (lückenlose Nummerierung) – bitte stornieren.")
     with db.tx() as c:
         c.execute("DELETE FROM documents WHERE id=?", (did,))
@@ -160,13 +200,25 @@ def _lead_log(c, lead_id, text):
 @router.post("/documents/{did}/status")
 def set_status(did: int, body: StatusIn):
     doc = get_doc(did)
-    today = date.today().isoformat()
+    if body.status == doc["status"]:
+        return doc
+    allowed = TRANSITIONS.get(doc["type"], {}).get(doc["status"], set())
+    if body.status not in allowed:
+        raise HTTPException(409, f"Statuswechsel {doc['status']} → {body.status} ist nicht erlaubt.")
+    today = date.today()
+    days = int(settings.get("PAYMENT_DAYS", "14") or 14)
+    storno_id = None
     with db.tx() as c:
-        number = doc["number"]
-        if body.status in ("gesendet", "bezahlt", "angenommen") and not number:
-            number = _next_number(c, doc["type"], date.today().year)
-        c.execute("UPDATE documents SET status=?, number=?, paid_at=? WHERE id=?",
-                  (body.status, number, today if body.status == "bezahlt" else doc["paid_at"], did))
+        c.execute("BEGIN IMMEDIATE")  # serialises number assignment (no duplicates on double-click)
+        number, issue, due, tax = doc["number"], doc["issue_date"], doc["due_date"], doc.get("tax_note")
+        if not number and body.status in ("gesendet", "bezahlt", "angenommen"):
+            if doc["type"] == "rechnung":
+                # invoice date = day the number is assigned, so numbers and dates always run in the same order
+                issue, due = today.isoformat(), (today + timedelta(days=days)).isoformat()
+            number = _next_number(c, doc["type"], date.fromisoformat(issue or today.isoformat()).year)
+            tax = _tax_note()  # frozen: reprints keep the legal text that was valid when sent
+        c.execute("UPDATE documents SET status=?, number=?, issue_date=?, due_date=?, tax_note=?, paid_at=? WHERE id=?",
+                  (body.status, number, issue, due, tax, today.isoformat() if body.status == "bezahlt" else doc["paid_at"], did))
         label = f"{'Angebot' if doc['type'] == 'angebot' else 'Rechnung'} {number or ''} → {body.status} ({doc['total']:.2f} €)"
         _lead_log(c, doc["lead_id"], label)
         if doc["type"] == "angebot" and body.status == "gesendet":
@@ -176,18 +228,37 @@ def set_status(did: int, body: StatusIn):
         if doc["type"] == "rechnung" and body.status == "bezahlt":
             c.execute("DELETE FROM ledger WHERE document_id=?", (did,))
             c.execute("INSERT INTO ledger(date, kind, category, description, amount, document_id) VALUES(?,?,?,?,?,?)",
-                      (today, "einnahme", "Video/Foto", f"Rechnung {number} – {doc['client_name']}", doc["total"], did))
+                      (today.isoformat(), "einnahme", "Video/Foto", f"Rechnung {number} – {doc['client_name']}", doc["total"], did))
             if doc["lead_id"] and c.execute("SELECT 1 FROM sqlite_master WHERE name='leads'").fetchone():
-                c.execute("UPDATE leads SET deal_value_final=COALESCE(deal_value_final, ?), status=CASE WHEN status IN "
+                c.execute("UPDATE leads SET deal_value_final=COALESCE(deal_value_final, ?), next_action_date=NULL, status=CASE WHEN status IN "
                           "('geliefert','retainer') THEN status ELSE 'gebucht' END WHERE id=?", (doc["total"], doc["lead_id"]))
         if body.status == "storniert":
             c.execute("DELETE FROM ledger WHERE document_id=?", (did,))
-    return get_doc(did)
+            # cancellation invoice with its own number in the same series, negated amounts, referencing the original
+            s_number = _next_number(c, "storno", today.year)
+            items = [{**it, "price": -float(it.get("price") or 0)} for it in doc["items"]]
+            cur = c.execute(
+                "INSERT INTO documents(type, number, lead_id, source_id, client_name, client_address, client_email, title, items, notes, "
+                "issue_date, delivery, status, total, tax_note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("storno", s_number, doc["lead_id"], did, doc["client_name"], doc["client_address"], doc["client_email"],
+                 f"Storno zu Rechnung {number}", json.dumps(items, ensure_ascii=False), f"Diese Rechnung storniert Rechnung {number} vom {_de(issue)}.",
+                 today.isoformat(), doc["delivery"], "storno", -doc["total"], tax))
+            storno_id = cur.lastrowid
+    out = get_doc(did)
+    if storno_id:
+        out["storno_id"] = storno_id
+    return out
 
 
 @router.post("/documents/{did}/to-invoice")
 def to_invoice(did: int):
     q = get_doc(did)
+    if q["type"] != "angebot":
+        raise HTTPException(400, "Nur Angebote können in Rechnungen umgewandelt werden")
+    with db.tx() as c:
+        existing = c.execute("SELECT id FROM documents WHERE source_id=? AND type='rechnung'", (did,)).fetchone()
+    if existing:
+        return get_doc(existing[0])
     d = DocIn(type="rechnung", lead_id=q["lead_id"], client_name=q["client_name"], client_address=q["client_address"],
               client_email=q["client_email"], title=q["title"], items=q["items"], notes="", rights=q["rights"],
               delivery=q["delivery"])
@@ -208,7 +279,7 @@ def _de(iso: str | None) -> str:
         y, m, d = (iso or "").split("-")
         return f"{int(d)}.{int(m)}.{y}"
     except ValueError:
-        return iso or ""
+        return escape(iso or "")
 
 
 def _epc_svg(doc: dict) -> str:
@@ -230,19 +301,20 @@ def print_doc(did: int):
     d = get_doc(did)
     e = lambda s: escape(str(s or "")).replace("\n", "<br>")
     is_inv = d["type"] == "rechnung"
-    title = ("Rechnung" if is_inv else "Angebot") + (f" {d['number']}" if d["number"] else " (Entwurf)")
+    title = {"rechnung": "Rechnung", "angebot": "Angebot", "storno": "Stornorechnung"}[d["type"]] + (f" {d['number']}" if d["number"] else " (Entwurf)")
     rows = "".join(
         f"<tr><td>{i + 1}</td><td>{e(it.get('desc'))}</td><td class=r>{float(it.get('qty') or 0):g}</td>"
         f"<td class=r>{_money(float(it.get('price') or 0))}</td><td class=r>{_money(float(it.get('qty') or 0) * float(it.get('price') or 0))}</td></tr>"
         for i, it in enumerate(d["items"]))
-    tax = ("Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)." if ku()
-           else "Alle Beträge inkl. 20 % USt.: " + _money(d["total"] / 1.2 * 0.2) + " enthalten.")
+    tax = d.get("tax_note") or _tax_note()
+    if "20 %" in tax:
+        tax += " Enthaltene USt.: " + _money(d["total"] / 1.2 * 0.2)
     biz = {k: settings.get(k) for k in ("BIZ_NAME", "BIZ_ADDRESS", "BIZ_EMAIL", "IBAN", "BIC", "UID", "MY_PHONE")}
     qr = _epc_svg(d)
     pay = (f"<div class=pay><div><b>Zahlbar bis {_de(d['due_date'])}</b> ohne Abzug auf<br>IBAN {e(biz['IBAN'] or '[IBAN in Einstellungen]')}"
            f"{'<br>BIC ' + e(biz['BIC']) if biz['BIC'] else ''}<br>Verwendungszweck: {e(d['number'] or '')}</div>"
            f"{'<div class=qr>' + qr + '<small>Mit Banking-App scannen</small></div>' if qr else ''}</div>") if is_inv else \
-          f"<p>Dieses Angebot ist gültig bis <b>{_de(d['valid_until'])}</b>. Bei Annahme werden 50 % Anzahlung vor dem Drehtag fällig.</p>"
+          ("" if d["type"] == "storno" else f"<p>Dieses Angebot ist gültig bis <b>{_de(d['valid_until'])}</b>. Bei Annahme werden 50 % Anzahlung vor dem Drehtag fällig.</p>")
     html = f"""<!doctype html><html lang=de><head><meta charset=utf-8><title>{e(title)} – {e(d['client_name'])}</title>
 <style>
 @page {{ size: A4; margin: 18mm 18mm 20mm; }}
@@ -285,7 +357,7 @@ footer {{ margin-top: 12mm; font-size: 8.5pt; color: #86868b; border-top: 1px so
 
 # ---------------------------------------------------------------- ledger + overview
 class LedgerIn(BaseModel):
-    date: str
+    date: date
     kind: str = "ausgabe"
     category: str = ""
     description: str = ""
@@ -306,7 +378,7 @@ def add_ledger(e: LedgerIn):
         raise HTTPException(400, "kind = einnahme | ausgabe")
     with db.tx() as c:
         c.execute("INSERT INTO ledger(date, kind, category, description, amount) VALUES(?,?,?,?,?)",
-                  (e.date, e.kind, e.category, e.description, abs(e.amount)))
+                  (e.date.isoformat(), e.kind, e.category, e.description, abs(e.amount)))
     return {"ok": True}
 
 
@@ -324,6 +396,8 @@ def overview(year: int | None = None):
     with db.tx() as c:
         months = {f"{m:02d}": {"in": 0.0, "out": 0.0} for m in range(1, 13)}
         for r in c.execute("SELECT substr(date,6,2) m, kind, SUM(amount) s FROM ledger WHERE substr(date,1,4)=? GROUP BY m, kind", (y,)):
+            if r["m"] not in months:  # skip malformed legacy rows instead of crashing
+                continue
             months[r["m"]]["in" if r["kind"] == "einnahme" else "out"] = round(r["s"], 2)
         by_cat = [dict(r) for r in c.execute(
             "SELECT kind, COALESCE(NULLIF(category,''),'Sonstiges') category, SUM(amount) total FROM ledger WHERE substr(date,1,4)=? GROUP BY kind, category ORDER BY total DESC", (y,))]
@@ -336,3 +410,12 @@ def overview(year: int | None = None):
             "ku_pct": round(100 * income / KU_LIMIT, 1),
             "open_invoices": open_inv, "overdue": [d for d in open_inv if (d["due_date"] or "9") < today],
             "open_quotes": {"count": open_quotes[0], "total": open_quotes[1]}}
+
+
+
+async def startup():
+    """Small migrations for older databases."""
+    with db.tx() as c:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(documents)")}
+        if "tax_note" not in cols:
+            c.execute("ALTER TABLE documents ADD COLUMN tax_note TEXT")

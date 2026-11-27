@@ -102,6 +102,8 @@ def put_settings(body: SettingsUpdate):
         if "••••" in v:  # masked value sent back unchanged
             continue
         updates[k] = v.replace("\n", "").strip()
+    if updates.get("ACCESS_PIN") and len(updates["ACCESS_PIN"]) < 6:
+        raise HTTPException(400, "Die PIN muss mindestens 6 Zeichen haben.")
     settings.save(updates)
     return {"ok": True, "saved": sorted(updates)}
 
@@ -182,7 +184,7 @@ def cancel_job(job_id: str):
 def lan_info():
     from . import lan
     from .__main__ import lan_enabled
-    enabled = lan_enabled() and settings.has("ACCESS_PIN")
+    enabled = lan_enabled() and lan.pin_ok(settings.get("ACCESS_PIN"))
     url = f"http://{lan.local_ip()}:{settings.get('PORT') or 8765}"
     qr = ""
     if enabled:

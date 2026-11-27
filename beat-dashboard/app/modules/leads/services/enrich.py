@@ -60,7 +60,32 @@ def _rank_email(e: str, domain: str) -> int:
     return s
 
 
+def _public(url: str) -> bool:
+    """Only fetch public websites - never LAN/localhost addresses that might sit in scraped data."""
+    import ipaddress
+    import socket
+    host = urlparse(url).hostname or ""
+    if not host or host in ("localhost",) or host.endswith((".local", ".lan", ".internal")):
+        return False
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        literal = True
+    except ValueError:
+        literal = False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return not literal  # DNS not resolvable here (e.g. behind a proxy) - the HTTP client decides
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            return False
+    return True
+
+
 async def _get(url: str) -> str | None:
+    if not _public(url):
+        return None
     try:
         r = await client().get(url, timeout=12)
         if r.status_code == 200 and "html" in r.headers.get("content-type", "html"):

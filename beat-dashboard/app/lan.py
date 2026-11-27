@@ -34,16 +34,54 @@ def local_ip() -> str:
         return "127.0.0.1"
 
 
+_FAILS: dict[str, list[float]] = {}   # ip -> timestamps of failed PIN attempts
+MAX_FAILS, LOCK_SECONDS = 5, 15 * 60
+
+
+def _locked(ip: str) -> bool:
+    import time
+    now = time.time()
+    recent = [t for t in _FAILS.get(ip, []) if now - t < LOCK_SECONDS]
+    _FAILS[ip] = recent
+    return len(recent) >= MAX_FAILS
+
+
+def pin_ok(pin: str | None) -> bool:
+    return bool(pin) and len(pin) >= 6
+
+
+def _allowed_hosts() -> set[str]:
+    return {"127.0.0.1", "localhost", "::1", "[::1]", "testserver", local_ip()}
+
+
+def _host_of(value: str) -> str:
+    """'http://192.168.1.5:8765/x' -> '192.168.1.5', 'localhost:8765' -> 'localhost', '[::1]:8765' -> '[::1]'."""
+    from urllib.parse import urlsplit
+    netloc = urlsplit(value).netloc if "://" in value else value
+    if netloc.startswith("["):
+        return netloc.split("]")[0] + "]"
+    return netloc.split(":")[0]
+
+
 def _is_local(request: Request) -> bool:
     host = request.client.host if request.client else ""
     return host in ("127.0.0.1", "::1", "localhost", "testclient")
 
 
 async def middleware(request: Request, call_next):
+    # 1) DNS-rebinding guard: only answer to our own host names
+    host = _host_of(request.headers.get("host", ""))
+    if host and host not in _allowed_hosts():
+        return JSONResponse({"detail": "Unbekannter Host"}, status_code=403)
+    # 2) CSRF guard: state-changing requests must come from the dashboard itself, not from another website
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        origin = request.headers.get("origin") or request.headers.get("referer") or ""
+        if request.headers.get("sec-fetch-site") == "cross-site" or (origin and _host_of(origin) not in _allowed_hosts()):
+            return JSONResponse({"detail": "Anfrage von fremder Website blockiert"}, status_code=403)
     if _is_local(request) or request.url.path in ("/login", "/static/style.css", "/manifest.webmanifest"):
         return await call_next(request)
     pin = settings.get("ACCESS_PIN")
-    if not pin:
+    if not pin_ok(pin):
         return JSONResponse({"detail": "Zugriff von anderen Geräten ist nicht aktiviert"}, status_code=403)
     if hmac.compare_digest(request.cookies.get(COOKIE, ""), _token(pin)):
         return await call_next(request)
@@ -70,12 +108,20 @@ def register(app):
 
     @app.post("/login", include_in_schema=False)
     async def login(request: Request):
+        import time
+        ip = request.client.host if request.client else "?"
+        if _locked(ip):
+            return HTMLResponse(LOGIN_HTML.format(err='<p class="neg small">Zu viele Fehlversuche – 15 Minuten gesperrt.</p>'), status_code=429)
         form = (await request.body()).decode()
         from urllib.parse import parse_qs
         pin = (parse_qs(form).get("pin") or [""])[0]
         real = settings.get("ACCESS_PIN")
-        if real and hmac.compare_digest(pin, real):
+        if pin_ok(real) and hmac.compare_digest(pin, real):
+            _FAILS.pop(ip, None)
             r = RedirectResponse("/", status_code=303)
             r.set_cookie(COOKIE, _token(real), httponly=True, samesite="lax", max_age=30 * 24 * 3600)
             return r
+        _FAILS.setdefault(ip, []).append(time.time())
+        import logging
+        logging.getLogger("beat-dashboard.lan").warning("Falsche PIN von %s", ip)
         return HTMLResponse(LOGIN_HTML.format(err='<p class="neg small">Falsche PIN</p>'), status_code=401)
