@@ -89,6 +89,8 @@ Hier findest du **Rapper/Artists** und **Restaurants** in Wien und im Bezirk Mö
 - **Liste:** Filter, Suche, Mehrfachauswahl. Ein Klick auf **„✓ Kontaktiert“** oder **„↩︎ Antwort“** reicht.
   - Das Dashboard setzt dann den Status und plant das nächste Follow-up selbst.
   - Takt bei Artists: Tag 4, Tag 7, dann 60 Tage Pause.
+- **Release-Radar:** prüft täglich über Deezer, ob deine Artists etwas veröffentlicht haben. Ein frischer Release ist der perfekte Moment: Der Lead steht dann auf „heute“, und die Vorlage „Nach Release“ enthält schon den Songtitel.
+- **Neueröffnungs-Monitor:** Einmal durchsuchte Gebiete werden jede Woche neu geprüft. Neu aufgetauchte Lokale werden als vermutliche Neueröffnung markiert und landen oben in der Walk-in-Route.
 - **Lead-Details:**
   - Checkliste (Warm-up, Portfolio geschickt, Anzahlung …) und Qualifizierung, die den Score erhöht.
   - Deal-Wert, Notizen, Verlauf.
@@ -121,6 +123,16 @@ In den Einstellungen trägst du deinen Namen, deinen Ort, deine Telefonnummer un
 - **Verknüpfung mit dem CRM:** Angebot gesendet, angenommen und bezahlt werden im Lead mitgeführt (Status, Deal-Wert, Verlauf).
 
 Pflichtangaben (Name, Anschrift, IBAN) trägst du unter Einstellungen ein. Das ist keine Steuerberatung.
+
+## 🎬 Drehs & Projekte
+
+- **Dreh planen:** im Lead auf „🎬 Dreh planen“ klicken. Kunde, Adresse, Kontakt und eine passende **Shotlist** für Musikvideo, Food, Imagefilm oder Reels werden übernommen.
+- **Checklisten** für Shots, Equipment und Lieferungen. Die Lieferungen haben Deadlines.
+- **Golden Hour und Sonnenzeiten** werden lokal berechnet, auch offline.
+  - Die **Wettervorhersage** kommt von Open-Meteo, ab 16 Tagen vor dem Dreh.
+  - Bei Regenrisiko erscheint eine Warnung.
+- **Call Sheet** zum Drucken oder Teilen: Zeiten, Location mit Karte, Kontakte, Shotlist, Equipment.
+- Bei Status **„Geliefert“** setzt das CRM automatisch eine Erinnerung nach 3 Tagen: nach Testimonial, Google-Bewertung und Empfehlung fragen.
 
 ## 📱 Am Handy nutzen
 

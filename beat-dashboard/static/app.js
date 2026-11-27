@@ -69,6 +69,7 @@ async function mountHome(el) {
   const [h, q] = await Promise.all([api('/api/core/health'), api('/api/core/quota')]);
   const k = await api('/api/seo/knowledge').catch(() => null);
   const st = modules.some(m => m.id === 'leads') ? await api('/api/leads/stats').catch(() => null) : null;
+  const shoots = modules.some(m => m.id === 'shoots') ? await api('/api/shoots/shoots?upcoming=1').catch(() => []) : [];
   const hr = new Date().getHours();
   const hello = hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Hallo' : 'Guten Abend';
   const tiles = modules.map(m => html`<a class="tile" href="#/${m.id}"><div class="tile-ico">${m.icon}</div><b>${m.name}</b><small>${m.description}</small></a>`).join('');
@@ -81,6 +82,7 @@ async function mountHome(el) {
       <div class="card stat"><span class="v">${st.reply_rate == null ? '–' : st.reply_rate + ' %'}</span><span class="l">Antwortquote</span></div>
       <div class="card stat"><span class="v">${st.won}</span><span class="l">Gebucht · ${fmt(Math.round(st.won_value))} €</span></div></div>` : '')}
     ${raw(!h.youtube ? `<div class="card hint">💡 Trag unter <a href="#/settings">Einstellungen</a> einen kostenlosen YouTube-API-Key ein – dann misst das Dashboard echte Konkurrenz und findet Newcomer-Rapper über ihre YouTube-Kanäle.</div>` : '')}
+    ${raw(shoots.length ? html`<div class="card"><h3>🎬 Nächste Drehs</h3><table class="tbl">${shoots.slice(0, 5).map(x => raw(html`<tr><td><a href="#/shoots"><b>${x.title}</b></a><div class="lead-sub">${x.location || ''}</div></td><td>${x.date}</td><td>${x.call_time || ''}</td></tr>`))}</table></div>` : '')}
     <div class="tiles">${raw(tiles)}</div>
     <div class="grid2">
       <div class="card">

@@ -215,3 +215,4 @@ input:disabled, select:disabled, textarea:disabled { background: var(--fill); co
   .btn { padding: 8px 14px; } .btn.sm { padding: 6px 11px; }
   .filters input, .filters select { min-width: 0; flex: 1 1 45%; }
 }
+.row > input[type=checkbox] { flex: 0 0 auto; min-width: 0; width: 18px; }
