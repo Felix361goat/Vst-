@@ -27,6 +27,9 @@ CORE_SETTINGS = [
      "help": "claude-sonnet-5-5 (günstig) oder claude-opus-5-5 (beste Qualität)"},
     {"key": "REGION_CODE", "label": "Region für YouTube-Suchen", "secret": False,
      "help": "z.B. US (größter Type-Beat-Markt), DE, GB"},
+    {"key": "LAN_ACCESS", "label": "Zugriff vom Handy im WLAN (ja/nein)", "secret": False,
+     "help": "ja + PIN setzen, dann Dashboard neu starten. Unten erscheint ein QR-Code zum Scannen."},
+    {"key": "ACCESS_PIN", "label": "PIN für Handy-Zugriff", "secret": True, "help": "mind. 6 Ziffern"},
     {"key": "PRODUCER_NAME", "label": "Dein Produzentenname", "secret": False, "help": "für 'prod. by ...'"},
     {"key": "STORE_LINK", "label": "Store-Link (BeatStars/Airbit)", "secret": False, "help": "kommt in die erste Beschreibungszeile"},
     {"key": "INSTAGRAM", "label": "Instagram / Kontakt", "secret": False, "help": "z.B. @deinname oder E-Mail"},
@@ -164,3 +167,19 @@ def cancel_job(job_id: str):
     if j:
         j.cancelled = True
     return {"ok": True}
+
+
+@router.get("/lan")
+def lan_info():
+    from . import lan
+    from .__main__ import lan_enabled
+    enabled = lan_enabled() and settings.has("ACCESS_PIN")
+    url = f"http://{lan.local_ip()}:{settings.get('PORT') or 8765}"
+    qr = ""
+    if enabled:
+        try:
+            import segno
+            qr = segno.make(url, error="m").svg_inline(scale=5, dark="#1d1d1f")
+        except ImportError:
+            pass
+    return {"enabled": enabled, "url": url, "qr": qr}

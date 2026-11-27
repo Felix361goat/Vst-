@@ -23,7 +23,12 @@ function renderNav() {
   nav.innerHTML = items.map(m => html`<a href="#/${m.id}" data-id="${m.id}"><span class="ico">${m.icon}</span><span>${m.name}</span></a>`).join('');
 }
 
+// drawers (slide-in panels) used by modules: Escape or navigating away closes them
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelector('.drawer-bg')?.click(); });
+function closeDrawers() { document.querySelectorAll('.drawer, .drawer-bg').forEach(x => x.remove()); }
+
 async function route() {
+  closeDrawers();
   const id = (location.hash.replace(/^#\//, '') || 'home').split('/')[0];
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('active', a.dataset.id === id));
   view.innerHTML = '<div class="loading">Lade …</div>';
@@ -116,9 +121,16 @@ async function mountSettings(el) {
           <small class="muted">${s.help || ''}</small></label>`))}
       <div class="row"><button class="btn primary">Speichern</button></div>
     </form>
+    <div class="card" id="lan"></div>
     <div class="card"><h3>🧩 Module</h3><p class="muted small">Neue Module einfach als Ordner in <code>app/modules/</code> anlegen (siehe README).</p>
       ${mods.map(m => raw(html`<label class="switch"><input type="checkbox" data-mod="${m.id}" ${raw(m.enabled ? 'checked' : '')}> ${m.icon} ${m.name}</label>`))}
     </div>`;
+  api('/api/core/lan').then(l => {
+    el.querySelector('#lan').innerHTML = l.enabled
+      ? html`<h3>📱 Am Handy öffnen</h3><div class="row" style="gap:20px;align-items:center"><div>${raw(l.qr)}</div><div><p>Mit der Handy-Kamera scannen (gleiches WLAN):</p><p><code>${l.url}</code></p>
+        <p class="small muted">Dann „Zum Home-Bildschirm“ hinzufügen – fühlt sich an wie eine App. Funktioniert nur, solange das Dashboard am PC läuft.</p></div></div>`
+      : html`<h3>📱 Am Handy nutzen</h3><p class="small muted">Oben „Zugriff vom Handy“ auf <b>ja</b> setzen, eine PIN wählen, speichern und das Dashboard neu starten (start.bat). Dann erscheint hier ein QR-Code. Windows fragt beim ersten Start evtl. nach der Firewall – „Private Netzwerke“ erlauben.</p>`;
+  });
   const form = el.querySelector('#sf');
   form.addEventListener('submit', async e => {
     e.preventDefault();

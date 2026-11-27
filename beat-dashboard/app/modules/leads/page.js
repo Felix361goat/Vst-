@@ -250,8 +250,6 @@ async function openLead(id) {
   document.body.append(bg, d);
   const close = () => { bg.remove(); d.remove(); rerender(); };
   bg.addEventListener('click', close);
-  const onKey = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
-  document.addEventListener('keydown', onKey);
   const templates = await api(`/api/leads/templates?kind=${kind}`);
   const render = async () => {
     const l = await api(`/api/leads/leads/${id}`);
@@ -314,6 +312,7 @@ async function openLead(id) {
       <div class="row"><button class="btn sm primary" id="save">Speichern</button><span class="spacer"></span>
         <button class="btn sm red" id="block">${l.flags.do_not_contact ? 'Von Sperrliste nehmen' : 'Sperrliste (will keinen Kontakt)'}</button>
         <button class="btn sm ghost" id="del">Löschen</button></div></div>
+      <div class="row"><button class="btn sm" id="quote">🧾 Angebot erstellen</button></div>
 
       <div class="card flat"><h3>Verlauf</h3>${raw(l.activities.length ? html`<div class="timeline">${l.activities.map(a => raw(html`<div class="ev">${actLabel(a)}${raw(a.text ? html`<div class="small">${a.text}</div>` : '')}<div class="t">${a.ts}</div></div>`))}</div>` : '<p class="small muted">Noch keine Einträge.</p>')}</div>`;
 
@@ -332,6 +331,7 @@ async function openLead(id) {
       if (on) await api(`/api/leads/leads/${id}/log`, { method: 'POST', body: { type: 'note', channel: 'other', text: 'Auf Sperrliste gesetzt (Widerspruch / kein Interesse)' } });
       render();
     });
+    d.querySelector('#quote').addEventListener('click', () => { store('money.newFor', id); bg.remove(); d.remove(); location.hash = '#/money'; });
     d.querySelector('#del').addEventListener('click', async () => { if (confirm('Lead löschen?')) { await api(`/api/leads/leads/${id}`, { method: 'DELETE' }); close(); } });
     d.querySelectorAll('[data-log]').forEach(b => b.addEventListener('click', async () => {
       const type = b.dataset.log;

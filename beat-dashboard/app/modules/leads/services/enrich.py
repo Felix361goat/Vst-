@@ -21,12 +21,27 @@ BAD_MAIL = ("example.", "sentry", "wixpress", "domain.", "@2x", ".png", ".jpg", 
 KEYWORDS = ("impressum", "kontakt", "contact", "imprint", "about", "ueber-uns", "uber-uns")
 
 
+TLDS = {"at", "com", "net", "org", "wien", "info", "eu", "de", "co", "biz", "io", "me", "cc", "ch", "it", "tirol",
+        "online", "restaurant", "cafe", "bar", "pizza", "kitchen", "shop", "gmbh", "app", "studio", "email"}
+
+
+def _rot13(s: str) -> str:
+    import codecs
+    return codecs.decode(s, "rot13")
+
+
 def _emails(html: str) -> list[str]:
     text = unescape(html)
     found = EMAIL.findall(text) + ["@".join(m[:2]) + "." + m[2] for m in OBFUSCATED.findall(text)]
     out = []
     for e in found:
         e = e.strip(".").lower()
+        if e.rsplit(".", 1)[-1] not in TLDS:
+            d = _rot13(e)  # some sites hide addresses with ROT13 (e.g. bssvpr@fnyzoenrh.pbz)
+            if d.rsplit(".", 1)[-1] in TLDS:
+                e = d
+            else:
+                continue
         if any(b in e for b in BAD_MAIL) or e in out:
             continue
         out.append(e)

@@ -194,3 +194,24 @@ textarea.mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace
 .toast.ok::before { content: "✓ "; color: var(--green); } .toast.err { color: var(--red); }
 details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+
+input:disabled, select:disabled, textarea:disabled { background: var(--fill); color: var(--muted); border-color: transparent; }
+
+/* ---------- phone ---------- */
+@media (max-width: 700px) {
+  body { font-size: 15px; }
+  .sidebar { flex-direction: row; align-items: center; padding: 8px 10px; gap: 6px; position: sticky; top: 0; z-index: 30; overflow-x: auto; }
+  .brand { padding: 0 6px 0 2px; } .brand span { display: none; }
+  nav { display: flex; gap: 2px; } nav a { white-space: nowrap; padding: 6px 10px; margin: 0; } nav a span:not(.ico):not(.badge-n) { display: none; }
+  nav a.active span:not(.ico):not(.badge-n) { display: inline; }
+  .sidebar-foot { display: none; }
+  .grid4 { grid-template-columns: 1fr 1fr; gap: 10px; } .stat .v { font-size: 22px; } .row > div > .lead, .lead { font-size: 14px; }
+  h1 { font-size: 24px; } main { padding: 14px 12px 60px; }
+  .card { padding: 14px; border-radius: 14px; }
+  .tabs { display: flex; overflow-x: auto; flex-wrap: nowrap; max-width: 100%; } .tabs button { white-space: nowrap; }
+  .drawer { width: 100vw; padding: 16px; }
+  .checkgrid { grid-template-columns: 1fr; }
+  .tbl { font-size: 13px; } .tbl th, .tbl td { padding: 7px 6px; }
+  .btn { padding: 8px 14px; } .btn.sm { padding: 6px 11px; }
+  .filters input, .filters select { min-width: 0; flex: 1 1 45%; }
+}

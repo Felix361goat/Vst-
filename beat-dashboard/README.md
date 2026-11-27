@@ -104,6 +104,33 @@ Hier findest du **Rapper/Artists** und **Restaurants** in Wien und im Bezirk Mö
 
 In den Einstellungen trägst du deinen Namen, deinen Ort, deine Telefonnummer und deinen Portfolio-Link für die Vorlagen ein.
 
+## 🧾 Angebote & Rechnungen
+
+- **Angebot erstellen:** direkt aus einem Lead (Button „🧾 Angebot erstellen“) oder hier im Modul.
+  - Positionen kommen aus Vorlagen (Musikvideo, Reels, Food-Shooting, Retainer, Imagefilm).
+  - Dazu passende Nutzungsrechte-Texte für Artists und Restaurants.
+- **Ablauf:** „Gesendet“ → „Angenommen“ → **„→ Rechnung erstellen“** → „Bezahlt“.
+  - Die Nummern sind lückenlos (A-2026-001, R-2026-001).
+  - Versendete Rechnungen sind gesperrt und können nur storniert werden.
+- **Drucken / PDF** im Apple-Look.
+  - Mit Kleinunternehmer-Hinweis (§ 6 Abs. 1 Z 27 UStG).
+  - Mit **Zahlungs-QR-Code**, den der Kunde mit der Banking-App scannt (EPC/SEPA).
+- **Einnahmen & Ausgaben:**
+  - Bezahlte Rechnungen werden automatisch gebucht. Beat-Verkäufe, Equipment usw. trägst du manuell ein.
+  - Die Monatsübersicht zeigt den Stand zur **Kleinunternehmergrenze** (55.000 €).
+- **Verknüpfung mit dem CRM:** Angebot gesendet, angenommen und bezahlt werden im Lead mitgeführt (Status, Deal-Wert, Verlauf).
+
+Pflichtangaben (Name, Anschrift, IBAN) trägst du unter Einstellungen ein. Das ist keine Steuerberatung.
+
+## 📱 Am Handy nutzen
+
+1. Unter Einstellungen **„Zugriff vom Handy“ auf `ja`** setzen und eine **PIN** wählen.
+2. Speichern und `start.bat` neu starten.
+3. Den QR-Code auf der Einstellungsseite mit dem Handy scannen (gleiches WLAN) und mit der PIN anmelden.
+4. „Zum Home-Bildschirm“ hinzufügen. Dann fühlt es sich an wie eine App.
+
+Praktisch für Walk-ins: Du trägst den Besuch direkt vor dem Lokal ein. Am PC selbst brauchst du nie eine PIN.
+
 ## 🧩 Später erweitern (eigene Module)
 
 Jedes Modul ist ein Ordner in `app/modules/`. Das Dashboard findet ihn beim Start automatisch und zeigt ihn im Menü an. Am Kern muss nichts geändert werden.

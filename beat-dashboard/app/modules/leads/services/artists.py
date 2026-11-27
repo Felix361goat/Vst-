@@ -23,6 +23,8 @@ MB_QUERIES = {
     "moedling": [f'(area:Mödling OR beginarea:Mödling OR area:Perchtoldsdorf OR beginarea:Baden) AND {TAGS}'],
     "oesterreich": [f"area:Austria AND {TAGS}"],
 }
+RAP_TAGS = {"hip hop", "hip-hop", "rap", "trap", "german hip hop", "cloud rap", "drill", "austrian hip hop", "deutschrap",
+            "gangsta rap", "conscious hip hop", "boom bap", "hiphop", "rnb", "r&b", "afrobeats", "pop rap", "emo rap"}
 _mb_last = 0.0
 _mb_lock = asyncio.Lock()
 
@@ -82,7 +84,10 @@ async def musicbrainz(job, regions: list[str], limit_lookups: int = 120) -> list
             if not data:
                 break
             for a in data.get("artists", []):
-                if a.get("score", 0) < 60:
+                if a.get("score", 0) < 60 or (a.get("life-span") or {}).get("ended"):
+                    continue  # weak match, deceased or disbanded
+                tags = {t["name"].lower() for t in a.get("tags", [])}
+                if tags and not tags & RAP_TAGS:
                     continue
                 found.setdefault(a["id"], {"name": a["name"], "area": (a.get("area") or {}).get("name"),
                                            "begin": (a.get("begin-area") or {}).get("name"),
@@ -111,10 +116,12 @@ async def musicbrainz(job, regions: list[str], limit_lookups: int = 120) -> list
 
 WIKIDATA_QUERY = """
 SELECT DISTINCT ?p ?pLabel ?ig ?placeLabel ?yt ?sp WHERE {
-  wd:Q277965 wdt:P131 ?bezMoedling .
-  { ?p wdt:P106 wd:Q2252262 } UNION { ?p wdt:P136/wdt:P279* wd:Q11401 } UNION { ?p wdt:P106 wd:Q130857 }
-  ?p (wdt:P19|wdt:P551|wdt:P740)/wdt:P131* ?place .
-  FILTER(?place IN (wd:Q1741, ?bezMoedling, wd:Q277965))
+  VALUES ?region { wd:Q1741 wd:Q277965 wd:Q676405 }   # Wien, Stadt Mödling, Bezirk Mödling
+  { ?p wdt:P106 wd:Q2252262 } UNION { ?p wdt:P106 wd:Q130857 } UNION { ?p wdt:P136 wd:Q11401 } UNION { ?p wdt:P136 wd:Q438503 }
+  { ?p wdt:P19 ?place } UNION { ?p wdt:P551 ?place } UNION { ?p wdt:P740 ?place }
+  ?place wdt:P131* ?region .
+  FILTER NOT EXISTS { ?p wdt:P570 ?died }
+  FILTER NOT EXISTS { ?p wdt:P576 ?dissolved }
   OPTIONAL { ?p wdt:P2003 ?ig }
   OPTIONAL { ?p wdt:P2397 ?yt }
   OPTIONAL { ?p wdt:P1902 ?sp }
