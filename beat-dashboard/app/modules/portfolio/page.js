@@ -29,7 +29,7 @@ export default {
           <td><input type="checkbox" data-vis="${x.id}" ${raw(x.visible ? 'checked' : '')} title="sichtbar"></td>
           <td><b>${x.title}</b><div class="lead-sub">${x.client}</div></td><td class="small">${x.result || ''}</td>
           <td class="small"><a href="${x.url || '#'}" target="_blank" rel="noopener">${x.url ? 'Link ↗︎' : ''}</a></td>
-          <td><button class="btn sm ghost" data-del="${x.id}">✕</button></td></tr>`))}</table>` : '<p class="small muted">Noch keine Projekte – auch 2–3 starke Arbeiten reichen für den Anfang.</p>')}</div>`;
+          <td><button class="btn sm ghost" data-del="${x.id}"></button></td></tr>`))}</table>` : '<p class="small muted">Noch keine Projekte – auch 2–3 starke Arbeiten reichen für den Anfang.</p>')}</div>`;
       el.querySelectorAll('[data-n]').forEach(b => b.addEventListener('click', () => { niche = b.dataset.n; store('portfolio.niche', niche); draw(); }));
       el.querySelector('#add').addEventListener('click', async () => {
         const v = id => el.querySelector(id).value.trim();

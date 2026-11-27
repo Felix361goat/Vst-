@@ -12,11 +12,11 @@ export default {
       <h1>YouTube SEO</h1>
       <p class="lead">Beat beschreiben oder hochladen → das Dashboard prüft echte Suchnachfrage und Konkurrenz und schreibt Titel, Tags und Beschreibung.</p>
       <div class="tabs" id="tabs">
-        <button data-t="new" class="active">🎵 Neuer Beat</button>
-        <button data-t="explore">🔎 Keyword-Explorer</button>
-        <button data-t="history">🗂️ Verlauf</button>
-        <button data-t="uploads">📤 Uploads & Performance</button>
-        <button data-t="guide">📘 Checkliste & Wissen</button>
+        <button data-t="new" class="active">Neuer Beat</button>
+        <button data-t="explore">Keyword-Explorer</button>
+        <button data-t="history">Verlauf</button>
+        <button data-t="uploads">Uploads & Performance</button>
+        <button data-t="guide">Checkliste & Wissen</button>
       </div>
       <div id="tab"></div>`;
     const tabs = { new: tabNew, explore: tabExplore, history: tabHistory, uploads: tabUploads, guide: tabGuide };
@@ -61,7 +61,7 @@ function tabNew(el, ctx) {
         <label class="switch">Tiefe <input name="youtube_depth" type="number" min="0" max="8" value="${saved.depth}" style="width:60px"> Keywords <span class="muted small">(je 2 von ~100 Tages-Suchen)</span></label>
         <label class="switch"><input type="checkbox" name="use_llm" ${raw(saved.use_llm ? 'checked' : '')}> Claude-KI-Texte</label>
         <span style="flex:1"></span>
-        <button class="btn primary" id="go">🔍 Analysieren</button>
+        <button class="btn primary" id="go">Analysieren</button>
       </div>
     </form>
     <div id="res"></div>`;
@@ -137,20 +137,20 @@ export function renderResult(res, r, input, ctx) {
   });
   const best = r.candidates.find(c => c.niche) || null;
   res.innerHTML = html`
-    ${raw(r.recommendation ? html`<div class="card reco">💡 ${r.recommendation}</div>` : '')}
+    ${raw(r.recommendation ? html`<div class="card reco">${r.recommendation}</div>` : '')}
     ${raw(r.notes.map(n => html`<div class="card hint small">ℹ️ ${n}</div>`).join(''))}
-    <div class="card"><h3>📊 Keyword-Chancen</h3>
+    <div class="card"><h3>Keyword-Chancen</h3>
       <p class="small muted">Chance = Nachfrage (Autocomplete, Popularität, Views) gegen Konkurrenz (Uploads der letzten 30 Tage, Kanalgrößen der Top 10). Phase: <b>${r.stage.name}</b>. ${r.stage.advice}</p>
       <div style="overflow-x:auto"><table class="tbl"><tr><th>Keyword</th><th>Chance</th><th>Nachfrage</th><th>Konkurrenz</th><th title="Uploads mit diesem Keyword in den letzten 30 Tagen">Uploads 30T</th><th title="Median-Views der Top-Ergebnisse">Ø Views</th><th title="Median-Abos der Top-10-Kanäle">Ø Abos Top10</th><th title="Videos mit überdurchschnittlich vielen Views (frisch)">Outlier</th><th>Popularität</th><th></th></tr>${rows}</table></div>
     </div>
     <div id="gen"></div>
     ${raw(r.ai ? renderAI(r.ai) : '')}
     <div class="grid2">
-      <div class="card"><h3>⏰ Wann posten die Top-Videos?</h3>${raw(renderHours(r.publish_hours_utc, r.publish_weekdays))}</div>
-      <div class="card"><h3>🏷️ Tags der Konkurrenz</h3>${raw(r.competitor_tags.length ? html`<div class="tags">${r.competitor_tags.map(([t, n]) => raw(html`<span class="tag" title="${n}× verwendet">${t} <span class="muted">${n}</span></span>`))}</div>` : '<p class="muted small">Braucht YouTube-API-Key.</p>')}</div>
+      <div class="card"><h3>Wann posten die Top-Videos?</h3>${raw(renderHours(r.publish_hours_utc, r.publish_weekdays))}</div>
+      <div class="card"><h3>Tags der Konkurrenz</h3>${raw(r.competitor_tags.length ? html`<div class="tags">${r.competitor_tags.map(([t, n]) => raw(html`<span class="tag" title="${n}× verwendet">${t} <span class="muted">${n}</span></span>`))}</div>` : '<p class="muted small">Braucht YouTube-API-Key.</p>')}</div>
     </div>
     ${raw(best ? renderVideos(best) : '')}
-    <div class="card"><h3>🔗 Ähnliche Künstler (für "x"-Kombos)</h3>${raw(r.related.length ? html`<div class="tags">${r.related.map(a => raw(html`<span class="tag" title="via ${a.via.join(', ')} · ${a.sources.join('+')}">${a.name}</span>`))}</div>` : '<p class="muted small">Keine Künstler angegeben.</p>')}</div>`;
+    <div class="card"><h3>Ähnliche Künstler (für "x"-Kombos)</h3>${raw(r.related.length ? html`<div class="tags">${r.related.map(a => raw(html`<span class="tag" title="via ${a.via.join(', ')} · ${a.sources.join('+')}">${a.name}</span>`))}</div>` : '<p class="muted small">Keine Künstler angegeben.</p>')}</div>`;
   renderGenerated(res.querySelector('#gen'), r.generated, r, input);
   res.querySelectorAll('[data-use]').forEach(b => b.addEventListener('click', async () => {
     const c = r.candidates[Number(b.dataset.use)];
@@ -165,28 +165,29 @@ export function renderResult(res, r, input, ctx) {
 
 function renderGenerated(el, g, r, input) {
   el.innerHTML = html`
-    <div class="card"><h3>✍️ Titel <span class="muted small">(klicken = kopieren)</span></h3>
+    <div class="card"><h3>Titel <span class="muted small">(klicken = kopieren)</span></h3>
       <div class="titles">${g.titles.map(t => raw(html`<div class="t" data-copy="${t.text}"><span>${t.text}</span><span class="len">${t.length} Z.${raw(t.keyword_end ? html` · Keyword bis ${t.keyword_end}` : '')}</span></div>`))}</div>
       <label class="form" style="display:block;margin-top:10px"><span class="small muted">Eigener Titel - wird live geprüft:</span>
         <input id="own-title" value="${g.titles[0]?.text || ''}"></label>
       <ul class="checks" id="checks">${g.checks.map(c => raw(html`<li class="lvl-${c.level}">${c.text}</li>`))}</ul>
     </div>
     <div class="grid2">
-      <div class="card"><h3>🏷️ Tags <span class="muted small">${g.tags.length} Tags · ${g.tag_chars}/500 Zeichen</span></h3>
+      <div class="card"><h3>Tags <span class="muted small">${g.tags.length} Tags · ${g.tag_chars}/500 Zeichen</span></h3>
         <div class="tags">${g.tags.map(t => raw(html`<span class="tag">${t}</span>`))}</div>
         <div class="row" style="margin-top:10px"><button class="btn sm" data-copy="${g.tags_csv}">Alle Tags kopieren</button></div>
         <h3 style="margin-top:16px">#️⃣ Hashtags</h3><div class="row"><code>${g.hashtags.join(' ')}</code><button class="btn sm ghost" data-copy="${g.hashtags.join(' ')}">Kopieren</button></div>
         <p class="small muted">Stehen schon am Ende der Beschreibung - die ersten 3 erscheinen über dem Titel.</p>
       </div>
-      <div class="card"><h3>📌 Angepinnter Kommentar</h3><textarea style="min-height:70px" id="pin">${g.pinned_comment}</textarea>
+      <div class="card"><h3>Angepinnter Kommentar</h3><textarea style="min-height:70px" id="pin">${g.pinned_comment}</textarea>
         <button class="btn sm" data-copy-from="pin">Kopieren</button>
-        <h3 style="margin-top:16px">📱 Short-Titel</h3><div class="row"><code>${g.short_title}</code><button class="btn sm ghost" data-copy="${g.short_title}">Kopieren</button></div>
-        <h3 style="margin-top:16px">📂 Playlists</h3><div class="tags">${g.playlists.map(p => raw(html`<span class="tag">${p}</span>`))}</div></div>
+        <h3 style="margin-top:16px">Short-Titel</h3><div class="row"><code>${g.short_title}</code><button class="btn sm ghost" data-copy="${g.short_title}">Kopieren</button></div>
+        <h3 style="margin-top:16px">Playlists</h3><div class="tags">${g.playlists.map(p => raw(html`<span class="tag">${p}</span>`))}</div></div>
     </div>
-    <div class="card"><h3>📝 Beschreibung</h3><textarea id="desc" style="min-height:280px">${g.description}</textarea>
+    <div class="card"><h3>Beschreibung</h3><textarea id="desc" style="min-height:280px">${g.description}</textarea>
       <div class="row"><button class="btn sm" data-copy-from="desc">Beschreibung kopieren</button>
         <button class="btn sm ghost" id="copy-all">Alles kopieren (Titel + Beschreibung + Tags)</button>
-        <button class="btn sm ghost" id="save-upload">📤 Als Upload merken</button>
+        <button class="btn sm ghost" id="save-upload">Als Upload merken</button>
+        <button class="btn sm ghost" id="plan">Einplanen</button>
         <span class="small muted">Store-Link, Name & Kontakt unter Einstellungen hinterlegen.</span></div></div>`;
   el.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copy(b.dataset.copy)));
   el.querySelectorAll('[data-copy-from]').forEach(b => b.addEventListener('click', () => copy(el.querySelector('#' + b.dataset.copyFrom).value)));
@@ -200,6 +201,10 @@ function renderGenerated(el, g, r, input) {
   own.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(recheck, 350); });
   el.querySelector('#desc').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(recheck, 600); });
   el.querySelector('#copy-all').addEventListener('click', () => copy(`${own.value}\n\n${el.querySelector('#desc').value}\n\nTAGS:\n${g.tags_csv}`, 'Alles kopiert'));
+  el.querySelector('#plan').addEventListener('click', () => {
+    store('content.new', { platform: 'yt_beat', title: own.value, status: 'produziert', analysis_id: r.id || null, date: new Date().toISOString().slice(0, 10) });
+    location.hash = '#/content';
+  });
   el.querySelector('#save-upload').addEventListener('click', async () => {
     const url = prompt('YouTube-Link oder Video-ID (kannst du auch später unter "Uploads" eintragen):', '');
     if (url === null) return;
@@ -210,8 +215,8 @@ function renderGenerated(el, g, r, input) {
 }
 
 function renderAI(ai) {
-  if (ai.error) return html`<div class="card hint">🤖 ${ai.error}</div>`;
-  return html`<div class="card"><h3>🤖 Claude-Vorschläge</h3>
+  if (ai.error) return html`<div class="card hint">${ai.error}</div>`;
+  return html`<div class="card"><h3>Claude-Vorschläge</h3>
     ${raw(ai.tip ? html`<p>💡 ${ai.tip}</p>` : '')}
     <div class="titles">${(ai.titles || []).map(t => raw(html`<div class="t" onclick="navigator.clipboard.writeText(this.dataset.c)" data-c="${t}"><span>${t}</span><span class="len">${t.length} Z.</span></div>`))}</div>
     ${raw(ai.thumbnail_text ? html`<p><b>Thumbnail-Text:</b> ${ai.thumbnail_text.join(' · ')}</p>` : '')}
@@ -286,7 +291,7 @@ async function tabHistory(el, ctx) {
   if (!list.length) { el.innerHTML = '<div class="card muted">Noch keine Analysen.</div>'; return; }
   el.innerHTML = html`<div class="card"><table class="tbl"><tr><th>Datum</th><th>Beat</th><th>Künstler</th><th>Genre</th><th>BPM</th><th>Key</th><th></th></tr>
     ${list.map(a => raw(html`<tr><td class="small">${a.created_at}</td><td><b>${a.beat_name || '–'}</b></td><td>${(a.artists || []).join(' x ')}</td><td>${K.genres[a.genre]?.label || a.genre}</td><td>${a.bpm || '–'}</td><td>${a.musical_key || '–'}</td>
-      <td class="row"><button class="btn sm" data-open="${a.id}">Öffnen</button><button class="btn sm ghost" data-del="${a.id}">🗑</button></td></tr>`))}</table></div><div id="detail"></div>`;
+      <td class="row"><button class="btn sm" data-open="${a.id}">Öffnen</button><button class="btn sm ghost" data-del="${a.id}"></button></td></tr>`))}</table></div><div id="detail"></div>`;
   el.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', async () => {
     const a = await api('/api/seo/analyses/' + b.dataset.open);
     const d = el.querySelector('#detail');
@@ -305,12 +310,12 @@ async function tabUploads(el, ctx) {
   el.innerHTML = html`
     <div class="card form"><h3>Upload hinzufügen</h3><div class="row">
       <input id="u-url" placeholder="YouTube-Link"><input id="u-kw" placeholder="Haupt-Keyword (z.B. ken carson type beat)"><button class="btn" id="u-add">Hinzufügen</button>
-      <button class="btn primary" id="u-ref">🔄 Views aktualisieren</button></div>
+      <button class="btn primary" id="u-ref">Views aktualisieren</button></div>
       <p class="small muted">Aktualisieren kostet nur 1 YouTube-Einheit pro 50 Videos. Check-Punkte: 48 h (CTR in Studio, Ziel 4–8 %), 7 Tage (≥ 2× deines Kanal-Medians, sonst Keyword wechseln), 30 Tage (Verkäufe).</p></div>
     <div class="card">${raw(list.length ? html`<table class="tbl"><tr><th>Video</th><th>Keyword</th><th>Veröffentlicht</th><th>Views</th><th>Likes</th><th>Komm.</th><th>Stand</th><th></th></tr>
       ${list.map(u => raw(html`<tr><td>${raw(u.youtube_video_id ? html`<a href="https://youtu.be/${u.youtube_video_id}" target="_blank" rel="noopener">${u.title || u.youtube_video_id}</a>` : html`${u.title || '–'}`)}</td>
       <td>${u.keyword || '–'}</td><td class="small">${(u.published_at || '').slice(0, 10) || '–'}</td><td><b>${fmt(u.views)}</b></td><td>${fmt(u.likes)}</td><td>${fmt(u.comments)}</td><td class="small muted">${u.fetched_at || '–'}</td>
-      <td><button class="btn sm ghost" data-del="${u.id}">🗑</button></td></tr>`))}</table>${raw(renderKeywordPerf(list))}` : '<p class="muted">Noch keine Uploads gespeichert. Nach einer Analyse "📤 Als Upload merken" klicken oder hier einen Link eintragen.</p>')}</div>`;
+      <td><button class="btn sm ghost" data-del="${u.id}"></button></td></tr>`))}</table>${raw(renderKeywordPerf(list))}` : '<p class="muted">Noch keine Uploads gespeichert. Nach einer Analyse "📤 Als Upload merken" klicken oder hier einen Link eintragen.</p>')}</div>`;
   el.querySelector('#u-add').addEventListener('click', async () => {
     await api('/api/seo/uploads', { method: 'POST', body: { youtube_url: el.querySelector('#u-url').value, keyword: el.querySelector('#u-kw').value } });
     tabUploads(el, ctx);
@@ -334,17 +339,17 @@ function renderKeywordPerf(list) {
 // ------------------------------------------------------------------ guide
 function tabGuide(el) {
   el.innerHTML = html`
-    <div class="card"><h3>✅ Upload-Checkliste</h3><ul class="checks">${K.checklist.map((c, i) => raw(html`<li><label class="switch"><input type="checkbox" data-i="${i}"> ${c}</label></li>`))}</ul>
+    <div class="card"><h3>Upload-Checkliste</h3><ul class="checks">${K.checklist.map((c, i) => raw(html`<li><label class="switch"><input type="checkbox" data-i="${i}"> ${c}</label></li>`))}</ul>
       <button class="btn sm ghost" id="reset">Haken zurücksetzen</button></div>
-    <div class="card"><h3>🎼 Genres, BPM & typische Künstler</h3><div style="overflow-x:auto"><table class="tbl"><tr><th>Genre</th><th>BPM</th><th>Keywords</th><th>Künstler (Startliste)</th></tr>
+    <div class="card"><h3>Genres, BPM & typische Künstler</h3><div style="overflow-x:auto"><table class="tbl"><tr><th>Genre</th><th>BPM</th><th>Keywords</th><th>Künstler (Startliste)</th></tr>
       ${Object.values(K.genres).map(g => raw(html`<tr><td><b>${g.label}</b></td><td>${g.bpm[0]}–${g.bpm[1]}</td><td class="small">${g.keywords.join(', ')}</td><td class="small">${g.artists.join(', ')}</td></tr>`))}</table></div>
       <p class="small muted">Liste anpassen: <code>app/modules/seo/services/knowledge.py</code>. Das Dashboard prüft die Nachfrage sowieso live.</p></div>
     <div class="grid2">
-      <div class="card"><h3>📏 Titel-Regeln</h3><ul class="small">
+      <div class="card"><h3>Titel-Regeln</h3><ul class="small">
         <li>"Künstler Type Beat" in den ersten ~40 Zeichen, gesamt 55–80 Zeichen</li><li>Max. 2 Künstler mit "x", ähnlichster zuerst</li>
         <li>Beat-Name in Anführungszeichen, 1–2 Wörter</li><li>[FREE] nur, wenn non-profit Nutzung wirklich frei ist</li>
         <li>Jahr (${K.year}) bei Trend-Genres, ab 1. Nov. schon das nächste Jahr</li><li>Nie: ft., feat, leak, official, unreleased, echte Songtitel</li></ul></div>
-      <div class="card"><h3>📅 Kanal-Routine</h3><ul class="small">
+      <div class="card"><h3>Kanal-Routine</h3><ul class="small">
         <li>Mind. 3 Uploads/Woche, 2–3 Wochen Vorrat einplanen</li><li>1–2 Shorts pro Beat (15–30 Sek. Loop)</li>
         <li>Jedes Keyword alle 7 Tage neu prüfen - Trends drehen sich alle 30–60 Tage</li>
         <li>Bei Album-/Single-Release eines Künstlers: innerhalb 0–48 h hochladen</li><li>Unter 2× Kanal-Median nach 7 Tagen → anderes Keyword</li></ul></div>

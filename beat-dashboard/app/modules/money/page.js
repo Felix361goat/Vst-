@@ -15,7 +15,7 @@ export default {
     el.innerHTML = html`
       <h1>Angebote & Rechnungen</h1>
       <p class="lead">Vom Angebot zur bezahlten Rechnung – mit Zahlungs-QR-Code und Überblick über deine Einnahmen.</p>
-      ${raw(!META.biz.BIZ_NAME || !META.biz.IBAN ? '<div class="card hint">💡 Trag unter <a href="#/settings">Einstellungen</a> Namen, Anschrift und IBAN ein – das sind Pflichtangaben auf Rechnungen (und für den QR-Code).</div>' : '')}
+      ${raw(!META.biz.BIZ_NAME || !META.biz.IBAN ? '<div class="card hint">Trag unter <a href="#/settings">Einstellungen</a> Namen, Anschrift und IBAN ein – das sind Pflichtangaben auf Rechnungen (und für den QR-Code).</div>' : '')}
       <div class="tabs" id="tabs"><button data-t="overview">Übersicht</button><button data-t="docs">Dokumente</button><button data-t="ledger">Einnahmen & Ausgaben</button></div>
       <div id="tab"></div>`;
     const tabs = { overview: tabOverview, docs: tabDocs, ledger: tabLedger };
@@ -86,7 +86,7 @@ async function openDoc(id, onClose) {
     const locked = d.type !== 'angebot' && !!d.number;
     const dis = locked ? 'disabled' : '';
     dr.innerHTML = html`
-      <div class="row"><h2 style="margin:0">${{ angebot: 'Angebot', rechnung: 'Rechnung', storno: 'Stornorechnung' }[d.type]} ${d.number || '(Entwurf)'}</h2>${raw(st(d.status))}<span class="spacer"></span><button class="btn sm icon" id="x">✕</button></div>
+      <div class="row"><h2 style="margin:0">${{ angebot: 'Angebot', rechnung: 'Rechnung', storno: 'Stornorechnung' }[d.type]} ${d.number || '(Entwurf)'}</h2>${raw(st(d.status))}<span class="spacer"></span><button class="btn sm icon" id="x"></button></div>
       ${raw(locked ? '<p class="small muted">Versendete Rechnungen sind gesperrt (Nachvollziehbarkeit). Bei Fehlern: stornieren und neu ausstellen.</p>' : '')}
       <div class="card flat form"><div class="fields">
         <label><span>Kunde</span><input data-k="client_name" value="${d.client_name || ''}" ${raw(dis)}></label>
@@ -100,7 +100,7 @@ async function openDoc(id, onClose) {
       <div class="card flat"><h3>Positionen</h3>
         <table class="tbl" id="items"><tr><th>Leistung</th><th style="width:70px">Menge</th><th style="width:110px">Preis €</th><th style="width:100px" class="c">Summe</th><th></th></tr>
           ${d.items.map((it, i) => raw(html`<tr data-i="${i}"><td><input data-f="desc" value="${it.desc || ''}" ${raw(dis)}></td><td><input data-f="qty" type="number" step="0.5" value="${it.qty ?? 1}" ${raw(dis)}></td>
-            <td><input data-f="price" type="number" step="0.01" value="${it.price ?? 0}" ${raw(dis)}></td><td class="c">${eur((it.qty || 0) * (it.price || 0))}</td><td>${raw(locked ? '' : '<button class="btn sm ghost" data-rm>✕</button>')}</td></tr>`))}
+            <td><input data-f="price" type="number" step="0.01" value="${it.price ?? 0}" ${raw(dis)}></td><td class="c">${eur((it.qty || 0) * (it.price || 0))}</td><td>${raw(locked ? '' : '<button class="btn sm ghost" data-rm></button>')}</td></tr>`))}
           <tr class="total"><td colspan="3" style="text-align:right"><b>Gesamt</b></td><td class="c"><b>${eur(d.total)}</b></td><td></td></tr></table>
         ${raw(locked ? '' : html`<div class="row" style="margin-top:8px"><select id="preset" style="max-width:420px"><option value="">＋ Vorlage hinzufügen …</option>${META.presets.map((p, i) => raw(html`<option value="${i}">${p.desc} – ${eur(p.price)}</option>`))}</select>
           <button class="btn sm" id="add-item">＋ Leere Position</button></div>`)}
@@ -159,7 +159,7 @@ async function tabLedger(el) {
       <label style="grid-column:1/-1"><span>Beschreibung</span><input id="l-desc" placeholder="z.B. Sony 35mm GM / BeatStars Auszahlung Nov."></label></div>
       <div class="row" style="margin-top:10px"><button class="btn primary" id="l-add">Hinzufügen</button><span class="small muted">Bezahlte Rechnungen werden automatisch gebucht. Belege trotzdem aufheben (7 Jahre).</span></div></div>
     <div class="card">${raw(rows.length ? html`<table class="tbl"><tr><th>Datum</th><th>Kategorie</th><th>Beschreibung</th><th>Betrag</th><th></th></tr>${rows.map(r => raw(html`<tr><td class="small">${r.date}</td><td>${r.category || '–'}</td><td>${r.description || ''}</td>
-      <td class="${r.kind === 'einnahme' ? 'pos' : ''}">${r.kind === 'einnahme' ? '+' : '−'} ${eur(r.amount)}</td><td>${raw(r.document_id ? '<span class="badge gray">Rechnung</span>' : html`<button class="btn sm ghost" data-del="${r.id}">✕</button>`)}</td></tr>`))}</table>` : '<p class="muted small">Noch keine Buchungen dieses Jahr.</p>')}</div>`;
+      <td class="${r.kind === 'einnahme' ? 'pos' : ''}">${r.kind === 'einnahme' ? '+' : '−'} ${eur(r.amount)}</td><td>${raw(r.document_id ? '<span class="badge gray">Rechnung</span>' : html`<button class="btn sm ghost" data-del="${r.id}"></button>`)}</td></tr>`))}</table>` : '<p class="muted small">Noch keine Buchungen dieses Jahr.</p>')}</div>`;
   const kindSel = el.querySelector('#l-kind'), catSel = el.querySelector('#l-cat');
   const fill = () => { catSel.innerHTML = cats[kindSel.value].map(c => `<option>${c}</option>`).join(''); };
   kindSel.addEventListener('change', fill); fill();

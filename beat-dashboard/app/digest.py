@@ -36,6 +36,10 @@ def build() -> tuple[str, list[str]]:
         if _has(c, "shoots"):
             for s in c.execute("SELECT title, date, call_time FROM shoots WHERE status='geplant' AND date IN (?,?) ORDER BY date", (today, tomorrow)):
                 lines.append(f"🎬 {'Heute' if s['date'] == today else 'Morgen'}: {s['title']}{' ab ' + s['call_time'] if s['call_time'] else ''}")
+        if _has(c, "posts"):
+            n = c.execute("SELECT COUNT(*) FROM posts WHERE date=? AND status<>'gepostet'", (today,)).fetchone()[0]
+            if n:
+                lines.append(f"📅 {n} Post(s) heute geplant")
         if _has(c, "documents"):
             od = c.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM documents WHERE type='rechnung' AND status='gesendet' AND due_date<?", (today,)).fetchone()
             if od[0]:

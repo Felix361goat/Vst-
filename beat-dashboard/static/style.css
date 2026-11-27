@@ -216,3 +216,119 @@ input:disabled, select:disabled, textarea:disabled { background: var(--fill); co
   .filters input, .filters select { min-width: 0; flex: 1 1 45%; }
 }
 .row > input[type=checkbox] { flex: 0 0 auto; min-width: 0; width: 18px; }
+
+/* ---------- calendar ---------- */
+.cal-head, .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-head div { font-size: 11px; color: var(--tertiary); padding: 10px 6px 4px; }
+.cal { border-top: .5px solid var(--line); border-left: .5px solid var(--line); }
+.cal-day { min-height: 96px; padding: 5px; border-right: .5px solid var(--line); border-bottom: .5px solid var(--line); cursor: pointer; overflow: hidden; }
+.cal-day:hover { background: rgba(0,0,0,.02); } .cal-day.out { background: rgba(0,0,0,.015); } .cal-day.out .cal-n { color: var(--quaternary); }
+.cal-n { font-size: 12px; font-weight: 500; margin-bottom: 4px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; }
+.cal-day.today .cal-n { background: var(--red); color: #fff; }
+.cal-post { display: block; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: left; }
+.cal-post.done { opacity: .55; }
+@media (max-width: 700px) { .cal-day { min-height: 60px; } .cal-post { font-size: 0; height: 6px; padding: 0; } }
+
+/* =====================================================================
+   Apple refinements (design review): one accent, hairlines instead of
+   shadows, macOS source list, HIG type scale, quieter badges & banners.
+   ===================================================================== */
+:root { color-scheme: light; letter-spacing: normal; --radius: 12px; --radius-sm: 6px; }
+body { background: var(--bg); font-size: 13px; line-height: 1.4; letter-spacing: -0.003em; }
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.022em; margin: 0 0 2px; }
+h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; }
+h3 { font-size: 13px; font-weight: 600; letter-spacing: 0; margin-bottom: 10px; }
+.lead { font-size: 13px; margin-bottom: 20px; }
+.small, .stat .l, .tbl th { font-size: 11px; }
+main { padding: 28px 32px 72px; max-width: 1180px; }
+
+/* sidebar = macOS source list */
+.sidebar { background: rgba(242, 242, 247, 0.6); border-right: .5px solid var(--line-strong); }
+.brand { font-size: 13px; font-weight: 600; }
+nav a { padding: 5px 10px; border-radius: 6px; font-size: 13px; }
+nav a .ico { width: 18px; height: 18px; display: inline-flex; color: var(--blue); }
+nav a .ico svg { width: 18px; height: 18px; }
+nav a.active { background: rgba(0, 0, 0, 0.06); color: var(--text); font-weight: 500; }
+nav a .badge-n { background: transparent; color: var(--tertiary); font-weight: 500; padding: 0; }
+nav a .badge-n.urgent, nav a.active .badge-n { background: transparent; }
+.sidebar-foot { flex-direction: column; gap: 3px; }
+.chip { background: none; padding: 0 0 0 13px; position: relative; color: var(--tertiary); border-radius: 0; }
+.chip::before { content: ""; position: absolute; left: 0; top: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--quaternary); }
+.chip.on { color: var(--muted); background: none; } .chip.on::before { background: var(--green); }
+
+/* flat grouped containers */
+.card, .tile { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; border: .5px solid rgba(0, 0, 0, 0.1);
+  box-shadow: none; border-radius: 12px; padding: 16px 18px; }
+.tile { transition: background .15s; } .tile:hover { transform: none; box-shadow: none; background: rgba(0, 0, 0, 0.02); }
+.tile-ico { width: 28px; height: 28px; color: var(--blue); font-size: 0; margin-bottom: 8px; } .tile-ico svg { width: 28px; height: 28px; stroke-width: 1.5; }
+.card.flat { border-color: rgba(0, 0, 0, 0.08); }
+.drawer .card { background: #fff; }
+/* stats row = one card split by hairlines (Stocks/Health style) */
+.grid4 { gap: 0; background: #fff; border: .5px solid rgba(0, 0, 0, 0.1); border-radius: 12px; overflow: hidden; margin: 16px 0; }
+.grid4 > .card { margin: 0; border: 0; border-left: .5px solid var(--line); border-radius: 0; }
+.grid4 > .card:first-child { border-left: 0; }
+.stat .v { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.grid3 > .card.stat .v { font-size: 24px; }
+.card.hint, .card.reco { background: rgba(0, 0, 0, 0.03); border: 0; color: var(--muted); font-size: 12px; padding: 10px 14px; }
+.card.reco { background: rgba(255, 149, 0, 0.08); color: #8a5300; }
+.card.error { background: rgba(255, 59, 48, 0.06); border: 0; }
+
+/* controls */
+.btn { color: var(--text); border-radius: 6px; padding: 5px 12px; font-size: 13px; }
+.btn.primary { color: #fff; } .btn.ghost { color: var(--blue); } .btn.red { color: var(--red); } .btn.green { color: #fff; }
+.btn.sm { padding: 3px 10px; font-size: 12px; }
+input, select, textarea { padding: 5px 9px; border-radius: 6px; border: .5px solid rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 .5px 1px rgba(0, 0, 0, 0.06); font-size: 13px; background: #fff; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35); border-color: transparent; }
+:focus-visible { outline: 3px solid rgba(0, 122, 255, 0.5); outline-offset: 1px; }
+.form label > span { color: var(--text); font-weight: 400; font-size: 12px; }
+.tabs { padding: 2px; border-radius: 8px; background: rgba(118, 118, 128, 0.12); }
+.tabs button { padding: 3px 12px; font-size: 12px; border-radius: 6px; }
+.tabs button.active { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 .5px rgba(0, 0, 0, 0.06); }
+
+/* System-Settings-like grouped form on the settings page */
+.settings-form label { display: grid; grid-template-columns: 1fr minmax(240px, 340px); align-items: center; gap: 2px 16px;
+  padding: 10px 0; border-bottom: .5px solid var(--line); margin: 0; }
+.settings-form label > span { font-size: 13px; }
+.settings-form label > small { grid-column: 1 / -1; font-size: 11px; }
+.settings-form label:last-of-type { border-bottom: 0; }
+
+/* tables = macOS inset list */
+.tbl th { font-weight: 500; color: var(--tertiary); padding: 6px 10px; border-bottom: .5px solid var(--line-strong); }
+.tbl td { padding: 7px 10px; border-bottom: 0; font-variant-numeric: tabular-nums; }
+.tbl tbody tr:nth-child(even) td { background: rgba(0, 0, 0, 0.018); }
+.tbl tr:hover td, .tbl tbody tr:hover td { background: rgba(0, 122, 255, 0.06); }
+.lead-name, .tbl td a.lead-name { color: var(--text); font-weight: 500; }
+.tbl a[href^="mailto"], .tbl a[href^="tel"] { color: var(--text); }
+.ig { color: var(--muted); font-weight: 400; }
+@media (hover: hover) { .tbl td .btn { opacity: 0; transition: opacity .12s; } .tbl tr:hover td .btn { opacity: 1; } }
+
+/* badges: neutral text with a status dot; colour only carries meaning */
+.badge { background: none !important; padding: 0; color: var(--muted) !important; font-size: 12px; font-weight: 400; }
+.badge::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--quaternary); margin-right: 6px; vertical-align: 1px; }
+.badge.blue::before { background: var(--blue); } .badge.green::before, .badge.Gut::before { background: var(--green); }
+.badge.orange::before { background: var(--orange); } .badge.red::before, .badge.Gesättigt::before, .badge[class~="Zu"]::before { background: var(--red); }
+.badge.purple::before { background: var(--purple); } .badge.indigo::before { background: var(--indigo); } .badge.teal::before { background: var(--teal); }
+.badge.Gold::before { background: var(--yellow); } .badge.est::before { display: none; }
+.cal-post.badge { font-size: 11px; color: var(--text) !important; }
+
+/* kanban */
+.kcol { background: rgba(0, 0, 0, 0.025); border: 0; border-radius: 10px; }
+.kcard { box-shadow: 0 0 0 .5px rgba(0, 0, 0, 0.1); border-radius: 8px; }
+.kcard:hover { box-shadow: 0 0 0 .5px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05); }
+
+/* empty states without emoji */
+.empty .e { display: none; }
+.empty { padding: 32px 10px; }
+
+/* drawer keeps the material (it floats) */
+.drawer { background: rgba(246, 246, 248, 0.92); }
+.toast { border-radius: 10px; font-weight: 500; }
+
+@media (max-width: 700px) {
+  body { font-size: 15px; } h1 { font-size: 24px; }
+  .grid4 { grid-template-columns: 1fr 1fr; } .grid4 > .card:nth-child(3) { border-left: 0; }
+  .grid4 > .card:nth-child(n+3) { border-top: .5px solid var(--line); }
+  .settings-form label { grid-template-columns: 1fr; }
+  nav a.active { background: rgba(0, 0, 0, 0.06); }
+}

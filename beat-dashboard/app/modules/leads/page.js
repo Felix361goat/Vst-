@@ -4,7 +4,7 @@ import { api, html, raw, toast, copy, fmt, store } from '/static/api.js';
 let M = null;                  // meta (stages, checks, areas …)
 let kind = store('leads.kind') || 'artist';
 let ctxRef = null;
-const KINDS = { artist: '🎤 Artists', restaurant: '🍽️ Restaurants' };
+const KINDS = { artist: 'Artists', restaurant: 'Restaurants' };
 const CH = { instagram: 'Instagram', email: 'E-Mail', phone: 'Telefon', visit: 'Besuch', letter: 'Brief', form: 'Kontaktformular' };
 const DM_LIMIT = 15;
 
@@ -28,7 +28,7 @@ export default {
       <div class="row" style="align-items:flex-end">
         <div><h1>Leads & CRM</h1><p class="lead">Finden, anschreiben, nachfassen – alles an einem Ort.</p></div>
         <span class="spacer"></span>
-        <div class="tabs" id="kind">${Object.entries(KINDS).map(([k, l]) => raw(html`<button data-k="${k}" class="${k === kind ? 'active' : ''}">${l}</button>`))}</div>
+        <div class="tabs" id="kind" style="margin:0 0 20px">${Object.entries(KINDS).map(([k, l]) => raw(html`<button data-k="${k}" class="${k === kind ? 'active' : ''}">${l}</button>`))}</div>
       </div>
       <div class="tabs" id="tabs">
         <button data-t="today">Heute</button><button data-t="board">Pipeline</button><button data-t="list">Liste</button>
@@ -71,23 +71,23 @@ async function tabToday(el) {
     </div>
     ${raw(kind === 'artist' ? html`<div class="card flat"><div class="row"><b>Instagram-DMs heute</b><span class="spacer"></span><span class="small muted">${s.dms_today} / ~${DM_LIMIT} (sicheres Tageslimit für kleine Accounts)</span></div>
       <div class="progress-line"><div style="width:${dmPct}%;background:${dmPct >= 100 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>` : '')}
-    ${raw(tot.n === 0 ? html`<div class="card empty"><div class="e">${kind === 'artist' ? '🎤' : '🍽️'}</div><b>Noch keine ${KINDS[kind].slice(3)}.</b><p>Starte im <a href="#" id="go-find">Lead-Finder</a> – oder füge Instagram-Namen per Copy & Paste ein.</p></div>` : '')}
+    ${raw(tot.n === 0 ? html`<div class="card empty"><div class="e">${kind === 'artist' ? '🎤' : '🍽️'}</div><b>Noch keine ${KINDS[kind]}.</b><p>Starte im <a href="#" id="go-find">Lead-Finder</a> – oder füge Instagram-Namen per Copy & Paste ein.</p></div>` : '')}
     <div class="grid2">
-      <div class="card"><h3>⏰ Heute nachfassen</h3>${raw(due.items.length ? leadRows(due.items, true) : '<p class="muted small">Nichts fällig. 🎉</p>')}</div>
-      <div class="card"><h3>⭐ Beste neue Leads</h3>${raw(best.items.length ? leadRows(best.items, false) : '<p class="muted small">Keine neuen Leads.</p>')}
+      <div class="card"><h3>Heute nachfassen</h3>${raw(due.items.length ? leadRows(due.items, true) : '<p class="muted small">Nichts fällig. 🎉</p>')}</div>
+      <div class="card"><h3>Beste neue Leads</h3>${raw(best.items.length ? leadRows(best.items, false) : '<p class="muted small">Keine neuen Leads.</p>')}
         <p class="small muted">${tot.n} gesamt · ${tot.ig} mit Instagram · ${tot.em} mit E-Mail · ${tot.ph} mit Telefon</p></div>
     </div>
-    ${raw(kind === 'artist' ? html`<div class="card"><div class="row"><h3 style="margin:0">🎵 Neue Releases deiner Artists</h3><span class="spacer"></span>
+    ${raw(kind === 'artist' ? html`<div class="card"><div class="row"><h3 style="margin:0">Neue Releases deiner Artists</h3><span class="spacer"></span>
       <span class="small muted" id="radar-last"></span><button class="btn sm" id="radar-run">Jetzt prüfen</button></div>
       <p class="small muted">Täglich automatisch über Deezer. Ein frischer Release ist der beste Moment für eine DM – „Glückwunsch + konkrete Video-Idee“.</p>
       <div id="radar"></div></div>` : '')}
-    ${raw(kind === 'restaurant' ? html`<div class="card"><div class="row"><h3 style="margin:0">🚶 Walk-in-Route für heute</h3><span class="spacer"></span>
+    ${raw(kind === 'restaurant' ? html`<div class="card"><div class="row"><h3 style="margin:0">Walk-in-Route für heute</h3><span class="spacer"></span>
       <select id="r-d" style="width:auto"><option value="">Alle Gebiete</option></select>
       <select id="r-n" style="width:auto">${[5, 6, 8, 10].map(n => raw(html`<option ${raw(n === 6 ? 'selected' : '')}>${n}</option>`))}</select><span class="small muted">Stopps</span>
       <button class="btn sm primary" id="r-go">Route planen</button></div>
       <p class="small muted">Persönlich vorbeigehen ist rechtlich der sicherste und erfolgreichste Weg (Di–Do 14:30–17:00). Beste noch nicht kontaktierte Lokale, als kurze Fußroute sortiert.</p>
       <div id="route"></div></div>` : '')}
-    <div class="card"><h3>🕘 Letzte Aktivität</h3>${raw(s.recent.length ? html`<div class="timeline">${s.recent.map(a => raw(html`<div class="ev"><a href="#" data-open="${a.id}"><b>${a.name}</b></a> · ${actLabel(a)}${raw(a.text ? html`<div class="small muted">${a.text.slice(0, 140)}</div>` : '')}<div class="t">${a.ts}</div></div>`))}</div>` : '<p class="muted small">Noch nichts passiert.</p>')}</div>`;
+    <div class="card"><h3>Letzte Aktivität</h3>${raw(s.recent.length ? html`<div class="timeline">${s.recent.map(a => raw(html`<div class="ev"><a href="#" data-open="${a.id}"><b>${a.name}</b></a> · ${actLabel(a)}${raw(a.text ? html`<div class="small muted">${a.text.slice(0, 140)}</div>` : '')}<div class="t">${a.ts}</div></div>`))}</div>` : '<p class="muted small">Noch nichts passiert.</p>')}</div>`;
   el.querySelector('#go-find')?.addEventListener('click', e => { e.preventDefault(); document.querySelector('#tabs [data-t=find]').click(); });
   wireRows(el);
   if (kind === 'restaurant') wireRoute(el);
@@ -127,7 +127,7 @@ async function wireRoute(el) {
     if (!r.stops.length) { box.innerHTML = '<p class="muted small">Keine offenen Lokale mit Koordinaten in diesem Gebiet.</p>'; return; }
     box.innerHTML = html`<table class="tbl">${r.stops.map((l, i) => raw(html`<tr><td class="c"><span class="badge blue">${i + 1}</span></td>
       <td><a href="#" data-open="${l.id}" class="lead-name">${l.name}</a><div class="lead-sub">${l.address || ''} · ${l.category || ''}</div></td>
-      <td>${raw(scoreBar(l.score))}</td><td style="text-align:right"><button class="btn sm" data-visit="${l.id}">🚶 Besucht</button></td></tr>`))}</table>
+      <td>${raw(scoreBar(l.score))}</td><td style="text-align:right"><button class="btn sm" data-visit="${l.id}">Besucht</button></td></tr>`))}</table>
       <div class="row" style="margin-top:10px"><a class="btn primary" href="${r.maps_url}" target="_blank" rel="noopener">In Google Maps öffnen ↗︎</a>
       <span class="small muted">≈ ${r.km} km zu Fuß · ca. ${r.minutes} Min. inkl. Gesprächen</span></div>`;
     wireRows(box);
@@ -151,8 +151,8 @@ function leadRows(items, showDue) {
 function quickButtons(l) {
   const parts = [];
   if (l.instagram) parts.push(html`<a class="btn sm icon" href="${igUrl(l.instagram)}" target="_blank" rel="noopener" title="Profil öffnen">↗︎</a>`);
-  parts.push(html`<button class="btn sm" data-contact="${l.id}" title="Als kontaktiert markieren">✓ ${l.contact_count ? 'Nachgefasst' : 'Kontaktiert'}</button>`);
-  parts.push(html`<button class="btn sm ghost" data-reply="${l.id}" title="Hat geantwortet">↩︎</button>`);
+  parts.push(html`<button class="btn sm" data-contact="${l.id}" title="Als kontaktiert markieren">${l.contact_count ? 'Nachgefasst' : 'Kontaktiert'}</button>`);
+  parts.push(html`<button class="btn sm ghost" data-reply="${l.id}" title="Hat geantwortet">︎</button>`);
   return parts.join('');
 }
 
@@ -218,7 +218,7 @@ async function tabList(el) {
     </div>
     <div class="card flat" id="bulkbar" style="display:none"><div class="row"><b id="bulk-n"></b><span class="spacer"></span>
       <select id="bulk-status" style="width:auto"><option value="">Status setzen …</option>${stages().map(s => raw(html`<option value="${s.id}">${s.label}</option>`))}</select>
-      <button class="btn sm" data-bulk="star">★ Markieren</button><button class="btn sm" data-bulk="archive">Archivieren</button><button class="btn sm red" data-bulk="delete">Löschen</button></div></div>
+      <button class="btn sm" data-bulk="star">Markieren</button><button class="btn sm" data-bulk="archive">Archivieren</button><button class="btn sm red" data-bulk="delete">Löschen</button></div></div>
     <div class="card" style="padding:8px 8px 4px"><div style="overflow-x:auto"><table class="tbl" id="tbl"></table></div>
       <div class="row" style="justify-content:center;padding:10px"><button class="btn sm ghost" id="more">Mehr laden</button></div></div>`;
   const tbl = el.querySelector('#tbl');
@@ -304,7 +304,7 @@ async function openLead(id) {
     ].filter(Boolean);
     d.innerHTML = html`
       <div class="row"><h2 style="margin:0">${l.name}</h2><span class="spacer"></span>
-        <button class="btn sm icon" id="star" title="Markieren">${l.starred ? '★' : '☆'}</button><button class="btn sm icon" id="x">✕</button></div>
+        <button class="btn sm icon" id="star" title="Markieren">${l.starred ? '★' : '☆'}</button><button class="btn sm icon" id="x"></button></div>
       <p class="small muted" style="margin:4px 0 12px">${l.category || ''} ${l.district ? '· ' + l.district : ''} · Quelle: ${l.source || '–'} · Score ${l.score}</p>
       <div class="row">${raw(links.join(''))}</div>
       ${raw(l.flags.do_not_contact ? '<div class="card error small">⛔ Sperrliste – diese Person/dieses Lokal will nicht kontaktiert werden.</div>' : '')}
@@ -325,9 +325,9 @@ async function openLead(id) {
           <button class="btn sm primary" id="tpl-send">Kopieren & als kontaktiert markieren</button></div></div>
 
       <div class="card flat"><h3>Schnell eintragen</h3><div class="row">
-        <button class="btn sm" data-log="contact">✉️ Angeschrieben</button><button class="btn sm" data-log="reply">↩️ Hat geantwortet</button>
-        <button class="btn sm" data-log="visit">🚶 Besucht</button><button class="btn sm" data-log="letter">📮 Brief</button><button class="btn sm" data-log="call">📞 Telefonat</button>
-        <button class="btn sm ghost" data-log="note">📝 Notiz</button></div>
+        <button class="btn sm" data-log="contact">Angeschrieben</button><button class="btn sm" data-log="reply">Hat geantwortet</button>
+        <button class="btn sm" data-log="visit">Besucht</button><button class="btn sm" data-log="letter">Brief</button><button class="btn sm" data-log="call">Telefonat</button>
+        <button class="btn sm ghost" data-log="note">Notiz</button></div>
         <textarea id="log-text" placeholder="Was wurde besprochen? (optional)" style="min-height:60px;margin-top:8px"></textarea></div>
 
       <div class="card flat"><h3>Checkliste</h3><div class="checkgrid">${checks.map(c => raw(html`<label class="switch small"><input type="checkbox" data-flag="${c.id}" ${raw(l.flags[c.id] ? 'checked' : '')}> ${c.label}</label>`))}</div></div>
@@ -348,7 +348,7 @@ async function openLead(id) {
       <div class="row"><button class="btn sm primary" id="save">Speichern</button><span class="spacer"></span>
         <button class="btn sm red" id="block">${l.flags.do_not_contact ? 'Von Sperrliste nehmen' : 'Sperrliste (will keinen Kontakt)'}</button>
         <button class="btn sm ghost" id="del">Löschen</button></div></div>
-      <div class="row"><button class="btn sm" id="quote">🧾 Angebot erstellen</button><button class="btn sm" id="shoot">🎬 Dreh planen</button></div>
+      <div class="row"><button class="btn sm" id="quote">Angebot erstellen</button><button class="btn sm" id="shoot">Dreh planen</button></div>
 
       <div class="card flat"><h3>Verlauf</h3>${raw(l.activities.length ? html`<div class="timeline">${l.activities.map(a => raw(html`<div class="ev">${actLabel(a)}${raw(a.text ? html`<div class="small">${a.text}</div>` : '')}<div class="t">${a.ts}</div></div>`))}</div>` : '<p class="small muted">Noch keine Einträge.</p>')}</div>`;
 
@@ -420,7 +420,7 @@ function tabFind(el) {
   M.areas.forEach(a => (groups[a.group] ||= []).push(a));
   const savedAreas = new Set(store('leads.areas') || ['moedling:Mödling']);
   el.innerHTML = kind === 'artist' ? html`
-    <div class="card"><h3>🎤 Rapper & Artists aus Wien / Mödling finden</h3>
+    <div class="card"><h3>Rapper & Artists aus Wien / Mödling finden</h3>
       <p class="small muted">Instagram hat keine offene Suche – das Dashboard sammelt öffentliche Profile aus Musik-Datenbanken und YouTube-Kanälen und übernimmt die dort verlinkten Instagram-Namen.</p>
       <div class="row" style="gap:18px;margin:10px 0">
         <label class="switch"><input type="checkbox" data-src="musicbrainz" checked> MusicBrainz <span class="small muted">(gratis)</span></label>
@@ -432,24 +432,24 @@ function tabFind(el) {
       <div class="row" style="margin-top:12px"><button class="btn primary" id="run-a">Artists suchen</button><span class="small muted">MusicBrainz braucht ~1 Sek. pro Artist – läuft im Hintergrund.</span></div>
       <div id="job"></div></div>
     ${raw(pasteCard())}
-    <div class="card"><h3>💡 Wo du die meisten Newcomer findest</h3><ul class="small">
+    <div class="card"><h3>Wo du die meisten Newcomer findest</h3><ul class="small">
       <li>Hashtags: #wienrap #austrorap #wienerrap #viennarap #1100wien #ösirap #mödling – Profile hier per Copy & Paste einfügen.</li>
       <li>Von jedem guten Lead aus: „Vorgeschlagene Konten“, Features, Follower von lokalen Beatmakern & Studios.</li>
       <li>Open Mics / Cyphers in Wien: vor Ort Kurz-Clips drehen = Content + Kontakt.</li>
       <li>Dein Type-Beat-Kanal: Käufer & Kommentare aus Österreich sind warme Leads – „Musikvideo? DM“ in jede Beschreibung.</li>
       <li>FM4 Soundpark (Hip-Hop-Neuzugänge), The Message Magazine, Spotify-Playlists „Austro Rap“ / „Wien Rap“.</li></ul></div>`
     : html`
-    <div class="card"><h3>🍽️ Lokale finden (OpenStreetMap)</h3>
+    <div class="card"><h3>Lokale finden (OpenStreetMap)</h3>
       <p class="small muted">Name, Adresse, Telefon, Website, Instagram & Küche – gratis. Danach optional Impressum/Kontakt-Seiten nach E-Mail & Instagram durchsuchen.</p>
       ${Object.entries(groups).map(([g, list]) => raw(html`<h4 style="margin:14px 0 6px">${g}</h4><div class="row" style="gap:4px 14px">${list.map(a => raw(html`<label class="switch small"><input type="checkbox" data-area="${a.id}" ${raw(savedAreas.has(a.id) ? 'checked' : '')}> ${a.label}</label>`))}</div>`))}
       <h4 style="margin:14px 0 6px">Art</h4><div class="row" style="gap:4px 14px">${Object.entries(M.types).map(([t, l]) => raw(html`<label class="switch small"><input type="checkbox" data-type="${t}" ${raw(['restaurant', 'cafe'].includes(t) ? 'checked' : '')}> ${l}</label>`))}</div>
       <p class="small muted">🆕 Gebiete, die du einmal durchsucht hast, prüft das Dashboard jede Woche automatisch erneut – neu aufgetauchte Lokale werden als vermutliche Neueröffnung markiert (die brauchen jetzt Content!).</p>
       <div class="row" style="margin-top:14px"><label class="switch"><input type="checkbox" id="enrich" checked> Websites nach E-Mail & Instagram durchsuchen</label><span class="spacer"></span><button class="btn primary" id="run-r">Lokale suchen</button></div>
       <div id="job"></div></div>
-    <div class="card"><h3>🔎 Fehlende Kontaktdaten ergänzen</h3><p class="small muted">Durchsucht Website + Impressum/Kontakt-Seite der Lokale ohne E-Mail oder Instagram (max. 150 pro Lauf, beste Leads zuerst).</p>
+    <div class="card"><h3>Fehlende Kontaktdaten ergänzen</h3><p class="small muted">Durchsucht Website + Impressum/Kontakt-Seite der Lokale ohne E-Mail oder Instagram (max. 150 pro Lauf, beste Leads zuerst).</p>
       <button class="btn" id="run-e">Kontaktdaten ergänzen</button><div id="job2"></div></div>
     ${raw(pasteCard())}
-    <div class="card"><h3>💡 Weitere Quellen für Lokale</h3><ul class="small">
+    <div class="card"><h3>Weitere Quellen für Lokale</h3><ul class="small">
       <li>Neueröffnungen: Falter, Falstaff, 1000things, wien.info, #neueröffnungwien – die brauchen jetzt Content.</li>
       <li>Wolt / Lieferando / Foodora: „Neu“-Filter, Lokale mit schlechten Fotos → Qualifizierung „Wenige Fotos“ anhaken.</li>
       <li>Google Maps: hohe Bewertung, aber wenige Fotos vom Inhaber.</li>
@@ -469,7 +469,7 @@ function tabFind(el) {
 }
 
 function pasteCard() {
-  return html`<div class="card"><h3>📋 Instagram-Profile einfügen</h3>
+  return html`<div class="card"><h3>Instagram-Profile einfügen</h3>
     <p class="small muted">Profile, die du beim Scrollen findest: Links oder @namen einfügen – einer pro Zeile, optional „Name – @handle“.</p>
     <textarea id="paste" placeholder="@beispiel.rapper\nhttps://www.instagram.com/anderer_artist/\nMC Muster – @mc.muster" style="min-height:110px"></textarea>
     <div class="row"><input id="paste-d" placeholder="Gebiet (optional, z.B. Favoriten)" style="max-width:260px"><button class="btn" id="paste-go">Hinzufügen</button>
@@ -507,7 +507,7 @@ async function runJob(box, url, body) {
         if (r.with_instagram != null) parts.push(`${r.with_instagram} mit Instagram`);
         if (r.new_openings) parts.push(`🆕 ${r.new_openings} vermutliche Neueröffnungen`);
         for (const k of ['email', 'instagram', 'phone']) if (r['found_' + k] != null) parts.push(`${r['found_' + k]}× ${k} gefunden`);
-        box.innerHTML = html`<div class="card hint small">✓ Fertig: ${raw(parts.join(' · '))}${raw((r.errors || []).length ? html`<div class="neg">${r.errors.join(' | ')}</div>` : '')}
+        box.innerHTML = html`<div class="card hint small">Fertig: ${raw(parts.join(' · '))}${raw((r.errors || []).length ? html`<div class="neg">${r.errors.join(' | ')}</div>` : '')}
           <div class="row" style="margin-top:8px"><button class="btn sm primary" id="to-list">Zur Liste</button></div></div>`;
         box.querySelector('#to-list').addEventListener('click', () => document.querySelector('#tabs [data-t=list]').click());
         ctxRef.refreshStatus?.();
@@ -540,12 +540,12 @@ async function tabTemplates(el) {
 function tabRules(el) {
   const c = M.compliance;
   el.innerHTML = html`
-    <div class="card reco"><h3>⚖️ Rechtliches in Österreich – kurz & ehrlich</h3>
+    <div class="card reco"><h3>Rechtliches in Österreich – kurz & ehrlich</h3>
       <p class="small">Keine Rechtsberatung, aber das Wichtigste (§174 TKG 2021, DSGVO, Stand 2026):</p>
       <ul class="small"><li>${c.email}</li><li>${c.phone}</li><li>${c.instagram}</li><li>${c.visit}</li><li>${c.letter}</li><li>${c.gdpr}</li>
       <li>Vor jeder Werbe-Mail: Adresse gegen die <a href="https://www.rtr.at/TKP/was_wir_tun/telekommunikation/konsumentenservice/ecg-liste/ECG-Liste.de.html" target="_blank" rel="noopener">ECG-Liste der RTR</a> prüfen.</li></ul></div>
     <div class="grid2">
-      <div class="card"><h3>🎤 Artists – Ablauf</h3><ol class="small">
+      <div class="card"><h3>Artists – Ablauf</h3><ol class="small">
         <li><b>Warm-up:</b> folgen, 2–3 Posts liken, 1 echter Kommentar / Story-Reaktion.</li>
         <li><b>Tag 0:</b> persönliche DM mit Song-Bezug – <i>kein Link</i> in der ersten Nachricht.</li>
         <li><b>Tag 3–4:</b> Follow-up mit Portfolio-Link.</li><li><b>Tag 10:</b> Story-Reaktion, kein Pitch.</li>
@@ -553,7 +553,7 @@ function tabRules(el) {
         <li>Max. 2 Pitch-Nachrichten ohne Antwort, dann 60–90 Tage Pause.</li>
         <li>Beste Zeit: abends 18–23 Uhr & Wochenende. ~10–15 neue DMs pro Tag.</li></ol>
         <p class="small muted">Beste Zielgruppe: 2k–30k Follower, 1k–50k Spotify-Hörer, aktueller Release, schwache Videos.</p></div>
-      <div class="card"><h3>🍽️ Restaurants – Ablauf</h3><ol class="small">
+      <div class="card"><h3>Restaurants – Ablauf</h3><ol class="small">
         <li><b>Vorbeigehen</b> (Di–Do 14:30–17:00) mit Handy-Reel + Visitenkarte – sicherster & stärkster Weg.</li>
         <li>Dort fragen: „Darf ich Ihnen Beispiele per Mail schicken?“ → <b>Einwilligung</b> notieren (Notiz im Lead).</li>
         <li><b>Tag 4:</b> Mail mit 1 Beispielbild ihres Gerichts.</li><li><b>Tag 10:</b> zweiter Besuch / Gratis-Testbild anbieten.</li>
@@ -561,6 +561,6 @@ function tabRules(el) {
         <li>Alternativ: persönlicher Brief mit QR-Code zum Showreel.</li></ol>
         <p class="small muted">Beste Ziele: Neueröffnungen, Top-Bewertungen mit schlechten Fotos, €€–€€€, Lieferplattformen.</p></div>
     </div>
-    <div class="card"><h3>💶 Preisanker Wien 2026 (Schätzung)</h3><table class="tbl">${[...M.prices.artist, ...M.prices.restaurant].map(p => raw(html`<tr><td>${p[0]}</td><td>${p[1]}–${p[2]} €</td></tr>`))}</table>
+    <div class="card"><h3>Preisanker Wien 2026 (Schätzung)</h3><table class="tbl">${[...M.prices.artist, ...M.prices.restaurant].map(p => raw(html`<tr><td>${p[0]}</td><td>${p[1]}–${p[2]} €</td></tr>`))}</table>
       <p class="small muted">50 % Anzahlung. Bundle-Idee für Rapper: Beat-Lizenz von deinem Type-Beat-Kanal + Musikvideo.</p></div>`;
 }

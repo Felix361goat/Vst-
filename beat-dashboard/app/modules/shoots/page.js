@@ -61,11 +61,11 @@ async function openShoot(id, onClose) {
   const checklist = (key, withDue = false) => html`<div data-list="${key}">${s[key].map((it, i) => raw(html`<div class="row" style="flex-wrap:nowrap;margin:4px 0">
       <input type="checkbox" data-i="${i}" ${raw(it.done ? 'checked' : '')}><input data-t="${i}" value="${it.text}" style="flex:1;padding:5px 9px">
       ${raw(withDue ? html`<input type="date" data-due="${i}" value="${it.due || ''}" style="width:150px;padding:5px 9px">` : '')}
-      <button class="btn sm ghost icon" data-rm="${i}">✕</button></div>`))}
+      <button class="btn sm ghost icon" data-rm="${i}"></button></div>`))}
     <button class="btn sm ghost" data-add="${key}">＋ hinzufügen</button></div>`;
   const draw = async () => {
     dr.innerHTML = html`
-      <div class="row"><input id="title" value="${s.title}" style="font-size:20px;font-weight:600;border:0;background:transparent;padding:0;flex:1"><button class="btn sm icon" id="x">✕</button></div>
+      <div class="row"><input id="title" value="${s.title}" style="font-size:20px;font-weight:600;border:0;background:transparent;padding:0;flex:1"><button class="btn sm icon" id="x"></button></div>
       <div class="card flat form"><div class="fields">
         <label><span>Art</span><select data-k="type">${Object.entries(META.types).map(([k, l]) => raw(html`<option value="${k}" ${raw(k === s.type ? 'selected' : '')}>${l}</option>`))}</select></label>
         <label><span>Status</span><select data-k="status">${Object.entries(STATUS).map(([k, [l]]) => raw(html`<option value="${k}" ${raw(k === s.status ? 'selected' : '')}>${l}</option>`))}</select></label>
@@ -77,9 +77,9 @@ async function openShoot(id, onClose) {
         <label style="grid-column:1/-1"><span>Crew</span><input data-k="crew" value="${s.crew || ''}" placeholder="z.B. 2. Kamera, Licht, Make-up"></label>
       </div></div>
       <div class="card flat" id="cond"><span class="spinner"></span> Wetter & Licht …</div>
-      <div class="card flat"><h3>🎬 Shotlist</h3>${raw(checklist('shots'))}</div>
-      <div class="card flat"><h3>🎒 Equipment</h3>${raw(checklist('gear'))}</div>
-      <div class="card flat"><h3>📦 Lieferungen & Deadlines</h3>${raw(checklist('deliverables', true))}</div>
+      <div class="card flat"><h3>Shotlist</h3>${raw(checklist('shots'))}</div>
+      <div class="card flat"><h3>Equipment</h3>${raw(checklist('gear'))}</div>
+      <div class="card flat"><h3>Lieferungen & Deadlines</h3>${raw(checklist('deliverables', true))}</div>
       <div class="card flat form"><label><span>Notizen / Konzept / Moodboard-Links</span><textarea data-k="notes">${s.notes || ''}</textarea></label></div>
       <div class="row"><a class="btn primary" href="/api/shoots/shoots/${id}/callsheet" target="_blank" rel="noopener">Call Sheet ↗︎</a>
         ${raw(s.location ? html`<a class="btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.location)}" target="_blank" rel="noopener">Karte ↗︎</a>` : '')}

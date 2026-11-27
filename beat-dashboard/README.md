@@ -71,6 +71,14 @@ Außerdem in den Einstellungen eintragen:
 Die Regeln und Genre-Daten stehen in `app/modules/seo/services/knowledge.py` und dürfen gern angepasst werden.
 
 
+## 📅 Content-Plan
+
+- **Monatskalender** im Stil von Apple Kalender für YouTube-Beats, Shorts, Instagram-Reels, Posts und TikToks.
+- Jeder Post hat einen Status: Idee → produziert → geplant → gepostet.
+- **Wochenziele** (Standard: 3 Beats und 4 Kurzvideos) mit Fortschrittsbalken und einer **Serie** („3 Wochen in Folge geschafft 🔥“).
+- In der SEO-Analyse steht „📅 Einplanen“: Der fertige Titel landet direkt im Kalender.
+- Posts für heute erscheinen auch im Morgen-Push.
+
 ## 🤝 Leads & CRM
 
 Hier findest du **Rapper/Artists** und **Restaurants** in Wien und im Bezirk Mödling. Du schreibst sie an und trackst alles bis zur Buchung.
