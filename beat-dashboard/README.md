@@ -141,7 +141,9 @@ Pflichtangaben (Name, Anschrift, IBAN) trägst du unter Einstellungen ein. Das i
 3. Den QR-Code auf der Einstellungsseite mit dem Handy scannen (gleiches WLAN) und mit der PIN anmelden.
 4. „Zum Home-Bildschirm“ hinzufügen. Dann fühlt es sich an wie eine App.
 
-Praktisch für Walk-ins: Du trägst den Besuch direkt vor dem Lokal ein. Am PC selbst brauchst du nie eine PIN.
+Praktisch für Walk-ins: Du trägst den Besuch direkt vor dem Lokal ein.
+
+**Push am Morgen:** Installiere die App **ntfy** (iOS/Android, gratis) und abonniere ein langes, zufälliges Thema (z.B. `dashboard-x7k2p9q4`). Dasselbe Thema trägst du unter Einstellungen ein und tippst auf „Testen“. Ab dann kommt jeden Morgen eine Übersicht: fällige Follow-ups, Drehs heute/morgen, überfällige Rechnungen, neue Releases. Voraussetzung: Das Dashboard läuft am PC. Am PC selbst brauchst du nie eine PIN.
 
 ## 🧩 Später erweitern (eigene Module)
 

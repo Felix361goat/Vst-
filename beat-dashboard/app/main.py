@@ -1,6 +1,7 @@
 """FastAPI app: core API, auto-discovered modules, static frontend."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import cache, db, lan, net, registry
+from . import cache, db, digest, lan, net, registry
 from .core_api import router as core_router
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -25,7 +26,9 @@ async def lifespan(app: FastAPI):
                 await m["startup"]()
             except Exception:
                 logging.getLogger("beat-dashboard").exception("Startup-Hook von %s fehlgeschlagen", m["id"])
+    task = asyncio.create_task(digest.loop())
     yield
+    task.cancel()
     await net.close()
 
 

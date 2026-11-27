@@ -30,6 +30,10 @@ CORE_SETTINGS = [
     {"key": "LAN_ACCESS", "label": "Zugriff vom Handy im WLAN (ja/nein)", "secret": False,
      "help": "ja + PIN setzen, dann Dashboard neu starten. Unten erscheint ein QR-Code zum Scannen."},
     {"key": "ACCESS_PIN", "label": "PIN für Handy-Zugriff", "secret": True, "help": "mind. 6 Ziffern"},
+    {"key": "NTFY_TOPIC", "label": "Push aufs Handy: ntfy-Thema", "secret": True,
+     "help": "App „ntfy“ installieren, ein langes zufälliges Thema abonnieren (z.B. dashboard-x7k2p9q4) und hier eintragen. Jeden Morgen kommt eine Übersicht.",
+     "link": "https://ntfy.sh/"},
+    {"key": "DIGEST_HOUR", "label": "Uhrzeit für den Morgen-Push", "secret": False, "help": "Stunde, z.B. 8"},
     {"key": "PRODUCER_NAME", "label": "Dein Produzentenname", "secret": False, "help": "für 'prod. by ...'"},
     {"key": "STORE_LINK", "label": "Store-Link (BeatStars/Airbit)", "secret": False, "help": "kommt in die erste Beschreibungszeile"},
     {"key": "INSTAGRAM", "label": "Instagram / Kontakt", "secret": False, "help": "z.B. @deinname oder E-Mail"},
@@ -122,6 +126,11 @@ async def test_service(service: str):
                 return {"ok": False, "message": "Kein Key eingetragen"}
             r = await c.get("https://api.anthropic.com/v1/models", headers={
                 "x-api-key": settings.get("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"})
+        elif service == "ntfy":
+            from . import digest
+            title, lines = digest.build()
+            ok = await digest.send("Test: " + title, lines or ["Push funktioniert ✔"])
+            return {"ok": ok, "message": "Push gesendet – schau aufs Handy ✔" if ok else "Kein Thema eingetragen oder ntfy.sh nicht erreichbar"}
         elif service == "suggest":
             r = await c.get("https://suggestqueries.google.com/complete/search",
                             params={"client": "firefox", "ds": "yt", "q": "type beat"})

@@ -118,7 +118,7 @@ async function mountSettings(el) {
       ${items.map(s => raw(html`
         <label><span>${s.label} ${raw(s.link ? html`<a href="${s.link}" target="_blank" rel="noopener">↗</a>` : '')}</span>
           <div class="row"><input name="${s.key}" type="${s.secret ? 'password' : 'text'}" value="${s.value}" placeholder="${s.secret && s.is_set ? '(gesetzt)' : ''}" autocomplete="off">
-          ${raw(['YOUTUBE_API_KEY', 'LASTFM_API_KEY', 'ANTHROPIC_API_KEY'].includes(s.key) ? html`<button type="button" class="btn sm ghost" data-test="${{ YOUTUBE_API_KEY: 'youtube', LASTFM_API_KEY: 'lastfm', ANTHROPIC_API_KEY: 'anthropic' }[s.key]}">Testen</button>` : '')}
+          ${raw(['YOUTUBE_API_KEY', 'LASTFM_API_KEY', 'ANTHROPIC_API_KEY', 'NTFY_TOPIC'].includes(s.key) ? html`<button type="button" class="btn sm ghost" data-test="${{ YOUTUBE_API_KEY: 'youtube', LASTFM_API_KEY: 'lastfm', ANTHROPIC_API_KEY: 'anthropic', NTFY_TOPIC: 'ntfy' }[s.key]}">Testen</button>` : '')}
           ${raw(s.key === 'MY_CHANNEL_ID' ? '<button type="button" class="btn sm ghost" id="sync">Abos holen</button>' : '')}</div>
           <small class="muted">${s.help || ''}</small></label>`))}
       <div class="row"><button class="btn primary">Speichern</button></div>
