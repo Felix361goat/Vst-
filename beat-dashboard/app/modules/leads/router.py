@@ -85,11 +85,15 @@ def upsert(c, lead: dict) -> str:
         existing = c.execute("SELECT * FROM leads WHERE kind='artist' AND lower(name)=lower(?)", (lead["name"],)).fetchone()
     if existing is not None:
         ex = _row(existing)
+        same_source = ex.get("source") == lead.get("source") and ex.get("source_id") == lead.get("source_id")
         changes = {}
         for k in ("instagram", "email", "phone", "website", "address", "district", "category", "lat", "lon"):
             if lead.get(k) and not ex.get(k):
                 changes[k] = lead[k]
-        extra = {**(lead.get("extra") or {}), **ex["extra"]}
+        if same_source and lead.get("category") and lead["category"] != ex.get("category"):
+            changes["category"] = lead["category"]  # a fresh scan of the same source is authoritative
+        extra = ({**ex["extra"], **(lead.get("extra") or {})} if same_source
+                 else {**(lead.get("extra") or {}), **ex["extra"]})
         if extra != ex["extra"]:
             changes["extra"] = json.dumps(extra, ensure_ascii=False)
         if not changes:
@@ -114,6 +118,7 @@ _rescored = False
 
 
 def _seed_templates():
+    """Insert default templates; on existing databases add new defaults by name (user edits are kept)."""
     global _rescored
     if not _rescored:
         _rescored = True
@@ -122,9 +127,12 @@ def _seed_templates():
         except Exception:
             pass
     with db.tx() as c:
-        if c.execute("SELECT COUNT(*) FROM lead_templates").fetchone()[0] == 0:
-            for i, t in enumerate(pipeline.DEFAULT_TEMPLATES):
+        seeded = {r[0][len("tpl_seeded:"):] for r in c.execute("SELECT key FROM settings_meta WHERE key LIKE 'tpl_seeded:%'")}
+        seeded |= {r[0] for r in c.execute("SELECT name FROM lead_templates")}  # databases from before this marker
+        for i, t in enumerate(pipeline.DEFAULT_TEMPLATES):
+            if t[2] not in seeded:
                 c.execute("INSERT INTO lead_templates(kind, channel, name, subject, body, sort) VALUES(?,?,?,?,?,?)", (*t, i))
+            c.execute("INSERT OR IGNORE INTO settings_meta(key, value) VALUES(?, '1')", ("tpl_seeded:" + t[2],))
 
 
 # ---------------------------------------------------------------- meta

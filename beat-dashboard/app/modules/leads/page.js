@@ -420,8 +420,13 @@ function tabFind(el) {
   M.areas.forEach(a => (groups[a.group] ||= []).push(a));
   const savedAreas = new Set(store('leads.areas') || ['moedling:Mödling']);
   el.innerHTML = kind === 'artist' ? html`
-    <div class="card"><h3>Rapper aus Österreich finden</h3>
-      <p class="small muted">Hauptquelle: von Menschen kuratierte Rap-Playlists auf Deezer („Austro Rap“, „Wien Rap“, „Deutschrap aus Österreich“ …). Jeder Artist wird geprüft: nur wer Releases im Genre <b>Rap/Hip Hop</b> hat, kommt rein. Stars über 50k Fans werden als „zu groß“ markiert. Instagram-Namen werden automatisch nachgeschlagen, wo öffentlich verlinkt.</p>
+    <div class="card"><h3>Underground-Trap-Rapper & Produzenten aus Österreich</h3>
+      <p class="small muted">Quelle: kuratierte österreichische Rap-Playlists auf Deezer. Jeder Artist wird geprüft:</p>
+      <ul class="small muted" style="margin-top:0"><li><b>Rap-Check</b> – nur wer Releases im Genre Rap/Hip Hop hat</li>
+        <li><b>Österreich-Check</b> – nur Haupt-Artists aus mind. 2 österreichischen Playlists (keine deutschen Feature-Gäste)</li>
+        <li><b>Trap</b> – wer auch in deutschsprachigen Trap/Drill/Cloud-Rap-Playlists läuft, bekommt das Label „Trap“ und Extrapunkte</li>
+        <li><b>Underground</b> – 50–5.000 Fans = höchster Score (zahlt für Beats, ist erreichbar); Stars über 50k werden abgewertet</li>
+        <li><b>Produzenten</b> (…Beats, Prod. …) werden markiert – für Collabs</li></ul>
       <div class="row" style="gap:18px;margin:10px 0">
         <label class="switch"><input type="checkbox" data-src="deezer" checked> Deezer-Rap-Playlists <span class="small muted">(gratis, empfohlen)</span></label>
         <label class="switch"><input type="checkbox" data-src="youtube" ${raw(M.has_youtube ? '' : 'disabled')}> YouTube-Kanäle <span class="small muted">${M.has_youtube ? '(Newcomer mit IG in der Kanalbeschreibung)' : '(braucht YouTube-Key)'}</span></label>
@@ -435,7 +440,7 @@ wien drill
 deutschrap wien
 favoriten rap
 österreich rap neu</textarea></details>
-      <div class="row" style="margin-top:12px"><button class="btn primary" id="run-a">Rapper suchen</button><span class="small muted">Dauert 2–4 Minuten (Rap-Check pro Artist), läuft im Hintergrund.</span></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="run-a">Rapper suchen</button><span class="small muted">Dauert 3–6 Minuten (Rap-Check + Instagram-Suche), läuft im Hintergrund. Tipp danach: Liste → Suche „Trap“.</span></div>
       <div id="job"></div></div>
     <div class="card"><h3>Liste aufräumen</h3><p class="small muted">Prüft alle Artists, die noch nicht verifiziert und noch nicht angeschrieben sind, und archiviert alle ohne Rap-Releases (z.B. Schlager, Lofi, Techno aus alten Suchen). Leads, mit denen du schon gearbeitet hast, bleiben unangetastet.</p>
       <button class="btn" id="run-clean">Nicht-Rapper archivieren</button><div id="job3"></div></div>

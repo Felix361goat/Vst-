@@ -93,6 +93,8 @@ def score(lead: dict) -> int:
             pts += 8  # unknown -> neutral
         if extra.get("rap_verified"):
             pts += 10
+        if extra.get("trap") or "trap" in (lead.get("category") or "").lower():
+            pts += 10  # your lane: trap / underground
         latest = extra.get("latest_release") or ""
         if latest and not flags.get("recent_release"):
             from datetime import date as _d, timedelta as _td
@@ -168,6 +170,14 @@ def normalize_phone(s: str | None) -> str | None:
 
 
 DEFAULT_TEMPLATES = [
+    ("artist", "instagram", "Beat anbieten – Trap", "",
+     "Yo {vorname}, hab „{song}“ gehört – dein Flow auf Trap-Beats ist krank 🔥 Ich bin Producer aus {mein_bezirk} und bau dunkle Trap-Beats ({vibe}). Hab ein paar, die voll zu deinem Sound passen würden. Soll ich dir 2–3 rüberschicken? Kein Stress, einfach anhören 🙏"),
+    ("artist", "instagram", "Free Beat gegen Credit", "",
+     "Servus {vorname}! Feier deinen Sound. Ich mach Trap-Beats und such Artists aus Wien, mit denen ich was aufbauen kann. Würd dir einen Beat gratis geben – nur „prod. {mein_name}“ im Titel. Wenn's passt, machen wir mehr. Interesse?"),
+    ("artist", "instagram", "Beat-Pack Follow-up (Tag 3–4)", "",
+     "Hey {vorname}, kurz nachgehakt 🙌 Hab dir ein kleines Pack mit 5 Trap-Beats zusammengestellt ({bpm_range} BPM, dark/melodic). Hier zum Anhören: {portfolio}. Wenn dir einer taugt, sag Bescheid – Lease oder Exclusive geht beides."),
+    ("artist", "instagram", "Producer-Collab", "",
+     "Yo {vorname}, deine Beats sind brutal 🔥 Bin auch Producer aus {mein_bezirk} (Trap/Dark). Lust auf eine Collab – Loop/Melodie von mir, Drums von dir oder umgekehrt? Könnten's dann beide an Artists pitchen."),
     # kind, channel, name, subject, body
     ("artist", "instagram", "Erst-DM A – Song-Bezug", "",
      "Yo {vorname}, hab grad „{song}“ gehört – {detail} sitzt brutal. Bin Videograf aus {mein_bezirk} und dreh Musikvideos & Reels für Artists aus Wien. Hab direkt eine Idee, wie man den Track visuell umsetzen könnte ({idee}). Wenn's dich interessiert, schick ich dir ein paar Sachen von mir. Kein Stress 🙏"),

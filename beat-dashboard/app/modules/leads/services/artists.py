@@ -163,8 +163,9 @@ async def wikidata(job) -> list[dict]:
     return list(out.values())
 
 
-YT_QUERIES = ["wien rap", "rap aus wien", "wiener rap musikvideo", "austrorap", "deutschrap wien", "mödling rap",
-              "wien drill", "wien trap musikvideo", "favoriten rap", "simmering rap", "ottakring rap", "österreich rap neu"]
+YT_QUERIES = ["wien trap", "wien rap", "rap aus wien", "austro trap musikvideo", "wien drill", "mödling rap",
+              "deutschrap wien underground", "favoriten rap", "österreich rap neu", "wien type beat producer"]
+PRODUCER_HINT = re.compile(r"\bprod\b|prod\.|beats|type ?beat|producer|produzent|instrumental", re.I)
 IG_IN_TEXT = re.compile(r"(?:instagram\.com/|(?:ig|insta|instagram)\s*[:\-–]?\s*@?)([A-Za-z0-9_.]{2,30})", re.I)
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
@@ -217,7 +218,8 @@ async def youtube_channels(job, queries: list[str] | None = None, max_searches: 
             out.append({
                 "kind": "artist", "name": sn.get("title") or channel_ids.get(c["id"], ""), "source": "youtube",
                 "source_id": c["id"], "instagram": igs[0] if igs else None, "email": mails[0] if mails else None,
-                "district": "AT" if country == "AT" else (country or None), "category": "YouTube-Artist",
+                "district": "AT" if country == "AT" else (country or None),
+                "category": "Produzent" if PRODUCER_HINT.search((sn.get("title") or "") + " " + desc[:200]) else "Trap/Underground",
                 "extra": {"youtube": f"https://www.youtube.com/channel/{c['id']}", "yt_subs": subs,
                           "yt_videos": int(st.get("videoCount", 0) or 0), "bio": desc.strip()[:400]},
             })
@@ -232,7 +234,14 @@ async def youtube_channels(job, queries: list[str] | None = None, max_searches: 
 DZ = "https://api.deezer.com"
 PLAYLIST_QUERIES = ["austro rap", "wien rap", "wiener rap", "austrian rap", "deutschrap österreich", "österreich rap",
                     "austria hip hop", "ösi rap", "austro hip hop", "wien hip hop", "vienna rap"]
-RAP_TITLE = re.compile(r"rap|hip ?hop|deutschrap|trap|drill", re.I)
+# Deezer has (almost) no Austrian trap playlists -> trap signal = also listed in German-language trap playlists
+TRAP_QUERIES = ["deutschrap trap", "german trap", "deutsch trap", "cloud rap deutsch", "german drill", "deutsch drill",
+                "deutschrap underground", "underground deutschrap", "plugg deutsch", "rage deutsch"]
+TRAP_TITLE = re.compile(r"trap|drill|cloud ?rap|plugg|rage|new ?wave|underground", re.I)
+GERMAN_TITLE = re.compile(r"deutsch|german|austr|österr|wien|ösi|dach", re.I)
+STRONG_LOCAL = re.compile(r"wien|vienna|austro|ösi", re.I)
+PRODUCER_NAME = re.compile(r"beats?\b|^prod|ondabeat|on ?the ?beat|productions?|\bprod\b|music$", re.I)
+RAP_TITLE = re.compile(r"rap|hip ?hop|deutschrap|trap|drill|underground|cloud|newcomer", re.I)
 LOCAL_TITLE = re.compile(r"austr|österr|oesterr|wien|vienna|ösi|austro|mödling|niederösterreich", re.I)
 DZ_RAP_GENRE = 116      # Deezer genre "Rap/Hip Hop"
 TOO_BIG_FANS = 50_000   # labels / stars - not realistic clients
@@ -293,13 +302,23 @@ async def deezer_playlists(job, extra_playlists: list[str] | None = None, min_pl
         job.update(done=i, total=len(playlists), message=f"Playlist: {title}")
         data = await _dz(f"/playlist/{pid}/tracks", {"limit": 300}) or {}
         for t in data.get("data", []):
-            for a in [t.get("artist")] + (t.get("contributors") or []):
-                if not a or not a.get("id"):
-                    continue
-                counts[a["id"]] = counts.get(a["id"], 0) + 1
-                names[a["id"]] = a["name"]
-                seen_in.setdefault(a["id"], set()).add(title)
-    ranked = sorted(counts, key=lambda a: -counts[a])[:250]
+            a = t.get("artist")  # primary artist only - features pull in German stars
+            if not a or not a.get("id"):
+                continue
+            counts[a["id"]] = counts.get(a["id"], 0) + 1
+            names[a["id"]] = a["name"]
+            seen_in.setdefault(a["id"], set()).add(f"{pid}:{title}")
+    # Austrian = in 2+ Austrian playlists, or in one explicitly called Wien/Austro/Ösi
+    local = [a for a in counts if len(seen_in[a]) >= 2 or any(STRONG_LOCAL.search(x) for x in seen_in[a])]
+    ranked = sorted(local, key=lambda a: -counts[a])[:250]
+    job.update(message="Trap-Playlists abgleichen …")
+    trap_ids: set[int] = set()
+    for q in TRAP_QUERIES:
+        data = await _dz("/search/playlist", {"q": q, "limit": 25}) or {}
+        for p in data.get("data", [])[:8]:
+            if TRAP_TITLE.search(p["title"]) and GERMAN_TITLE.search(p["title"]):
+                tracks = await _dz(f"/playlist/{p['id']}/tracks", {"limit": 300}) or {}
+                trap_ids |= {t["artist"]["id"] for t in tracks.get("data", []) if t.get("artist")}
     out = []
     for n, aid in enumerate(ranked):
         if job.cancelled:
@@ -309,11 +328,16 @@ async def deezer_playlists(job, extra_playlists: list[str] | None = None, min_pl
         is_rap = chk["rap_releases"] > 0 or len(seen_in[aid]) >= min_playlists_without_genre
         if not is_rap or chk["releases"] == 0:
             continue
+        trap = aid in trap_ids
+        producer = bool(PRODUCER_NAME.search(names[aid]))
         out.append({
             "kind": "artist", "name": names[aid], "source": "deezer", "source_id": str(aid),
-            "district": "Österreich", "category": "Rap" + (" · zu groß (Label/Star)" if chk["fans"] > TOO_BIG_FANS else ""),
-            "extra": {"deezer_id": aid, "deezer": chk["link"], "deezer_fans": chk["fans"], "picture": chk["picture"],
-                      "latest_release": chk["latest"], "playlists": sorted(seen_in[aid])[:6], "rap_verified": True},
+            "district": "Österreich",
+            "category": ("Produzent" if producer else "Trap" if trap else "Rap")
+                        + (" · Underground" if 0 < chk["fans"] <= 5000 else "")
+                        + (" · zu groß (Label/Star)" if chk["fans"] > TOO_BIG_FANS else ""),
+            "extra": {"trap": trap, "producer": producer, "deezer_id": aid, "deezer": chk["link"], "deezer_fans": chk["fans"], "picture": chk["picture"],
+                      "latest_release": chk["latest"], "playlists": sorted(x.split(":", 1)[1] for x in seen_in[aid])[:6], "rap_verified": True},
         })
     return out
 
