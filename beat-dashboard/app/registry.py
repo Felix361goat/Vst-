@@ -8,6 +8,7 @@ A module is a package in app/modules/<id>/ whose __init__.py exposes:
         "page": "page.js",           # ES module in the package folder, served at /modules/<id>/page.js
         "schema": "schema.sql",      # optional, run at startup (use CREATE ... IF NOT EXISTS)
         "settings": [...],           # optional, extra .env keys shown on the settings page
+        "startup": async_fn,         # optional, awaited once when the dashboard starts
         "description": "...",
     }
 

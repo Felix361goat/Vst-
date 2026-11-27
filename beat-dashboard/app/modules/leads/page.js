@@ -77,6 +77,10 @@ async function tabToday(el) {
       <div class="card"><h3>⭐ Beste neue Leads</h3>${raw(best.items.length ? leadRows(best.items, false) : '<p class="muted small">Keine neuen Leads.</p>')}
         <p class="small muted">${tot.n} gesamt · ${tot.ig} mit Instagram · ${tot.em} mit E-Mail · ${tot.ph} mit Telefon</p></div>
     </div>
+    ${raw(kind === 'artist' ? html`<div class="card"><div class="row"><h3 style="margin:0">🎵 Neue Releases deiner Artists</h3><span class="spacer"></span>
+      <span class="small muted" id="radar-last"></span><button class="btn sm" id="radar-run">Jetzt prüfen</button></div>
+      <p class="small muted">Täglich automatisch über Deezer. Ein frischer Release ist der beste Moment für eine DM – „Glückwunsch + konkrete Video-Idee“.</p>
+      <div id="radar"></div></div>` : '')}
     ${raw(kind === 'restaurant' ? html`<div class="card"><div class="row"><h3 style="margin:0">🚶 Walk-in-Route für heute</h3><span class="spacer"></span>
       <select id="r-d" style="width:auto"><option value="">Alle Gebiete</option></select>
       <select id="r-n" style="width:auto">${[5, 6, 8, 10].map(n => raw(html`<option ${raw(n === 6 ? 'selected' : '')}>${n}</option>`))}</select><span class="small muted">Stopps</span>
@@ -87,6 +91,29 @@ async function tabToday(el) {
   el.querySelector('#go-find')?.addEventListener('click', e => { e.preventDefault(); document.querySelector('#tabs [data-t=find]').click(); });
   wireRows(el);
   if (kind === 'restaurant') wireRoute(el);
+  if (kind === 'artist') wireRadar(el);
+}
+
+async function wireRadar(el) {
+  const box = el.querySelector('#radar');
+  const show = async () => {
+    const [r, tpls] = await Promise.all([api('/api/leads/radar?days=45'), api('/api/leads/templates?kind=artist')]);
+    el.querySelector('#radar-last').textContent = r.last_run ? `zuletzt: ${r.last_run}` : 'noch nie geprüft';
+    const tpl = tpls.find(t => /release/i.test(t.name));
+    box.innerHTML = r.releases.length ? html`<div class="vids">${r.releases.slice(0, 12).map(x => raw(html`<div class="vid">
+        ${raw(x.cover ? html`<img src="${x.cover}" alt="" loading="lazy" style="aspect-ratio:1">` : '')}
+        <div><b>${x.title}</b><br><span class="muted">${x.name} · ${x.type} · ${x.release_date}</span>
+        <div class="row" style="margin-top:6px"><button class="btn sm primary" data-dm="${x.lead_id}">DM schreiben</button><a class="btn sm ghost" href="${x.link}" target="_blank" rel="noopener">Anhören ↗︎</a></div></div></div>`))}</div>`
+      : '<p class="small muted">Keine neuen Releases in den letzten 45 Tagen.</p>';
+    box.querySelectorAll('[data-dm]').forEach(b => b.addEventListener('click', () => { if (tpl) store('leads.tpl.artist', String(tpl.id)); openLead(Number(b.dataset.dm)); }));
+  };
+  el.querySelector('#radar-run').addEventListener('click', async () => {
+    const b = el.querySelector('#radar-run'); b.disabled = true; b.textContent = 'prüfe …';
+    const { job } = await api('/api/leads/radar', { method: 'POST' });
+    for (;;) { await new Promise(r => setTimeout(r, 1500)); const j = await api('/api/core/jobs/' + job); if (j.status !== 'running') { toast(`${j.result?.new_releases ?? 0} neue Releases gefunden`, 'ok'); break; } }
+    b.disabled = false; b.textContent = 'Jetzt prüfen'; show();
+  });
+  show();
 }
 
 async function wireRoute(el) {
@@ -111,7 +138,7 @@ async function wireRoute(el) {
   });
 }
 
-const actLabel = a => ({ contact: `✉️ angeschrieben (${CH[a.channel] || a.channel})`, reply: '↩️ hat geantwortet', note: '📝 Notiz', call: '📞 Anruf', visit: '🚶 besucht', letter: '✉️ Brief', status: '🔀 Status', check: '☑️' }[a.type] || a.type);
+const actLabel = a => ({ contact: `✉️ angeschrieben (${CH[a.channel] || a.channel})`, reply: '↩️ hat geantwortet', note: '📝 Notiz', call: '📞 Anruf', visit: '🚶 besucht', letter: '✉️ Brief', status: '🔀 Status', check: '☑️', release: '🎵 Release' }[a.type] || a.type);
 
 function leadRows(items, showDue) {
   return html`<table class="tbl">${items.map(l => raw(html`<tr>
@@ -262,7 +289,7 @@ async function openLead(id) {
       l.phone && html`<a class="btn sm" href="tel:${l.phone}">Anrufen</a>`,
       l.website && html`<a class="btn sm" href="${l.website.startsWith('http') ? l.website : 'https://' + l.website}" target="_blank" rel="noopener">Website ↗︎</a>`,
       l.lat && html`<a class="btn sm" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.name + ' ' + (l.address || ''))}" target="_blank" rel="noopener">Maps ↗︎</a>`,
-      ...['youtube', 'spotify', 'soundcloud', 'tiktok'].filter(x => ex[x]).map(x => html`<a class="btn sm ghost" href="${ex[x]}" target="_blank" rel="noopener">${x} ↗︎</a>`),
+      ...['youtube', 'spotify', 'soundcloud', 'tiktok', 'deezer'].filter(x => ex[x]).map(x => html`<a class="btn sm ghost" href="${ex[x]}" target="_blank" rel="noopener">${x} ↗︎</a>`),
       !l.instagram && k === 'artist' && html`<a class="btn sm ghost" href="https://www.google.com/search?q=${encodeURIComponent(l.name + ' rapper instagram')}" target="_blank" rel="noopener">IG suchen ↗︎</a>`,
       !l.instagram && k !== 'artist' && html`<a class="btn sm ghost" href="https://www.google.com/search?q=${encodeURIComponent(l.name + ' ' + (l.district || '') + ' instagram')}" target="_blank" rel="noopener">IG suchen ↗︎</a>`,
     ].filter(Boolean);
@@ -406,6 +433,7 @@ function tabFind(el) {
       <p class="small muted">Name, Adresse, Telefon, Website, Instagram & Küche – gratis. Danach optional Impressum/Kontakt-Seiten nach E-Mail & Instagram durchsuchen.</p>
       ${Object.entries(groups).map(([g, list]) => raw(html`<h4 style="margin:14px 0 6px">${g}</h4><div class="row" style="gap:4px 14px">${list.map(a => raw(html`<label class="switch small"><input type="checkbox" data-area="${a.id}" ${raw(savedAreas.has(a.id) ? 'checked' : '')}> ${a.label}</label>`))}</div>`))}
       <h4 style="margin:14px 0 6px">Art</h4><div class="row" style="gap:4px 14px">${Object.entries(M.types).map(([t, l]) => raw(html`<label class="switch small"><input type="checkbox" data-type="${t}" ${raw(['restaurant', 'cafe'].includes(t) ? 'checked' : '')}> ${l}</label>`))}</div>
+      <p class="small muted">🆕 Gebiete, die du einmal durchsucht hast, prüft das Dashboard jede Woche automatisch erneut – neu aufgetauchte Lokale werden als vermutliche Neueröffnung markiert (die brauchen jetzt Content!).</p>
       <div class="row" style="margin-top:14px"><label class="switch"><input type="checkbox" id="enrich" checked> Websites nach E-Mail & Instagram durchsuchen</label><span class="spacer"></span><button class="btn primary" id="run-r">Lokale suchen</button></div>
       <div id="job"></div></div>
     <div class="card"><h3>🔎 Fehlende Kontaktdaten ergänzen</h3><p class="small muted">Durchsucht Website + Impressum/Kontakt-Seite der Lokale ohne E-Mail oder Instagram (max. 150 pro Lauf, beste Leads zuerst).</p>
@@ -467,6 +495,7 @@ async function runJob(box, url, body) {
         const r = j.result || {};
         const parts = [`<b>${r.new ?? 0} neue Leads</b>`, `${r.updated ?? 0} ergänzt`];
         if (r.with_instagram != null) parts.push(`${r.with_instagram} mit Instagram`);
+        if (r.new_openings) parts.push(`🆕 ${r.new_openings} vermutliche Neueröffnungen`);
         for (const k of ['email', 'instagram', 'phone']) if (r['found_' + k] != null) parts.push(`${r['found_' + k]}× ${k} gefunden`);
         box.innerHTML = html`<div class="card hint small">✓ Fertig: ${raw(parts.join(' · '))}${raw((r.errors || []).length ? html`<div class="neg">${r.errors.join(' | ')}</div>` : '')}
           <div class="row" style="margin-top:8px"><button class="btn sm primary" id="to-list">Zur Liste</button></div></div>`;

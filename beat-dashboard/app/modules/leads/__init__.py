@@ -1,4 +1,4 @@
-from .router import router
+from .router import router, startup
 
 MODULE = {
     "id": "leads",
@@ -9,6 +9,7 @@ MODULE = {
     "router": router,
     "page": "page.js",
     "schema": "schema.sql",
+    "startup": startup,
     "settings": [
         {"key": "MY_NAME", "label": "Dein Name (für Nachrichten)", "secret": False, "help": "z.B. Felix"},
         {"key": "MY_BEZIRK", "label": "Dein Ort / Bezirk", "secret": False, "help": "z.B. Mödling"},

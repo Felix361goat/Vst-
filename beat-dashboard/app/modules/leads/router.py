@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from ... import db, jobs
 from ...config import settings
-from .services import artists, enrich, osm, pipeline
+from .services import artists, enrich, osm, pipeline, radar
 
 router = APIRouter()
 
@@ -105,6 +105,7 @@ def upsert(c, lead: dict) -> str:
     cols = ["kind", "name", "instagram", "email", "phone", "website", "address", "district", "lat", "lon", "category",
             "source", "source_id", "score", "extra", "flags", "followers", "notes"]
     vals = [json.dumps(lead.get(k) or {}, ensure_ascii=False) if k in JSON_FIELDS else lead.get(k) for k in cols]
+    # (flags is a JSON field too - qualifiers like new_opening count towards the score)
     c.execute(f"INSERT INTO leads({', '.join(cols)}) VALUES({', '.join('?' * len(cols))})", vals)
     return "new"
 
@@ -365,10 +366,21 @@ async def _find_restaurants(job, body: RestaurantFind):
             counts.setdefault("errors", []).append(f"{a.split(':')[-1]}: {e}")
             continue
         with db.tx() as c:
+            key = f"osm_scanned:{a}"
+            scanned_before = c.execute("SELECT value FROM settings_meta WHERE key=?", (key,)).fetchone()
             before = c.execute("SELECT COALESCE(MAX(id),0) FROM leads").fetchone()[0]
             for lead in found:
+                if scanned_before:  # wasn't there last time -> probably a new opening
+                    lead["flags"] = {"new_opening": True}
                 counts[upsert(c, lead)] += 1
-            new_ids += [r[0] for r in c.execute("SELECT id FROM leads WHERE id>? AND kind='restaurant'", (before,))]
+            fresh = [r[0] for r in c.execute("SELECT id FROM leads WHERE id>? AND kind='restaurant'", (before,))]
+            new_ids += fresh
+            if scanned_before:
+                counts["new_openings"] = counts.get("new_openings", 0) + len(fresh)
+                for lid in fresh:
+                    _log(c, lid, "note", f"🆕 Neu auf OpenStreetMap seit {scanned_before[0]} – vermutlich Neueröffnung")
+                    c.execute("UPDATE leads SET next_action_date=? WHERE id=?", (date.today().isoformat(), lid))
+            c.execute("INSERT OR REPLACE INTO settings_meta(key, value) VALUES(?,?)", (key, date.today().isoformat()))
     if counts.get("errors") and not (counts["new"] or counts["updated"] or counts["same"]):
         raise RuntimeError(" | ".join(counts["errors"]))
     job.update(done=len(body.areas), message=f"{counts['new']} neue Lokale")
@@ -584,14 +596,20 @@ def delete_template(tid: int):
 
 
 @router.get("/leads/{lid}/render/{tid}")
-def render_template(lid: int, tid: int):
+def render_template(lid: int, tid: int, song: str = ""):
     with db.tx() as c:
         lead = _get(c, lid)
         t = c.execute("SELECT * FROM lead_templates WHERE id=?", (tid,)).fetchone()
     if not t:
         raise HTTPException(404)
-    body = pipeline.render(t["body"], lead, me())
-    subject = pipeline.render(t["subject"] or "", lead, me())
+    extra = {"song": song} if song else {}
+    if not song and lead["kind"] == "artist":
+        with db.tx() as c:
+            r = c.execute("SELECT title FROM artist_releases WHERE lead_id=? ORDER BY release_date DESC LIMIT 1", (lid,)).fetchone()
+        if r:
+            extra["song"] = r[0]
+    body = pipeline.render(t["body"], lead, me(), extra)
+    subject = pipeline.render(t["subject"] or "", lead, me(), extra)
     return {"subject": subject, "body": body, "channel": t["channel"],
             "open_placeholders": sorted(set(re.findall(r"\{(\w+)\}", body + subject))),
             "compliance": COMPLIANCE.get(t["channel"])}
@@ -644,3 +662,38 @@ def rescore():
         for l in rows:
             c.execute("UPDATE leads SET score=? WHERE id=?", (pipeline.score(l), l["id"]))
     return {"updated": len(rows)}
+
+
+
+# ---------------------------------------------------------------- release radar
+async def _radar_job(job):
+    return await radar.scan(job)
+
+
+@router.post("/radar")
+async def run_radar():
+    return {"job": jobs.start("Release-Radar", _radar_job)}
+
+
+@router.get("/radar")
+def get_radar(days: int = 60):
+    return {"releases": radar.recent(days), "last_run": radar.last_run()}
+
+
+async def _weekly_osm(job, areas: list[str]):
+    return await _find_restaurants(job, RestaurantFind(areas=areas, types=["restaurant", "cafe", "bar", "fast_food"], enrich=True))
+
+
+async def startup():
+    """Called once when the dashboard starts: release radar (daily), re-scan known areas for new openings (weekly)."""
+    week_ago = (date.today() - timedelta(days=7)).isoformat()
+    with db.tx() as c:
+        stale = [r[0].split(":", 1)[1] for r in c.execute(
+            "SELECT key FROM settings_meta WHERE key LIKE 'osm_scanned:%' AND value<=?", (week_ago,))]
+    if stale:
+        jobs.start("Neueröffnungen suchen (wöchentlich)", _weekly_osm, stale[:6])
+    if radar.last_run() != date.today().isoformat():
+        with db.tx() as c:
+            n = c.execute("SELECT COUNT(*) FROM leads WHERE kind='artist' AND archived=0").fetchone()[0]
+        if n:
+            jobs.start("Release-Radar (täglich)", _radar_job)

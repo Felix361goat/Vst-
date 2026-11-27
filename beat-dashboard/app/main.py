@@ -19,6 +19,12 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cache.purge_expired()
+    for m in registry.LOADED:  # optional per-module startup hooks (e.g. daily background checks)
+        if m.get("startup"):
+            try:
+                await m["startup"]()
+            except Exception:
+                logging.getLogger("beat-dashboard").exception("Startup-Hook von %s fehlgeschlagen", m["id"])
     yield
     await net.close()
 

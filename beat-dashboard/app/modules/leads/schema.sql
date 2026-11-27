@@ -41,3 +41,11 @@ CREATE TABLE IF NOT EXISTS lead_templates(
     kind TEXT, channel TEXT, name TEXT, subject TEXT, body TEXT,
     sort INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS artist_releases(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    release_id TEXT NOT NULL, title TEXT, type TEXT, release_date TEXT, link TEXT, cover TEXT,
+    seen_at TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE(lead_id, release_id)
+);

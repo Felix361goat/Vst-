@@ -25,6 +25,10 @@ MB_QUERIES = {
 }
 RAP_TAGS = {"hip hop", "hip-hop", "rap", "trap", "german hip hop", "cloud rap", "drill", "austrian hip hop", "deutschrap",
             "gangsta rap", "conscious hip hop", "boom bap", "hiphop", "rnb", "r&b", "afrobeats", "pop rap", "emo rap"}
+CORE_RAP = {"rap", "trap", "drill", "deutschrap", "german hip hop", "austrian hip hop", "gangsta rap", "cloud rap",
+            "pop rap", "emo rap", "conscious hip hop"}
+NOT_CLIENT_TAGS = {"lo-fi", "lofi", "lo-fi hip hop", "lofi hip hop", "chillhop", "jazz hop", "jazzhop", "instrumental hip hop",
+                   "trip hop", "electronic", "techno", "house", "ambient", "downtempo", "beats"}
 _mb_last = 0.0
 _mb_lock = asyncio.Lock()
 
@@ -89,6 +93,8 @@ async def musicbrainz(job, regions: list[str], limit_lookups: int = 120) -> list
                 tags = {t["name"].lower() for t in a.get("tags", [])}
                 if tags and not tags & RAP_TAGS:
                     continue
+                if tags & NOT_CLIENT_TAGS and not tags & CORE_RAP:
+                    continue  # lofi/instrumental producers don't need music videos
                 found.setdefault(a["id"], {"name": a["name"], "area": (a.get("area") or {}).get("name"),
                                            "begin": (a.get("begin-area") or {}).get("name"),
                                            "tags": [t["name"] for t in a.get("tags", [])][:5], "type": a.get("type")})

@@ -174,7 +174,7 @@ DEFAULT_TEMPLATES = [
 MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
 
 
-def render(body: str, lead: dict, me: dict) -> str:
+def render(body: str, lead: dict, me: dict, extra: dict | None = None) -> str:
     first = (lead.get("name") or "").split()[0] if lead.get("kind") == "artist" else lead.get("name", "")
     nxt = MONTHS[date.today().month % 12]
     values = {
@@ -182,5 +182,6 @@ def render(body: str, lead: dict, me: dict) -> str:
         "mein_name": me.get("name") or "[DEIN NAME]", "mein_bezirk": me.get("bezirk") or "Mödling",
         "mein_telefon": me.get("phone") or "[TELEFON]", "portfolio": me.get("portfolio") or "[PORTFOLIO-LINK]",
         "monat": nxt,
+        **(extra or {}),
     }
     return re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1), m.group(0)), body)
