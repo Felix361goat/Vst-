@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import cache, db, registry
+from . import cache, db, jobs, registry
 from .config import DEFAULTS, SECRET_KEYS, mask, settings
 from .net import client
 
@@ -143,3 +143,24 @@ def quota():
         "youtube_search_budget": int(settings.get("YT_SEARCH_BUDGET", "90") or 90),
         "other": {k: v for k, v in used.items() if not k.startswith("youtube")},
     }
+
+
+@router.get("/jobs")
+def list_jobs():
+    return jobs.running()
+
+
+@router.get("/jobs/{job_id}")
+def get_job(job_id: str):
+    j = jobs.get(job_id)
+    if not j:
+        raise HTTPException(404, "Job nicht gefunden")
+    return j.public()
+
+
+@router.delete("/jobs/{job_id}")
+def cancel_job(job_id: str):
+    j = jobs.get(job_id)
+    if j:
+        j.cancelled = True
+    return {"ok": True}

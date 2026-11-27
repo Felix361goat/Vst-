@@ -9,8 +9,8 @@ export default {
   async mount(el, ctx) {
     K = await api('/api/seo/knowledge');
     el.innerHTML = html`
-      <h1>🎯 YouTube SEO</h1>
-      <p class="muted">Beat beschreiben oder hochladen → das Dashboard prüft echte Suchnachfrage und Konkurrenz und schreibt Titel, Tags und Beschreibung.</p>
+      <h1>YouTube SEO</h1>
+      <p class="lead">Beat beschreiben oder hochladen → das Dashboard prüft echte Suchnachfrage und Konkurrenz und schreibt Titel, Tags und Beschreibung.</p>
       <div class="tabs" id="tabs">
         <button data-t="new" class="active">🎵 Neuer Beat</button>
         <button data-t="explore">🔎 Keyword-Explorer</button>

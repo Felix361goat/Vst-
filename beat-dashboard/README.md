@@ -1,6 +1,6 @@
 # 🎛️ Beat Dashboard
 
-Dein lokales Dashboard für den Beat-Kanal. Es läuft auf deinem PC im Browser, und deine Daten und Keys bleiben bei dir.
+Dein lokales Dashboard für Beat-Kanal und Video-Business. Es läuft auf deinem PC im Browser, und deine Daten und Keys bleiben bei dir.
 
 **Modul 1: YouTube SEO für Type Beats.** So funktioniert es:
 
@@ -69,6 +69,40 @@ Außerdem in den Einstellungen eintragen:
 - **Bonus** für frische Top-Videos, Outlier und steigende Künstler.
 
 Die Regeln und Genre-Daten stehen in `app/modules/seo/services/knowledge.py` und dürfen gern angepasst werden.
+
+
+## 🤝 Leads & CRM
+
+Hier findest du **Rapper/Artists** und **Restaurants** in Wien und im Bezirk Mödling. Du schreibst sie an und trackst alles bis zur Buchung.
+
+**Lead-Finder**
+- **Restaurants** kommen aus OpenStreetMap (gratis): Name, Adresse, Telefon, Website, Instagram, Küche.
+  - Du wählst ganz Wien, einzelne Wiener Bezirke oder Gemeinden im Bezirk Mödling.
+  - Optional durchsucht das Dashboard die Website und die **Impressum-/Kontaktseite** nach E-Mail und Instagram.
+- **Artists** kommen aus MusicBrainz und Wikidata (gratis). Mit YouTube-Key kommen **Newcomer** über ihre YouTube-Kanäle dazu: Die Kanalbeschreibung enthält meist den Instagram-Namen und eine Booking-Mail.
+- **Copy & Paste:** Instagram-Profile, die du selbst findest (#wienrap, #austrorap …), einfach als Liste einfügen.
+- CSV-Import und -Export funktionieren mit Excel.
+
+**CRM**
+- **Heute:** fällige Follow-ups, beste neue Leads, Antwortquote, Umsatz, DM-Zähler (max. ~15 pro Tag).
+- **Pipeline:** Kanban-Board. Karten per Drag & Drop in die nächste Spalte ziehen.
+- **Liste:** Filter, Suche, Mehrfachauswahl. Ein Klick auf **„✓ Kontaktiert“** oder **„↩︎ Antwort“** reicht.
+  - Das Dashboard setzt dann den Status und plant das nächste Follow-up selbst.
+  - Takt bei Artists: Tag 4, Tag 7, dann 60 Tage Pause.
+- **Lead-Details:**
+  - Checkliste (Warm-up, Portfolio geschickt, Anzahlung …) und Qualifizierung, die den Score erhöht.
+  - Deal-Wert, Notizen, Verlauf.
+  - Nachricht aus einer Vorlage, mit Platzhaltern wie `{song}`, die du persönlich ausfüllst.
+  - **„Kopieren & als kontaktiert markieren“** öffnet gleich das Instagram-Profil.
+- **Sperrliste:** Wer keinen Kontakt will, wird nie wieder vorgeschlagen, auch nicht bei neuen Suchen.
+
+**⚖️ Wichtig (Österreich, § 174 TKG):**
+- Werbe-E-Mails und Werbeanrufe brauchen **vorher eine Einwilligung, auch bei Firmen**.
+- Bei Restaurants daher: **vorbeigehen** (Di–Do 14:30–17:00) oder einen Brief schicken, dort fragen, ob du Beispiele mailen darfst, und *dann* mailen.
+- Instagram-DMs nur persönlich und 1:1, keine Massennachrichten.
+- Details stehen im Tab „Regeln & Tipps“. Das ist keine Rechtsberatung.
+
+In den Einstellungen trägst du deinen Namen, deinen Ort, deine Telefonnummer und deinen Portfolio-Link für die Vorlagen ein.
 
 ## 🧩 Später erweitern (eigene Module)
 

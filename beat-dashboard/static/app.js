@@ -50,6 +50,12 @@ export async function refreshStatus() {
       chip(h.anthropic, 'Claude KI', h.anthropic ? 'Key eingetragen' : 'optional'),
       html`<div class="quota">YT heute: ${q.youtube_searches}/${q.youtube_search_budget} Suchen · ${q.youtube_units} Einh.</div>`,
     ].join('');
+    if (modules.some(m => m.id === 'leads')) {
+      const st = await api('/api/leads/stats');
+      const a = nav.querySelector('a[data-id=leads]');
+      a?.querySelector('.badge-n')?.remove();
+      if (a && st.due) a.insertAdjacentHTML('beforeend', `<span class="badge-n" title="Follow-ups fällig">${st.due}</span>`);
+    }
   } catch { /* server restarting */ }
 }
 
@@ -57,27 +63,34 @@ export async function refreshStatus() {
 async function mountHome(el) {
   const [h, q] = await Promise.all([api('/api/core/health'), api('/api/core/quota')]);
   const k = await api('/api/seo/knowledge').catch(() => null);
+  const st = modules.some(m => m.id === 'leads') ? await api('/api/leads/stats').catch(() => null) : null;
+  const hr = new Date().getHours();
+  const hello = hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Hallo' : 'Guten Abend';
   const tiles = modules.map(m => html`<a class="tile" href="#/${m.id}"><div class="tile-ico">${m.icon}</div><b>${m.name}</b><small>${m.description}</small></a>`).join('');
   el.innerHTML = html`
-    <h1>Willkommen 👋</h1>
-    <p class="muted">Dein lokales Dashboard. Läuft nur auf deinem PC, deine Keys bleiben hier.</p>
-    ${raw(!h.youtube ? `<div class="card hint">💡 <b>Tipp:</b> Trag unter <a href="#/settings">Einstellungen</a> einen kostenlosen YouTube-API-Key ein. Dann misst das Dashboard die echte Konkurrenz (Uploads, Views, Kanalgrößen) statt sie zu schätzen.</div>` : '')}
+    <h1>${hello} 👋</h1>
+    <p class="lead">${new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' })} · Läuft lokal auf deinem PC.</p>
+    ${raw(st ? html`<div class="grid4">
+      <a class="card stat tile" href="#/leads"><span class="v" style="color:${st.due ? 'var(--red)' : 'inherit'}">${st.due}</span><span class="l">Follow-ups fällig</span></a>
+      <div class="card stat"><span class="v">${st.contacted_week}</span><span class="l">Kontakte diese Woche</span></div>
+      <div class="card stat"><span class="v">${st.reply_rate == null ? '–' : st.reply_rate + ' %'}</span><span class="l">Antwortquote</span></div>
+      <div class="card stat"><span class="v">${st.won}</span><span class="l">Gebucht · ${fmt(Math.round(st.won_value))} €</span></div></div>` : '')}
+    ${raw(!h.youtube ? `<div class="card hint">💡 Trag unter <a href="#/settings">Einstellungen</a> einen kostenlosen YouTube-API-Key ein – dann misst das Dashboard echte Konkurrenz und findet Newcomer-Rapper über ihre YouTube-Kanäle.</div>` : '')}
     <div class="tiles">${raw(tiles)}</div>
     <div class="grid2">
       <div class="card">
         <h3>📈 Deine Phase</h3>
-        ${raw(k ? html`<p><b>${k.stage.name}</b> · ${fmt(k.subs)} Abos</p><p class="muted">${k.stage.advice}</p>` : '')}
-        <p class="muted small">Abozahl unter Einstellungen pflegen oder Kanal-ID eintragen.</p>
+        ${raw(k ? html`<p><b>${k.stage.name}</b> · ${fmt(k.subs)} Abos</p><p class="muted small">${k.stage.advice}</p>` : '')}
       </div>
       <div class="card">
         <h3>🔋 YouTube-Kontingent heute</h3>
         <div class="bar"><div style="width:${Math.min(100, 100 * q.youtube_searches / q.youtube_search_budget)}%"></div></div>
-        <p class="small">${q.youtube_searches} / ${q.youtube_search_budget} Suchen · ${q.youtube_units} / ${q.youtube_budget} Einheiten · Reset um 9:00 (MEZ)</p>
+        <p class="small muted">${q.youtube_searches} / ${q.youtube_search_budget} Suchen · ${q.youtube_units} / ${q.youtube_budget} Einheiten · Reset 9:00</p>
       </div>
     </div>
     <div class="card"><h3>🚀 Aufsteigende Künstler mit Type-Beat-Nachfrage</h3>
-      <p class="muted small">Spotify-Hörer wachsen gerade (kworb.net) <i>und</i> Leute suchen nach "… type beat". Früh dran sein = wenig Konkurrenz.</p>
-      <div id="rising" class="loading">Wird geladen (beim ersten Mal ~20 Sek.) …</div></div>`;
+      <p class="muted small">Spotify-Hörer wachsen gerade (kworb.net) <i>und</i> Leute suchen „… type beat“. Früh dran sein = wenig Konkurrenz.</p>
+      <div id="rising" class="loading"><span class="spinner"></span> Wird geladen (beim ersten Mal ~20 Sek.) …</div></div>`;
   try {
     const r = await api('/api/seo/rising');
     document.getElementById('rising').outerHTML = r.rising.length ? html`<table class="tbl"><tr><th>Künstler</th><th>Monatl. Hörer</th><th>Wachstum/Tag</th><th>Suchen</th><th></th></tr>
@@ -92,7 +105,7 @@ async function mountHome(el) {
 async function mountSettings(el) {
   const [items, mods] = await Promise.all([api('/api/core/settings'), api('/api/core/modules')]);
   el.innerHTML = html`
-    <h1>⚙️ Einstellungen</h1>
+    <h1>Einstellungen</h1>
     <p class="muted">Gespeichert in <code>beat-dashboard/.env</code> auf deinem PC. Keys werden nie vollständig angezeigt.</p>
     <form id="sf" class="card form">
       ${items.map(s => raw(html`
